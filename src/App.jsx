@@ -39,7 +39,42 @@ function App() {
   const [customerAuthError, setCustomerAuthError] = useState("");
   const [loggedCustomer, setLoggedCustomer] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoClickCount, setLogoClickCount] = useState(0);
   const [loggedBusiness, setLoggedBusiness] = useState(null);
+
+const [adminLogin, setAdminLogin] = useState({
+  email: "",
+  password: "",
+});
+
+const [adminError, setAdminError] = useState("");
+
+const [adminBusinesses, setAdminBusinesses] = useState(
+  businesses.map((business) => ({
+    ...business,
+    reservationActive: true,
+    aiMenuActive: false,
+    email:
+      business.id === 1
+        ? "sky@rezpoint.com"
+        : business.id === 2
+        ? "qbar@rezpoint.com"
+        : "sushinn@rezpoint.com",
+    password: "1234",
+    menuText: "",
+  }))
+);
+const [showAddBusinessForm, setShowAddBusinessForm] = useState(false);
+
+const [newBusinessForm, setNewBusinessForm] = useState({
+  name: "",
+  type: "",
+  location: "",
+  icon: "",
+  email: "",
+  password: "",
+});
+
 
   const [customerForm, setCustomerForm] = useState({
     name: "",
@@ -296,23 +331,32 @@ function getDistributionList(field) {
     setPage("summary");
   }
 
-  function handleBusinessLogin() {
-  const account = businessAccounts.find(
+ function handleBusinessLogin() {
+  const business = adminBusinesses.find(
     (item) =>
       item.email === businessLogin.email &&
       item.password === businessLogin.password
   );
-  
 
-  if (account) {
-    const business = businesses.find((item) => item.id === account.businessId);
-
+  if (business) {
     setLoggedBusiness(business);
     setLoginError("");
     setPanelTab("incoming");
     setPage("businessPanel");
   } else {
     setLoginError("Wrong email or password.");
+  }
+}
+
+function handleAdminLogin() {
+  if (
+    adminLogin.email === "admin@rezpoint.com" &&
+    adminLogin.password === "0000"
+  ) {
+    setAdminError("");
+    setPage("adminPanel");
+  } else {
+    setAdminError("Wrong admin email or password.");
   }
 }
 function closeDayReservations() {
@@ -403,11 +447,20 @@ setRegisteredCustomers((prevCustomers) =>
   return (
     <div className="page">
       <nav className="navbar">
-        <div
+       <div
   className="logo"
   onClick={() => {
-    setPage("home");
-    setMobileMenuOpen(false);
+    const newCount = logoClickCount + 1;
+
+    if (newCount >= 5) {
+      setLogoClickCount(0);
+      setPage("adminLogin");
+      setMobileMenuOpen(false);
+    } else {
+      setLogoClickCount(newCount);
+      setPage("home");
+      setMobileMenuOpen(false);
+    }
   }}
 >
   <img src={logo} alt="RezPoint Logo" />
@@ -502,7 +555,9 @@ setRegisteredCustomers((prevCustomers) =>
           <p className="description">Select where you want to create your reservation.</p>
 
           <div className="business-grid">
-            {businesses.map((business) => (
+           {adminBusinesses
+  .filter((business) => business.reservationActive)
+  .map((business) => (
               <div className="business-card" key={business.id}>
                 <div className="business-icon">{business.icon}</div>
                 <h3>{business.name}</h3>
@@ -1353,6 +1408,258 @@ setRegisteredCustomers((prevCustomers) =>
           </div>
         </section>
       )}
+      {page === "adminLogin" && (
+  <section className="reservation-section">
+    <div className="reservation-box">
+      <h1>Admin Login</h1>
+      <p className="description">RezPoint management panel.</p>
+
+      <form className="reservation-form">
+        <input
+          type="email"
+          placeholder="Admin Email"
+          value={adminLogin.email}
+          onChange={(e) =>
+            setAdminLogin({ ...adminLogin, email: e.target.value })
+          }
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={adminLogin.password}
+          onChange={(e) =>
+            setAdminLogin({ ...adminLogin, password: e.target.value })
+          }
+        />
+
+        {adminError && <p className="error-message">{adminError}</p>}
+
+        <button type="button" onClick={handleAdminLogin}>
+          Login
+        </button>
+      </form>
+    </div>
+  </section>
+)}
+
+{page === "adminPanel" && (
+  <section className="business-panel-section">
+    <div className="business-panel-header">
+      <div>
+        <h1>RezPoint Admin Panel</h1>
+        <p className="description">
+          Manage businesses, AI Menu access and platform statistics.
+        </p>
+      </div>
+
+      <button
+        className="nav-button"
+        onClick={() => {
+          setAdminLogin({ email: "", password: "" });
+          setPage("home");
+        }}
+      >
+        Logout
+      </button>
+    </div>
+
+    <div className="stats-grid">
+      <div className="stat-card">
+        <span>Businesses</span>
+        <strong>{adminBusinesses.length}</strong>
+      </div>
+
+      <div className="stat-card">
+        <span>Customers</span>
+        <strong>{registeredCustomers.length}</strong>
+      </div>
+
+      <div className="stat-card">
+        <span>Reservations</span>
+        <strong>{reservations.length}</strong>
+      </div>
+
+      <div className="stat-card">
+        <span>AI Menu Active</span>
+        <strong>
+          {adminBusinesses.filter((business) => business.aiMenuActive).length}
+        </strong>
+      </div>
+    </div>
+
+    <div className="reservation-box" style={{ marginTop: "24px" }}>
+      <h2>Businesses</h2>
+      <button
+  className="primary-btn"
+  style={{ marginBottom: "20px" }}
+  onClick={() => setShowAddBusinessForm(!showAddBusinessForm)}
+>
+  + Add Business
+</button>
+{showAddBusinessForm && (
+  <form className="reservation-form" style={{ marginBottom: "24px" }}>
+    <input
+      type="text"
+      placeholder="Business Name"
+      value={newBusinessForm.name}
+      onChange={(e) =>
+        setNewBusinessForm({ ...newBusinessForm, name: e.target.value })
+      }
+    />
+
+    <input
+      type="text"
+      placeholder="Business Type"
+      value={newBusinessForm.type}
+      onChange={(e) =>
+        setNewBusinessForm({ ...newBusinessForm, type: e.target.value })
+      }
+    />
+
+    <input
+      type="text"
+      placeholder="Location"
+      value={newBusinessForm.location}
+      onChange={(e) =>
+        setNewBusinessForm({ ...newBusinessForm, location: e.target.value })
+      }
+    />
+
+    <input
+      type="text"
+      placeholder="Icon emoji e.g. 🍸"
+      value={newBusinessForm.icon}
+      onChange={(e) =>
+        setNewBusinessForm({ ...newBusinessForm, icon: e.target.value })
+      }
+    />
+
+    <input
+      type="email"
+      placeholder="Business Login Email"
+      value={newBusinessForm.email}
+      onChange={(e) =>
+        setNewBusinessForm({ ...newBusinessForm, email: e.target.value })
+      }
+    />
+
+    <input
+      type="password"
+      placeholder="Business Login Password"
+      value={newBusinessForm.password}
+      onChange={(e) =>
+        setNewBusinessForm({ ...newBusinessForm, password: e.target.value })
+      }
+    />
+
+    <button
+      type="button"
+      onClick={() => {
+        if (
+          !newBusinessForm.name ||
+          !newBusinessForm.type ||
+          !newBusinessForm.location ||
+          !newBusinessForm.email ||
+          !newBusinessForm.password
+        ) {
+          alert("Please fill all required fields.");
+          return;
+        }
+
+        const newBusiness = {
+          id: Date.now(),
+          name: newBusinessForm.name,
+          type: newBusinessForm.type,
+          location: newBusinessForm.location,
+          icon: newBusinessForm.icon || "🏢",
+          email: newBusinessForm.email,
+          password: newBusinessForm.password,
+          reservationActive: true,
+          aiMenuActive: false,
+          menuText: "",
+        };
+
+        setAdminBusinesses([...adminBusinesses, newBusiness]);
+
+        setNewBusinessForm({
+          name: "",
+          type: "",
+          location: "",
+          icon: "",
+          email: "",
+          password: "",
+        });
+
+        setShowAddBusinessForm(false);
+      }}
+    >
+      Create Business
+    </button>
+  </form>
+)}
+
+      {adminBusinesses.map((business) => (
+        <div className="accepted-list-item" key={business.id}>
+          <div>
+            <strong>{business.name}</strong>
+            <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
+              {business.type} • {business.location}
+            </p>
+
+            <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
+              Reservations: {business.reservationActive ? "Active" : "Disabled"}
+            </p>
+
+            <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
+              AI Menu: {business.aiMenuActive ? "Active" : "Disabled"}
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              className={
+                business.reservationActive ? "selected-time" : "time-btn"
+              }
+              onClick={() => {
+                setAdminBusinesses(
+                  adminBusinesses.map((item) =>
+                    item.id === business.id
+                      ? {
+                          ...item,
+                          reservationActive: !item.reservationActive,
+                        }
+                      : item
+                  )
+                );
+              }}
+            >
+              Reservation {business.reservationActive ? "ON" : "OFF"}
+            </button>
+
+            <button
+              className={business.aiMenuActive ? "selected-time" : "time-btn"}
+              onClick={() => {
+                setAdminBusinesses(
+                  adminBusinesses.map((item) =>
+                    item.id === business.id
+                      ? {
+                          ...item,
+                          aiMenuActive: !item.aiMenuActive,
+                        }
+                      : item
+                  )
+                );
+              }}
+            >
+              AI Menu {business.aiMenuActive ? "ON" : "OFF"}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
 
       {page === "businessPanel" && (
         <section className="business-panel-section">
