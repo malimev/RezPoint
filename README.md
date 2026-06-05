@@ -1,16 +1,76 @@
-# React + Vite
+# RezPoint
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+RezPoint is a reservation platform I started building to make reservations easier for both customers and businesses.
 
-Currently, two official plugins are available:
+The goal is simple: customers can create reservations in seconds, while businesses can manage requests, track customer activity, and gain useful insights from their reservations.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Current Features
 
-## React Compiler
+* Customer registration and login
+* Business login panel
+* Reservation creation and management
+* Accept / Reject reservation requests
+* Customer notifications
+* Reservation cancellation
+* Safe Score system
+* Completed and No Show tracking
+* Customer analytics
+* Admin panel
+* Dynamic business creation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Planned Features
 
-## Expanding the ESLint configuration
+* Supabase integration
+* AI Menu Assistant
+* QR based menu access
+* Business management tools
+* Push notifications
+* Multi-language support
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Technologies
+
+* React
+* Vite
+* JavaScript
+* CSS
+
+This project is currently under active development.
+------------------------------------------------------------
+
+# RezPoint
+
+RezPoint, müşteriler ve işletmeler için rezervasyon sürecini daha kolay hale getirmek amacıyla geliştirmeye başladığım bir platformdur.
+
+Amaç; müşterilerin hızlı şekilde rezervasyon oluşturabilmesi, işletmelerin ise rezervasyonlarını yönetebilmesi ve müşterileri hakkında faydalı veriler elde edebilmesidir.
+
+## Mevcut Özellikler
+
+* Müşteri kayıt ve giriş sistemi
+* İşletme giriş paneli
+* Rezervasyon oluşturma
+* Rezervasyon kabul / red işlemleri
+* Bildirim sistemi
+* Rezervasyon iptali
+* Safe Score sistemi
+* Completed ve No Show takibi
+* Müşteri analizi
+* Admin paneli
+* Dinamik işletme ekleme
+
+## Planlanan Özellikler
+
+* Supabase entegrasyonu
+* AI Menü Asistanı
+* QR kod destekli menü sistemi
+* İşletme yönetim araçları
+* Anlık bildirimler
+* Çoklu dil desteği
+
+## Kullanılan Teknolojiler
+
+* React
+* Vite
+* JavaScript
+* CSS
+
+Proje aktif olarak geliştirilmeye devam etmektedir.
