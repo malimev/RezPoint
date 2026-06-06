@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 import logo from "./assets/logo.png";
+import { supabase } from "./supabaseClient";
 
 const businesses = [
   { id: 1, name: "Sky Lounge", type: "Bar & Lounge", location: "İskele", icon: "🍸" },
@@ -14,6 +15,7 @@ const businessAccounts = [
 ];
 
 function App() {
+  
   const [page, setPage] = useState("home");
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [error, setError] = useState("");
@@ -41,6 +43,7 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [loggedBusiness, setLoggedBusiness] = useState(null);
+  const [isCreatingReservation, setIsCreatingReservation] = useState(false);
 
 const [adminLogin, setAdminLogin] = useState({
   email: "",
@@ -101,6 +104,69 @@ const [newBusinessForm, setNewBusinessForm] = useState({
     email: "",
     password: "",
   });
+
+  useEffect(() => {
+  const testSupabase = async () => {
+    const { data, error } = await supabase
+      .from("businesses")
+      .select("*");
+      if (data) {
+  const formattedBusinesses = data.map((business) => ({
+    id: business.id,
+    name: business.name,
+    email: business.email,
+    password: business.password,
+    reservationActive: business.reservation_enabled,
+    aiMenuActive: business.ai_menu_enabled,
+    menuText: business.menu_text || "",
+    type: business.type || "Business",
+    location: business.location || "",
+    icon: business.icon || "🏢",
+  }));
+ 
+  const { data: reservationData, error: reservationError } = await supabase
+  .from("reservations")
+  .select("*");
+
+if (reservationError) {
+  console.log("Reservations fetch error:", reservationError);
+}
+
+if (reservationData) {
+  const formattedReservations = reservationData.map((rez) => ({
+    id: rez.id,
+    business: rez.business,
+    businessId: rez.business_id,
+    fullName: rez.full_name,
+    email: rez.email,
+    phone: rez.phone,
+    date: rez.date,
+    time: rez.time,
+    guests: rez.guests,
+    note: rez.note,
+    safeScore: rez.safe_score,
+    code: rez.code,
+    status: rez.status,
+    customerProfile: {
+      gender: rez.gender,
+      birthDate: rez.birth_date,
+      job: rez.job,
+      smoking: rez.smoking,
+    },
+  }));
+
+  setReservations(formattedReservations);
+}
+
+  setAdminBusinesses(formattedBusinesses);
+}
+
+    console.log("DATA:", data);
+    console.log("ERROR:", error);
+  };
+
+  testSupabase();
+}, []);
 
   
 
@@ -674,8 +740,12 @@ setRegisteredCustomers((prevCustomers) =>
             <div className="card-row"><span>Note</span><strong>{reservation.note || "No note"}</strong></div>
 
             <button
-              className="primary-btn"
-              onClick={() => {
+  className="primary-btn"
+  disabled={isCreatingReservation}
+  onClick={async () => {
+    if (isCreatingReservation) return;
+
+    setIsCreatingReservation(true);
                 const newCode = generateReservationCode();
                 setReservationCode(newCode);
 
@@ -701,11 +771,48 @@ setRegisteredCustomers((prevCustomers) =>
 },
                 };
 
+                const { error } = await supabase
+  .from("reservations")
+  .insert([
+    {
+      business_id: selectedBusiness.id,
+      business: selectedBusiness.name,
+
+      full_name: loggedCustomer.name,
+      email: loggedCustomer.email,
+      phone: reservation.phone,
+
+      date: reservation.date,
+      time: reservation.time,
+      guests: Number(reservation.guests),
+      note: reservation.note,
+
+      safe_score: loggedCustomer.safeScore ?? 100,
+      code: newCode,
+      status: "pending",
+
+      gender: customerProfile.gender,
+      birth_date: customerProfile.birthDate,
+      job: customerProfile.job,
+      smoking: customerProfile.smoking,
+
+      user_email: loggedCustomer.email,
+    },
+  ]);
+
+if (error) {
+  console.log("Reservation insert error:", error);
+  alert("Rezervasyon oluşturulamadı.");
+  setIsCreatingReservation(false);
+  return;
+}
+
                 setReservations([...reservations, newReservation]);
+                setIsCreatingReservation(false);
                 setPage("success");
               }}
             >
-              Confirm & Send
+              {isCreatingReservation ? "Creating Reservation..." : "Confirm & Send"}
             </button>
           </div>
         </section>
@@ -1235,31 +1342,48 @@ setRegisteredCustomers((prevCustomers) =>
             </div>
 
            {rez.status === "pending" ? (
-  <button
-    type="button"
-    className="cancel-reservation-btn"
-    onClick={(e) => {
-      e.stopPropagation();
+ <button
+  type="button"
+  className="cancel-reservation-btn"
+  onClick={async (e) => {
+    e.stopPropagation();
 
-      if (!window.confirm("Cancel this reservation?")) {
-        return;
-      }
+    console.log("CANCEL CLICKED");
 
-      setReservations(
-        reservations.map((item) =>
-          item.id === rez.id
-            ? {
-                ...item,
-                status: "cancelled",
-                businessMessage: "Customer cancelled this reservation.",
-              }
-            : item
-        )
-      );
-    }}
-  >
-    Cancel
-  </button>
+    if (!window.confirm("Cancel this reservation?")) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("reservations")
+      .update({
+        status: "cancelled",
+      })
+      .eq("id", rez.id);
+
+    console.log("Cancel error:", error);
+    console.log("Rez ID:", rez.id);
+
+    if (error) {
+      alert("Rezervasyon iptal edilemedi.");
+      return;
+    }
+
+    setReservations(
+      reservations.map((item) =>
+        item.id === rez.id
+          ? {
+              ...item,
+              status: "cancelled",
+              businessMessage: "Customer cancelled this reservation.",
+            }
+          : item
+      )
+    );
+  }}
+>
+  Cancel
+</button>
 ) : (
   <span>{rez.status}</span>
 )}
@@ -1304,31 +1428,46 @@ setRegisteredCustomers((prevCustomers) =>
             </div>
 
             {rez.status === "pending" ? (
-  <button
-    type="button"
-    className="cancel-reservation-btn"
-    onClick={(e) => {
-      e.stopPropagation();
+<button
+  type="button"
+  className="cancel-reservation-btn"
+  onClick={async (e) => {
+    e.stopPropagation();
 
-      if (!window.confirm("Cancel this reservation?")) {
-        return;
-      }
+    if (!window.confirm("Cancel this reservation?")) {
+      return;
+    }
 
-      setReservations(
-        reservations.map((item) =>
-          item.id === rez.id
-            ? {
-                ...item,
-                status: "cancelled",
-                businessMessage: "Customer cancelled this reservation.",
-              }
-            : item
-        )
-      );
-    }}
-  >
-    Cancel
-  </button>
+    const { error } = await supabase
+      .from("reservations")
+      .update({
+        status: "cancelled",
+      })
+      .eq("id", rez.id);
+
+    console.log("Cancel error:", error);
+    console.log("Rez ID:", rez.id);
+
+    if (error) {
+      alert("Rezervasyon iptal edilemedi.");
+      return;
+    }
+
+    setReservations(
+      reservations.map((item) =>
+        item.id === rez.id
+          ? {
+              ...item,
+              status: "cancelled",
+              businessMessage: "Customer cancelled this reservation.",
+            }
+          : item
+      )
+    );
+  }}
+>
+  Cancel
+</button>
 ) : (
   <span>{rez.status}</span>
 )}
@@ -1555,7 +1694,7 @@ setRegisteredCustomers((prevCustomers) =>
 
     <button
       type="button"
-      onClick={() => {
+      onClick={async () => {
         if (
           !newBusinessForm.name ||
           !newBusinessForm.type ||
@@ -1567,20 +1706,41 @@ setRegisteredCustomers((prevCustomers) =>
           return;
         }
 
-        const newBusiness = {
-          id: Date.now(),
-          name: newBusinessForm.name,
-          type: newBusinessForm.type,
-          location: newBusinessForm.location,
-          icon: newBusinessForm.icon || "🏢",
-          email: newBusinessForm.email,
-          password: newBusinessForm.password,
-          reservationActive: true,
-          aiMenuActive: false,
-          menuText: "",
-        };
+      const { data, error } = await supabase
+  .from("businesses")
+  .insert([
+    {
+      name: newBusinessForm.name,
+      email: newBusinessForm.email,
+      password: newBusinessForm.password,
+      reservation_enabled: true,
+      ai_menu_enabled: false,
+    },
+  ])
+  .select();
 
-        setAdminBusinesses([...adminBusinesses, newBusiness]);
+if (error) {
+  console.log("Add business error:", error);
+  alert("Business eklenirken hata oldu.");
+  return;
+}
+
+const addedBusiness = data[0];
+
+const formattedBusiness = {
+  id: addedBusiness.id,
+  name: addedBusiness.name,
+  email: addedBusiness.email,
+  password: addedBusiness.password,
+  reservationActive: addedBusiness.reservation_enabled,
+  aiMenuActive: addedBusiness.ai_menu_enabled,
+  menuText: "",
+  type: newBusinessForm.type || "Business",
+  location: newBusinessForm.location || "",
+  icon: newBusinessForm.icon || "🏢",
+};
+
+setAdminBusinesses([...adminBusinesses, formattedBusiness]);
 
         setNewBusinessForm({
           name: "",
@@ -1621,39 +1781,108 @@ setRegisteredCustomers((prevCustomers) =>
               className={
                 business.reservationActive ? "selected-time" : "time-btn"
               }
-              onClick={() => {
-                setAdminBusinesses(
-                  adminBusinesses.map((item) =>
-                    item.id === business.id
-                      ? {
-                          ...item,
-                          reservationActive: !item.reservationActive,
-                        }
-                      : item
-                  )
-                );
-              }}
+              onClick={async () => {
+
+  const newValue = !business.reservationActive;
+
+  const { error } = await supabase
+    .from("businesses")
+    .update({
+      reservation_enabled: newValue,
+    })
+    .eq("id", business.id);
+
+  if (error) {
+    console.log(error);
+    alert("Reservation durumu güncellenemedi.");
+    return;
+  }
+
+  setAdminBusinesses(
+    adminBusinesses.map((item) =>
+      item.id === business.id
+        ? {
+            ...item,
+            reservationActive: !item.reservationActive,
+          }
+        : item
+    )
+  );
+}}
             >
               Reservation {business.reservationActive ? "ON" : "OFF"}
             </button>
 
             <button
               className={business.aiMenuActive ? "selected-time" : "time-btn"}
-              onClick={() => {
-                setAdminBusinesses(
-                  adminBusinesses.map((item) =>
-                    item.id === business.id
-                      ? {
-                          ...item,
-                          aiMenuActive: !item.aiMenuActive,
-                        }
-                      : item
-                  )
-                );
-              }}
+              onClick={async () => {
+
+  const newValue = !business.aiMenuActive;
+
+  const { error } = await supabase
+    .from("businesses")
+    .update({
+      ai_menu_enabled: newValue,
+    })
+    .eq("id", business.id);
+
+  if (error) {
+    console.log(error);
+    alert("AI Menu durumu güncellenemedi.");
+    return;
+  }
+
+  setAdminBusinesses(
+    adminBusinesses.map((item) =>
+      item.id === business.id
+        ? {
+            ...item,
+            aiMenuActive: !item.aiMenuActive,
+          }
+        : item
+    )
+  );
+}}
             >
               AI Menu {business.aiMenuActive ? "ON" : "OFF"}
             </button>
+            <button
+  className="time-btn"
+  style={{ color: "#fca5a5", borderColor: "#fca5a5" }}
+  onClick={async () => {
+    const confirmDelete = window.confirm(
+      `${business.name} işletmesini silmek istediğine emin misin? Bu işletmeye ait rezervasyonlar da silinecek.`
+    );
+
+    if (!confirmDelete) return;
+
+    const { error } = await supabase
+      .from("businesses")
+      .delete()
+      .eq("id", business.id);
+
+    if (error) {
+      console.log("Delete business error:", error);
+      alert("Business silinirken hata oldu.");
+      return;
+    }
+
+    setAdminBusinesses(
+      adminBusinesses.filter((item) => item.id !== business.id)
+    );
+
+    setReservations(
+      reservations.filter((rez) => rez.businessId !== business.id)
+    );
+
+    if (loggedBusiness?.id === business.id) {
+      setLoggedBusiness(null);
+      setPage("home");
+    }
+  }}
+>
+  Delete Business
+</button>
           </div>
         </div>
       ))}
@@ -1770,8 +1999,20 @@ setRegisteredCustomers((prevCustomers) =>
   <div style={{ display: "flex", gap: "10px" }}>
     <button
       className="primary-btn"
-      onClick={(e) => {
+      onClick={async (e) => {
         e.stopPropagation();
+        const { error } = await supabase
+  .from("reservations")
+  .update({
+    status: "accepted",
+  })
+  .eq("id", rez.id);
+
+if (error) {
+  console.log("Accept error:", error);
+  alert("Rezervasyon kabul edilemedi.");
+  return;
+}
         setReservations(
           reservations.map((item) =>
             item.id === rez.id
@@ -1791,21 +2032,35 @@ setRegisteredCustomers((prevCustomers) =>
 
     <button
       className="reject-btn"
-      onClick={(e) => {
-        e.stopPropagation();
-        setReservations(
-          reservations.map((item) =>
-            item.id === rez.id
-              ? {
-                  ...item,
-                  status: "rejected",
-                  businessMessage:
-                    "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️",
-                }
-              : item
-          )
-        );
-      }}
+      onClick={async (e) => {
+  e.stopPropagation();
+
+  const { error } = await supabase
+    .from("reservations")
+    .update({
+      status: "rejected",
+    })
+    .eq("id", rez.id);
+
+  if (error) {
+    console.log("Reject error:", error);
+    alert("Rezervasyon reddedilemedi.");
+    return;
+  }
+
+  setReservations(
+    reservations.map((item) =>
+      item.id === rez.id
+        ? {
+            ...item,
+            status: "rejected",
+            businessMessage:
+              "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️",
+          }
+        : item
+    )
+  );
+}}
     >
       Reject
     </button>
