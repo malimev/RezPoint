@@ -3,8 +3,6 @@ import "./App.css";
 import logo from "./assets/logo.png";
 import { supabase } from "./supabaseClient";
 
-
-
 function App() {
   const [page, setPage] = useState("home");
   const [selectedBusiness, setSelectedBusiness] = useState(null);
@@ -46,7 +44,7 @@ function App() {
 
   const [adminError, setAdminError] = useState("");
 
- const [adminBusinesses, setAdminBusinesses] = useState([]);
+  const [adminBusinesses, setAdminBusinesses] = useState([]);
   const [showAddBusinessForm, setShowAddBusinessForm] = useState(false);
 
   const [newBusinessForm, setNewBusinessForm] = useState({
@@ -99,6 +97,13 @@ function App() {
           type: business.type || "Business",
           location: business.location || "",
           icon: business.icon || "🏢",
+          availabilityMode: business.availability_mode || "selected",
+          availableDays: business.available_days
+            ? business.available_days.split(",")
+            : ["Friday", "Saturday"],
+          availableTimes: business.available_times
+            ? business.available_times.split(",")
+            : ["18:00", "19:00", "20:30"],
         }));
 
         const { data: reservationData, error: reservationError } =
@@ -168,8 +173,17 @@ function App() {
         weekday: "long",
       });
 
+      const businessAvailabilityMode =
+  selectedBusiness?.availabilityMode || availabilityMode;
+
+const businessAvailableDays =
+  selectedBusiness?.availableDays?.length
+    ? selectedBusiness.availableDays
+    : availableDays;
+
       const shouldInclude =
-        availabilityMode === "everyday" || availableDays.includes(dayName);
+  businessAvailabilityMode === "everyday" ||
+  businessAvailableDays.includes(dayName);
 
       if (shouldInclude) {
         dates.push({
@@ -376,6 +390,21 @@ function App() {
 
     if (business) {
       setLoggedBusiness(business);
+
+      setAvailabilityMode(
+        business.availabilityMode || business.availability_mode || "selected",
+      );
+
+      setAvailableDays(
+        business.availableDays ||
+          (business.available_days ? business.available_days.split(",") : []),
+      );
+
+      setAvailableTimes(
+        business.availableTimes ||
+          (business.available_times ? business.available_times.split(",") : []),
+      );
+
       setLoginError("");
       setPanelTab("incoming");
       setPage("businessPanel");
@@ -438,6 +467,27 @@ function App() {
         alert("Close Day işlemi sırasında hata oldu.");
         return;
       }
+      const scoreChange = newStatus === "completed" ? 2 : -8;
+
+const { data: customerData } = await supabase
+  .from("customers")
+  .select("safe_score")
+  .eq("email", rez.email)
+  .single();
+
+if (customerData) {
+  const newSafeScore = Math.max(
+    0,
+    (customerData.safe_score || 100) + scoreChange
+  );
+
+  await supabase
+    .from("customers")
+    .update({
+      safe_score: newSafeScore,
+    })
+    .eq("email", rez.email);
+}
     }
 
     setReservations((prev) =>
@@ -705,7 +755,11 @@ function App() {
               </p>
 
               <div className="time-slots">
-                {availableTimes.map((time) => (
+                {(
+  selectedBusiness?.availableTimes?.length
+    ? selectedBusiness.availableTimes
+    : availableTimes
+).map((time) => (
                   <button
                     key={time}
                     type="button"
@@ -1195,19 +1249,7 @@ function App() {
                       </strong>
                     </div>
 
-                    <div className="card-row">
-                      <span>Accepted</span>
-                      <strong>
-                        {
-                          reservations.filter(
-                            (rez) =>
-                              rez.email === loggedCustomer.email &&
-                              rez.status === "accepted",
-                          ).length
-                        }
-                      </strong>
-                    </div>
-
+                   
                     <div className="card-row">
                       <span>Rejected</span>
                       <strong>
@@ -1220,6 +1262,44 @@ function App() {
                         }
                       </strong>
                     </div>
+                    <div className="card-row">
+  <span>Completed</span>
+  <strong>
+    {
+      reservations.filter(
+        (rez) =>
+          rez.email === loggedCustomer.email &&
+          rez.status === "completed",
+      ).length
+    }
+  </strong>
+</div>
+
+<div className="card-row">
+  <span>No Show</span>
+  <strong>
+    {
+      reservations.filter(
+        (rez) =>
+          rez.email === loggedCustomer.email &&
+          rez.status === "no-show",
+      ).length
+    }
+  </strong>
+</div>
+
+<div className="card-row">
+  <span>Cancelled</span>
+  <strong>
+    {
+      reservations.filter(
+        (rez) =>
+          rez.email === loggedCustomer.email &&
+          rez.status === "cancelled",
+      ).length
+    }
+  </strong>
+</div>
                   </div>
                 )}
                 {customerTab === "profile" && (
@@ -2630,7 +2710,22 @@ function App() {
                 <button
                   className="save-changes-btn"
                   style={{ marginTop: "20px" }}
-                  onClick={() => {
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from("businesses")
+                      .update({
+                        availability_mode: availabilityMode,
+                        available_days: availableDays.join(","),
+                        available_times: availableTimes.join(","),
+                      })
+                      .eq("id", loggedBusiness.id);
+
+                    if (error) {
+                      console.log("Availability save error:", error);
+                      alert("Settings kaydedilemedi.");
+                      return;
+                    }
+
                     setSavedMessage("Changes updated successfully ✅");
 
                     setTimeout(() => {
