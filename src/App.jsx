@@ -27,7 +27,7 @@ function App() {
 
   const [reservationCode, setReservationCode] = useState("");
   const [reservations, setReservations] = useState([]);
-  const [loadingReservationId, setLoadingReservationId] = useState(null)
+  const [loadingReservationId, setLoadingReservationId] = useState(null);
 
   const [customerMode, setCustomerMode] = useState("login");
   const [registeredCustomers, setRegisteredCustomers] = useState([]);
@@ -176,16 +176,15 @@ function App() {
       });
 
       const businessAvailabilityMode =
-  selectedBusiness?.availabilityMode || availabilityMode;
+        selectedBusiness?.availabilityMode || availabilityMode;
 
-const businessAvailableDays =
-  selectedBusiness?.availableDays?.length
-    ? selectedBusiness.availableDays
-    : availableDays;
+      const businessAvailableDays = selectedBusiness?.availableDays?.length
+        ? selectedBusiness.availableDays
+        : availableDays;
 
       const shouldInclude =
-  businessAvailabilityMode === "everyday" ||
-  businessAvailableDays.includes(dayName);
+        businessAvailabilityMode === "everyday" ||
+        businessAvailableDays.includes(dayName);
 
       if (shouldInclude) {
         dates.push({
@@ -471,28 +470,25 @@ const businessAvailableDays =
       }
       const scoreChange = newStatus === "completed" ? 2 : -8;
 
-const { data: customerData } = await supabase
-  .from("customers")
-  .select("safe_score")
-  .eq("email", rez.email)
-  .single();
+      const { data: customerData } = await supabase
+        .from("customers")
+        .select("safe_score")
+        .eq("email", rez.email)
+        .single();
 
-if (customerData) {
-  const newSafeScore = Math.min(
-  100,
-  Math.max(
-    0,
-    (customerData.safe_score || 100) + scoreChange
-  )
-);
+      if (customerData) {
+        const newSafeScore = Math.min(
+          100,
+          Math.max(0, (customerData.safe_score || 100) + scoreChange),
+        );
 
-  await supabase
-    .from("customers")
-    .update({
-      safe_score: newSafeScore,
-    })
-    .eq("email", rez.email);
-}
+        await supabase
+          .from("customers")
+          .update({
+            safe_score: newSafeScore,
+          })
+          .eq("email", rez.email);
+      }
     }
 
     setReservations((prev) =>
@@ -636,7 +632,6 @@ if (customerData) {
       {page === "home" && (
         <section className="hero">
           <div className="hero-text">
-            <p className="badge">AI Powered Reservation System</p>
             <h1>Smart reservations for modern businesses.</h1>
             <p className="description">
               Customers choose a business, select a date and time, then create a
@@ -760,11 +755,10 @@ if (customerData) {
               </p>
 
               <div className="time-slots">
-                {(
-  selectedBusiness?.availableTimes?.length
-    ? selectedBusiness.availableTimes
-    : availableTimes
-).map((time) => (
+                {(selectedBusiness?.availableTimes?.length
+                  ? selectedBusiness.availableTimes
+                  : availableTimes
+                ).map((time) => (
                   <button
                     key={time}
                     type="button"
@@ -1189,7 +1183,6 @@ if (customerData) {
                   <button
                     className={customerTab === "accepted" ? "active-tab" : ""}
                     onClick={() => setCustomerTab("accepted")}
-                    
                   >
                     Accepted
                   </button>
@@ -1255,7 +1248,6 @@ if (customerData) {
                       </strong>
                     </div>
 
-                   
                     <div className="card-row">
                       <span>Rejected</span>
                       <strong>
@@ -1269,43 +1261,43 @@ if (customerData) {
                       </strong>
                     </div>
                     <div className="card-row">
-  <span>Completed</span>
-  <strong>
-    {
-      reservations.filter(
-        (rez) =>
-          rez.email === loggedCustomer.email &&
-          rez.status === "completed",
-      ).length
-    }
-  </strong>
-</div>
+                      <span>Completed</span>
+                      <strong>
+                        {
+                          reservations.filter(
+                            (rez) =>
+                              rez.email === loggedCustomer.email &&
+                              rez.status === "completed",
+                          ).length
+                        }
+                      </strong>
+                    </div>
 
-<div className="card-row">
-  <span>No Show</span>
-  <strong>
-    {
-      reservations.filter(
-        (rez) =>
-          rez.email === loggedCustomer.email &&
-          rez.status === "no-show",
-      ).length
-    }
-  </strong>
-</div>
+                    <div className="card-row">
+                      <span>No Show</span>
+                      <strong>
+                        {
+                          reservations.filter(
+                            (rez) =>
+                              rez.email === loggedCustomer.email &&
+                              rez.status === "no-show",
+                          ).length
+                        }
+                      </strong>
+                    </div>
 
-<div className="card-row">
-  <span>Cancelled</span>
-  <strong>
-    {
-      reservations.filter(
-        (rez) =>
-          rez.email === loggedCustomer.email &&
-          rez.status === "cancelled",
-      ).length
-    }
-  </strong>
-</div>
+                    <div className="card-row">
+                      <span>Cancelled</span>
+                      <strong>
+                        {
+                          reservations.filter(
+                            (rez) =>
+                              rez.email === loggedCustomer.email &&
+                              rez.status === "cancelled",
+                          ).length
+                        }
+                      </strong>
+                    </div>
                   </div>
                 )}
                 {customerTab === "profile" && (
@@ -1576,51 +1568,53 @@ if (customerData) {
 
                             {rez.status === "pending" ? (
                               <button
-  type="button"
-  className="cancel-reservation-btn"
-  disabled={loadingReservationId === rez.id}
-  onClick={async (e) => {
-    setLoadingReservationId(rez.id);
+                                type="button"
+                                className="cancel-reservation-btn"
+                                disabled={loadingReservationId === rez.id}
+                                onClick={async (e) => {
+                                  setLoadingReservationId(rez.id);
 
-    e.stopPropagation();
+                                  e.stopPropagation();
 
-    if (!window.confirm("Cancel this reservation?")) {
-      setLoadingReservationId(null);
-      return;
-    }
+                                  if (
+                                    !window.confirm("Cancel this reservation?")
+                                  ) {
+                                    setLoadingReservationId(null);
+                                    return;
+                                  }
 
-    const { error } = await supabase
-      .from("reservations")
-      .update({
-        status: "cancelled",
-      })
-      .eq("id", rez.id);
+                                  const { error } = await supabase
+                                    .from("reservations")
+                                    .update({
+                                      status: "cancelled",
+                                    })
+                                    .eq("id", rez.id);
 
-    setLoadingReservationId(null);
+                                  setLoadingReservationId(null);
 
-    if (error) {
-      alert("Rezervasyon iptal edilemedi.");
-      return;
-    }
+                                  if (error) {
+                                    alert("Rezervasyon iptal edilemedi.");
+                                    return;
+                                  }
 
-    setReservations(
-      reservations.map((item) =>
-        item.id === rez.id
-          ? {
-              ...item,
-              status: "cancelled",
-              businessMessage:
-                "Customer cancelled this reservation.",
-            }
-          : item
-      )
-    );
-  }}
->
-  {loadingReservationId === rez.id
-    ? "Loading..."
-    : "Cancel"}
-</button>
+                                  setReservations(
+                                    reservations.map((item) =>
+                                      item.id === rez.id
+                                        ? {
+                                            ...item,
+                                            status: "cancelled",
+                                            businessMessage:
+                                              "Customer cancelled this reservation.",
+                                          }
+                                        : item,
+                                    ),
+                                  );
+                                }}
+                              >
+                                {loadingReservationId === rez.id
+                                  ? "Loading..."
+                                  : "Cancel"}
+                              </button>
                             ) : (
                               <span>{rez.status}</span>
                             )}
@@ -2292,87 +2286,89 @@ if (customerData) {
                           </span>
                         ) : (
                           <div style={{ display: "flex", gap: "10px" }}>
-                           <button
-  className="primary-btn"
-  disabled={loadingReservationId === rez.id}
-  onClick={async (e) => {
-    e.stopPropagation();
+                            <button
+                              className="primary-btn"
+                              disabled={loadingReservationId === rez.id}
+                              onClick={async (e) => {
+                                e.stopPropagation();
 
-    setLoadingReservationId(rez.id);
+                                setLoadingReservationId(rez.id);
 
-    const { data, error } = await supabase
-      .from("reservations")
-      .update({
-        status: "accepted",
-      })
-      .eq("id", rez.id)
-      .select();
+                                const { data, error } = await supabase
+                                  .from("reservations")
+                                  .update({
+                                    status: "accepted",
+                                  })
+                                  .eq("id", rez.id)
+                                  .select();
 
-    if (error) {
-      console.log("Accept error:", error);
-      alert("Rezervasyon kabul edilemedi.");
-      setLoadingReservationId(null);
-      return;
-    }
+                                if (error) {
+                                  console.log("Accept error:", error);
+                                  alert("Rezervasyon kabul edilemedi.");
+                                  setLoadingReservationId(null);
+                                  return;
+                                }
 
-   
+                                setReservations((prev) =>
+                                  prev.map((item) =>
+                                    item.id === rez.id
+                                      ? {
+                                          ...item,
+                                          status: "accepted",
+                                          businessMessage:
+                                            "Rezervasyonunuz oluşturuldu. Sizi bekliyoruz ❤️",
+                                        }
+                                      : item,
+                                  ),
+                                );
 
-    setReservations((prev) =>
-      prev.map((item) =>
-        item.id === rez.id
-          ? {
-              ...item,
-              status: "accepted",
-              businessMessage:
-                "Rezervasyonunuz oluşturuldu. Sizi bekliyoruz ❤️",
-            }
-          : item
-      )
-    );
+                                setLoadingReservationId(null);
+                              }}
+                            >
+                              {loadingReservationId === rez.id
+                                ? "Accepting..."
+                                : "Accept"}
+                            </button>
+                            <button
+                              className="reject-btn"
+                              disabled={loadingReservationId === rez.id}
+                              onClick={async (e) => {
+                                setLoadingReservationId(rez.id);
+                                e.stopPropagation();
 
-    setLoadingReservationId(null);
-  }}
->
-  {loadingReservationId === rez.id ? "Accepting..." : "Accept"}
-</button>
-                           <button
-  className="reject-btn"
-  disabled={loadingReservationId === rez.id}
-  onClick={async (e) => {
-    setLoadingReservationId(rez.id);
-    e.stopPropagation();
+                                const { error } = await supabase
+                                  .from("reservations")
+                                  .update({
+                                    status: "rejected",
+                                  })
+                                  .eq("id", rez.id);
 
-    const { error } = await supabase
-      .from("reservations")
-      .update({
-        status: "rejected",
-      })
-      .eq("id", rez.id);
+                                setLoadingReservationId(null);
 
-    setLoadingReservationId(null);
+                                if (error) {
+                                  console.log("Reject error:", error);
+                                  alert("Rezervasyon reddedilemedi.");
+                                  return;
+                                }
 
-    if (error) {
-      console.log("Reject error:", error);
-      alert("Rezervasyon reddedilemedi.");
-      return;
-    }
-
-    setReservations(
-      reservations.map((item) =>
-        item.id === rez.id
-          ? {
-              ...item,
-              status: "rejected",
-              businessMessage:
-                "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️",
-            }
-          : item
-      )
-    );
-  }}
->
-  {loadingReservationId === rez.id ? "Loading..." : "Reject"}
-</button>
+                                setReservations(
+                                  reservations.map((item) =>
+                                    item.id === rez.id
+                                      ? {
+                                          ...item,
+                                          status: "rejected",
+                                          businessMessage:
+                                            "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️",
+                                        }
+                                      : item,
+                                  ),
+                                );
+                              }}
+                            >
+                              {loadingReservationId === rez.id
+                                ? "Loading..."
+                                : "Reject"}
+                            </button>
                           </div>
                         )}
                       </div>
