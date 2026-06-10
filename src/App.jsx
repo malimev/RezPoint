@@ -27,6 +27,7 @@ function App() {
 
   const [reservationCode, setReservationCode] = useState("");
   const [reservations, setReservations] = useState([]);
+  const [loadingReservationId, setLoadingReservationId] = useState(null)
 
   const [customerMode, setCustomerMode] = useState("login");
   const [registeredCustomers, setRegisteredCustomers] = useState([]);
@@ -36,6 +37,7 @@ function App() {
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [loggedBusiness, setLoggedBusiness] = useState(null);
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const [adminLogin, setAdminLogin] = useState({
     email: "",
@@ -476,10 +478,13 @@ const { data: customerData } = await supabase
   .single();
 
 if (customerData) {
-  const newSafeScore = Math.max(
+  const newSafeScore = Math.min(
+  100,
+  Math.max(
     0,
     (customerData.safe_score || 100) + scoreChange
-  );
+  )
+);
 
   await supabase
     .from("customers")
@@ -1184,6 +1189,7 @@ if (customerData) {
                   <button
                     className={customerTab === "accepted" ? "active-tab" : ""}
                     onClick={() => setCustomerTab("accepted")}
+                    
                   >
                     Accepted
                   </button>
@@ -1570,52 +1576,51 @@ if (customerData) {
 
                             {rez.status === "pending" ? (
                               <button
-                                type="button"
-                                className="cancel-reservation-btn"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
+  type="button"
+  className="cancel-reservation-btn"
+  disabled={loadingReservationId === rez.id}
+  onClick={async (e) => {
+    setLoadingReservationId(rez.id);
 
-                                  console.log("CANCEL CLICKED");
+    e.stopPropagation();
 
-                                  if (
-                                    !window.confirm("Cancel this reservation?")
-                                  ) {
-                                    return;
-                                  }
+    if (!window.confirm("Cancel this reservation?")) {
+      setLoadingReservationId(null);
+      return;
+    }
 
-                                  const { data, error } = await supabase
-                                    .from("reservations")
-                                    .update({
-                                      status: "accepted",
-                                    })
-                                    .eq("id", rez.id)
-                                    .select();
+    const { error } = await supabase
+      .from("reservations")
+      .update({
+        status: "cancelled",
+      })
+      .eq("id", rez.id);
 
-                                  console.log("ACCEPT REZ ID:", rez.id);
-                                  console.log("ACCEPT DATA:", data);
-                                  console.log("ACCEPT ERROR:", error);
+    setLoadingReservationId(null);
 
-                                  if (error) {
-                                    alert("Rezervasyon iptal edilemedi.");
-                                    return;
-                                  }
+    if (error) {
+      alert("Rezervasyon iptal edilemedi.");
+      return;
+    }
 
-                                  setReservations(
-                                    reservations.map((item) =>
-                                      item.id === rez.id
-                                        ? {
-                                            ...item,
-                                            status: "cancelled",
-                                            businessMessage:
-                                              "Customer cancelled this reservation.",
-                                          }
-                                        : item,
-                                    ),
-                                  );
-                                }}
-                              >
-                                Cancel
-                              </button>
+    setReservations(
+      reservations.map((item) =>
+        item.id === rez.id
+          ? {
+              ...item,
+              status: "cancelled",
+              businessMessage:
+                "Customer cancelled this reservation.",
+            }
+          : item
+      )
+    );
+  }}
+>
+  {loadingReservationId === rez.id
+    ? "Loading..."
+    : "Cancel"}
+</button>
                             ) : (
                               <span>{rez.status}</span>
                             )}
@@ -2287,73 +2292,87 @@ if (customerData) {
                           </span>
                         ) : (
                           <div style={{ display: "flex", gap: "10px" }}>
-                            <button
-                              className="primary-btn"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                const { error } = await supabase
-                                  .from("reservations")
-                                  .update({
-                                    status: "accepted",
-                                  })
-                                  .eq("id", rez.id);
+                           <button
+  className="primary-btn"
+  disabled={loadingReservationId === rez.id}
+  onClick={async (e) => {
+    e.stopPropagation();
 
-                                if (error) {
-                                  console.log("Accept error:", error);
-                                  alert("Rezervasyon kabul edilemedi.");
-                                  return;
-                                }
-                                setReservations(
-                                  reservations.map((item) =>
-                                    item.id === rez.id
-                                      ? {
-                                          ...item,
-                                          status: "accepted",
-                                          businessMessage:
-                                            "Rezervasyonunuz oluşturuldu. Sizi bekliyoruz ❤️",
-                                        }
-                                      : item,
-                                  ),
-                                );
-                              }}
-                            >
-                              Accept
-                            </button>
+    setLoadingReservationId(rez.id);
 
-                            <button
-                              className="reject-btn"
-                              onClick={async (e) => {
-                                e.stopPropagation();
+    const { data, error } = await supabase
+      .from("reservations")
+      .update({
+        status: "accepted",
+      })
+      .eq("id", rez.id)
+      .select();
 
-                                const { error } = await supabase
-                                  .from("reservations")
-                                  .update({
-                                    status: "rejected",
-                                  })
-                                  .eq("id", rez.id);
+    if (error) {
+      console.log("Accept error:", error);
+      alert("Rezervasyon kabul edilemedi.");
+      setLoadingReservationId(null);
+      return;
+    }
 
-                                if (error) {
-                                  console.log("Reject error:", error);
-                                  alert("Rezervasyon reddedilemedi.");
-                                  return;
-                                }
+   
 
-                                setReservations(
-                                  reservations.map((item) =>
-                                    item.id === rez.id
-                                      ? {
-                                          ...item,
-                                          status: "rejected",
-                                          businessMessage:
-                                            "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️",
-                                        }
-                                      : item,
-                                  ),
-                                );
-                              }}
-                            >
-                              Reject
-                            </button>
+    setReservations((prev) =>
+      prev.map((item) =>
+        item.id === rez.id
+          ? {
+              ...item,
+              status: "accepted",
+              businessMessage:
+                "Rezervasyonunuz oluşturuldu. Sizi bekliyoruz ❤️",
+            }
+          : item
+      )
+    );
+
+    setLoadingReservationId(null);
+  }}
+>
+  {loadingReservationId === rez.id ? "Accepting..." : "Accept"}
+</button>
+                           <button
+  className="reject-btn"
+  disabled={loadingReservationId === rez.id}
+  onClick={async (e) => {
+    setLoadingReservationId(rez.id);
+    e.stopPropagation();
+
+    const { error } = await supabase
+      .from("reservations")
+      .update({
+        status: "rejected",
+      })
+      .eq("id", rez.id);
+
+    setLoadingReservationId(null);
+
+    if (error) {
+      console.log("Reject error:", error);
+      alert("Rezervasyon reddedilemedi.");
+      return;
+    }
+
+    setReservations(
+      reservations.map((item) =>
+        item.id === rez.id
+          ? {
+              ...item,
+              status: "rejected",
+              businessMessage:
+                "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️",
+            }
+          : item
+      )
+    );
+  }}
+>
+  {loadingReservationId === rez.id ? "Loading..." : "Reject"}
+</button>
                           </div>
                         )}
                       </div>
