@@ -1,7 +1,50 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import "./App.css";
 import logo from "./assets/logo.png";
 import { supabase } from "./supabaseClient";
+
+function Spinner() {
+  return <span className="spinner" />;
+}
+
+function ScoreBadge({ score }) {
+  const cls = score >= 80 ? "high" : score >= 50 ? "medium" : "low";
+  const label = score >= 80 ? "✓ Güvenilir" : score >= 50 ? "⚠ Orta" : "✕ Riskli";
+  return <span className={`score-badge ${cls}`}>{label} {score}/100</span>;
+}
+
+function StatusBadge({ status }) {
+  const labels = { pending:"Bekliyor", accepted:"Kabul", rejected:"Reddedildi", completed:"Tamamlandı", "no-show":"No Show", cancelled:"İptal" };
+  return <span className={`status-badge ${status}`}>{labels[status] || status}</span>;
+}
+
+function ProgressBar({ percent, color }) {
+  return (
+    <div className="progress-track">
+      <div className={`progress-fill ${color || ""}`} style={{ width: `${percent}%` }} />
+    </div>
+  );
+}
+
+function AnimatedNumber({ value }) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef(null);
+  useEffect(() => {
+    let start = 0;
+    const end = Number(value) || 0;
+    if (end === 0) { setDisplay(0); return; }
+    const step = Math.max(1, Math.ceil(end / 30));
+    clearInterval(ref.current);
+    ref.current = setInterval(() => {
+      start += step;
+      if (start >= end) { setDisplay(end); clearInterval(ref.current); }
+      else setDisplay(start);
+    }, 30);
+    return () => clearInterval(ref.current);
+  }, [value]);
+  return <>{display}</>;
+}
 
 function App() {
   const [page, setPage] = useState("home");
@@ -38,6 +81,20 @@ function App() {
   const [loggedBusiness, setLoggedBusiness] = useState(null);
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const [businessSearch, setBusinessSearch] = useState("");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+
+  const [businessProfileForm, setBusinessProfileForm] = useState({
+    name: "",
+    location: "",
+    phone: "",
+    description: "",
+    menu: "",
+  });
+  const [businessProfileSaved, setBusinessProfileSaved] = useState("");
+  const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
 
   const [adminLogin, setAdminLogin] = useState({
     email: "",
@@ -84,77 +141,153 @@ function App() {
     password: "",
   });
 
+  // ---------------------------------------------------------------------
+  // Initial data load
+  // ---------------------------------------------------------------------
   useEffect(() => {
-    const testSupabase = async () => {
-      const { data, error } = await supabase.from("businesses").select("*");
-      if (data) {
-        const formattedBusinesses = data.map((business) => ({
-          id: business.id,
-          name: business.name,
-          email: business.email,
-          password: business.password,
-          reservationActive: business.reservation_enabled,
-          aiMenuActive: business.ai_menu_enabled,
-          menuText: business.menu_text || "",
-          type: business.type || "Business",
-          location: business.location || "",
-          icon: business.icon || "🏢",
-          availabilityMode: business.availability_mode || "selected",
-          availableDays: business.available_days
-            ? business.available_days.split(",")
-            : ["Friday", "Saturday"],
-          availableTimes: business.available_times
-            ? business.available_times.split(",")
-            : ["18:00", "19:00", "20:30"],
-        }));
+    const loadInitialData = async () => {
+      // Businesses
+      const { data: businessData, error: businessError } = await supabase
+        .from("businesses")
+        .select("*");
 
-        const { data: reservationData, error: reservationError } =
-          await supabase.from("reservations").select("*");
+      if (businessError) {
+        console.log("Businesses fetch error:", businessError);
+      }
 
-        if (reservationError) {
-          console.log("Reservations fetch error:", reservationError);
-        }
+      if (businessData) {
+        const parseMenuText = (raw) => {
+          if (!raw) return { description: "", menu: "", phone: "" };
+          try {
+            const p = JSON.parse(raw);
+            if (p && typeof p === "object") return { description: p.description || "", menu: p.menu || "", phone: p.phone || "" };
+          } catch {}
+          return { description: "", menu: raw, phone: "" };
+        };
 
-        if (reservationData) {
-          const formattedReservations = reservationData.map((rez) => ({
-            id: rez.id,
-            business: rez.business,
-            businessId: rez.business_id,
-            fullName: rez.full_name,
-            email: rez.email,
-            phone: rez.phone,
-            date: rez.date,
-            time: rez.time,
-            guests: rez.guests,
-            note: rez.note,
-            safeScore: rez.safe_score,
-            code: rez.code,
-            status: rez.status,
-            customerProfile: {
-              gender: rez.gender,
-              birthDate: rez.birth_date,
-              job: rez.job,
-              smoking: rez.smoking,
-            },
-          }));
-
-          setReservations(formattedReservations);
-        }
+        const formattedBusinesses = businessData.map((business) => {
+          const parsed = parseMenuText(business.menu_text);
+          return {
+            id: business.id,
+            name: business.name,
+            email: business.email,
+            password: business.password,
+            reservationActive: business.reservation_enabled,
+            aiMenuActive: business.ai_menu_enabled,
+            menuText: business.menu_text || "",
+            description: parsed.description,
+            menu: parsed.menu,
+            phone: parsed.phone,
+            type: business.type || "Business",
+            location: business.location || "",
+            icon: business.icon || "🏢",
+            availabilityMode: business.availability_mode || "selected",
+            availableDays: business.available_days
+              ? business.available_days.split(",")
+              : ["Friday", "Saturday"],
+            availableTimes: business.available_times
+              ? business.available_times.split(",")
+              : ["18:00", "19:00", "20:30"],
+          };
+        });
 
         setAdminBusinesses(formattedBusinesses);
       }
 
-      console.log("DATA:", data);
-      console.log("ERROR:", error);
+      // Reservations
+      const { data: reservationData, error: reservationError } =
+        await supabase.from("reservations").select("*");
+
+      if (reservationError) {
+        console.log("Reservations fetch error:", reservationError);
+      }
+
+      if (reservationData) {
+        const formattedReservations = reservationData.map((rez) => ({
+          id: rez.id,
+          business: rez.business,
+          businessId: rez.business_id,
+          fullName: rez.full_name,
+          email: rez.email,
+          phone: rez.phone,
+          date: rez.date,
+          time: rez.time,
+          guests: rez.guests,
+          note: rez.note,
+          safeScore: rez.safe_score,
+          code: rez.code,
+          status: rez.status,
+          businessMessage: rez.business_message || "",
+          customerProfile: {
+            gender: rez.gender,
+            birthDate: rez.birth_date,
+            job: rez.job,
+            smoking: rez.smoking,
+          },
+        }));
+
+        setReservations(formattedReservations);
+      }
+
+      // Customers
+      // NOTE: previously this state was never populated, which meant
+      // safe-score updates inside closeDayReservations() never reached
+      // any actual customer record in local state.
+      const { data: customerData, error: customerError } = await supabase
+        .from("customers")
+        .select("*");
+
+      if (customerError) {
+        console.log("Customers fetch error:", customerError);
+      }
+
+      if (customerData) {
+        const formattedCustomers = customerData.map((customer) => ({
+          id: customer.id,
+          name: customer.name,
+          email: customer.email,
+          password: customer.password,
+          safeScore: customer.safe_score ?? 100,
+          profile: {
+            phone: customer.phone || "",
+            gender: customer.gender || "",
+            birthDate: customer.birth_date || "",
+            job: customer.job || "",
+            smoking: customer.smoking || "",
+          },
+        }));
+
+        setRegisteredCustomers(formattedCustomers);
+      }
     };
 
-    testSupabase();
+    loadInitialData();
   }, []);
 
-  function formatDate(dateValue) {
-    if (!dateValue) return "Choose date";
+  // ---------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------
 
-    const date = new Date(dateValue);
+  // Build a Date object from a "YYYY-MM-DD" string as a LOCAL date
+  // (avoids the off-by-one day issue caused by `new Date("YYYY-MM-DD")`
+  // being parsed as UTC midnight).
+  function parseLocalDate(dateValue) {
+    if (!dateValue) return null;
+
+    if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+      const [year, month, day] = dateValue.split("-").map(Number);
+      return new Date(year, month - 1, day);
+    }
+
+    return new Date(dateValue);
+  }
+
+  function formatDate(dateValue) {
+    if (!dateValue) return "Tarih seçin";
+
+    const date = parseLocalDate(dateValue);
+
+    if (!date || isNaN(date.getTime())) return "Tarih seçin";
 
     return date.toLocaleDateString("tr-TR", {
       day: "2-digit",
@@ -169,6 +302,7 @@ function App() {
 
     for (let i = 0; i < 14; i++) {
       const date = new Date();
+      date.setHours(0, 0, 0, 0);
       date.setDate(date.getDate() + i);
 
       const dayName = date.toLocaleDateString("en-US", {
@@ -250,9 +384,10 @@ function App() {
     const dayMap = {};
 
     accepted.forEach((rez) => {
-      const dayName = new Date(rez.date).toLocaleDateString("tr-TR", {
-        weekday: "long",
-      });
+      const dayDate = parseLocalDate(rez.date);
+      const dayName = dayDate
+        ? dayDate.toLocaleDateString("tr-TR", { weekday: "long" })
+        : "Bilinmiyor";
 
       if (!dayMap[dayName]) {
         dayMap[dayName] = 0;
@@ -284,9 +419,11 @@ function App() {
   }
 
   function getAgeGroup(birthDate) {
-    if (!birthDate) return "Not provided";
+    if (!birthDate) return "Belirtilmedi";
 
-    const birth = new Date(birthDate);
+    const birth = parseLocalDate(birthDate);
+    if (!birth || isNaN(birth.getTime())) return "Belirtilmedi";
+
     const today = new Date();
 
     let age = today.getFullYear() - birth.getFullYear();
@@ -299,7 +436,7 @@ function App() {
       age--;
     }
 
-    if (age < 18) return "Under 18";
+    if (age < 18) return "18 Altı";
     if (age <= 24) return "18-24";
     if (age <= 34) return "25-34";
     if (age <= 44) return "35-44";
@@ -311,12 +448,12 @@ function App() {
     const map = {};
 
     accepted.forEach((rez) => {
-      let value = "Not provided";
+      let value = "Belirtilmedi";
 
       if (field === "age") {
         value = getAgeGroup(rez.customerProfile?.birthDate);
       } else {
-        value = rez.customerProfile?.[field] || "Not provided";
+        value = rez.customerProfile?.[field] || "Belirtilmedi";
       }
 
       if (!map[value]) {
@@ -353,6 +490,10 @@ function App() {
     }
 
     setSelectedBusiness(business);
+    setReservation({ phone: "", date: "", time: "", guests: "", note: "" });
+    setDatePickerOpen(false);
+    setTimePickerOpen(false);
+    setError("");
     setPage("reservation");
   }
 
@@ -365,18 +506,27 @@ function App() {
 
   function sendReservation() {
     if (!loggedCustomer) {
-      setError("Please login before creating a reservation.");
+      setError("Rezervasyon oluşturmak için giriş yapın.");
       setCustomerMode("login");
       setPage("customerAuth");
       return;
     }
 
     if (reservation.phone === "")
-      return setError("Please enter your phone number.");
-    if (reservation.date === "") return setError("Please select a date.");
-    if (reservation.time === "") return setError("Please select a time.");
-    if (reservation.guests === "")
-      return setError("Please enter number of guests.");
+      return setError("Telefon numaranızı girin.");
+    if (reservation.date === "") return setError("Tarih seçin.");
+    if (reservation.time === "") return setError("Saat seçin.");
+
+    const guestsNumber = Number(reservation.guests);
+
+    if (
+      reservation.guests === "" ||
+      isNaN(guestsNumber) ||
+      guestsNumber < 1 ||
+      !Number.isInteger(guestsNumber)
+    ) {
+      return setError("Geçerli bir misafir sayısı girin (en az 1).");
+    }
 
     setError("");
     setPage("summary");
@@ -406,15 +556,27 @@ function App() {
           (business.available_times ? business.available_times.split(",") : []),
       );
 
+      setBusinessProfileForm({
+        name: business.name || "",
+        location: business.location || "",
+        phone: business.phone || "",
+        description: business.description || "",
+        menu: business.menu || "",
+      });
+
       setLoginError("");
       setPanelTab("incoming");
       setPage("businessPanel");
     } else {
-      setLoginError("Wrong email or password.");
+      setLoginError("Hatalı e-posta veya şifre.");
     }
   }
 
   function handleAdminLogin() {
+    // SECURITY NOTE: This check runs entirely in the browser, so the
+    // credentials below are visible to anyone who opens devtools / the
+    // bundled JS. For real protection this must be enforced server-side
+    // (e.g. Supabase Auth + Row Level Security policies), not here.
     if (
       adminLogin.email === "admin@rezpoint.com" &&
       adminLogin.password === "0000"
@@ -422,25 +584,28 @@ function App() {
       setAdminError("");
       setPage("adminPanel");
     } else {
-      setAdminError("Wrong admin email or password.");
+      setAdminError("Hatalı yönetici e-postası veya şifre.");
     }
   }
+
   async function closeDayReservations() {
-    const password = prompt("Enter security code to close the day:");
+    // SECURITY NOTE: same caveat as handleAdminLogin - this is a
+    // client-side-only check and is not a real access control.
+    const password = prompt("Günü kapatmak için güvenlik kodunu girin:");
 
     if (password !== "0000") {
-      alert("Wrong security code.");
+      alert("Hatalı güvenlik kodu.");
       return;
     }
     if (
       !window.confirm(
-        "Close this day? Checked customers will be marked as completed, unchecked customers as no-show.",
+        "Bu günü kapat? İşaretli müşteriler tamamlandı, işaretlenmeyenler no-show olarak işaretlenecek.",
       )
     ) {
       return;
     }
     if (!selectedAcceptedDate) {
-      alert("Please select a date first.");
+      alert("Önce bir tarih seçin.");
       return;
     }
 
@@ -451,46 +616,88 @@ function App() {
         rez.date === selectedAcceptedDate,
     );
 
+    if (targetReservations.length === 0) {
+      alert("Bu tarih için kabul edilmiş rezervasyon yok.");
+      return;
+    }
+
+    // Track score changes per customer email so we can apply them to
+    // local state (registeredCustomers / loggedCustomer) after the
+    // Supabase updates succeed.
+    const scoreChangesByEmail = {};
+
     for (const rez of targetReservations) {
       const newStatus = checkedInReservations.includes(rez.id)
         ? "completed"
         : "no-show";
 
-      const { error } = await supabase
+      const { error: reservationUpdateError } = await supabase
         .from("reservations")
         .update({
           status: newStatus,
         })
         .eq("id", rez.id);
 
-      if (error) {
-        console.log("Close day error:", error);
+      if (reservationUpdateError) {
+        console.log("Close day error:", reservationUpdateError);
         alert("Close Day işlemi sırasında hata oldu.");
         return;
       }
+
       const scoreChange = newStatus === "completed" ? 2 : -8;
 
-      const { data: customerData } = await supabase
+      scoreChangesByEmail[rez.email] =
+        (scoreChangesByEmail[rez.email] || 0) + scoreChange;
+    }
+
+    // Apply accumulated score changes to each affected customer.
+    for (const email of Object.keys(scoreChangesByEmail)) {
+      const { data: customerRow, error: customerFetchError } = await supabase
         .from("customers")
         .select("safe_score")
-        .eq("email", rez.email)
+        .eq("email", email)
         .single();
 
-      if (customerData) {
-        const newSafeScore = Math.min(
-          100,
-          Math.max(0, (customerData.safe_score || 100) + scoreChange),
-        );
+      if (customerFetchError || !customerRow) {
+        console.log("Customer fetch error for", email, customerFetchError);
+        continue;
+      }
 
-        await supabase
-          .from("customers")
-          .update({
-            safe_score: newSafeScore,
-          })
-          .eq("email", rez.email);
+      const currentScore = customerRow.safe_score ?? 100;
+      const newSafeScore = Math.min(
+        100,
+        Math.max(0, currentScore + scoreChangesByEmail[email]),
+      );
+
+      const { error: customerUpdateError } = await supabase
+        .from("customers")
+        .update({
+          safe_score: newSafeScore,
+        })
+        .eq("email", email);
+
+      if (customerUpdateError) {
+        console.log("Customer score update error for", email, customerUpdateError);
+        continue;
+      }
+
+      // Keep local state in sync with the database.
+      setRegisteredCustomers((prevCustomers) =>
+        prevCustomers.map((customer) =>
+          customer.email === email
+            ? { ...customer, safeScore: newSafeScore }
+            : customer,
+        ),
+      );
+
+      if (loggedCustomer && loggedCustomer.email === email) {
+        setLoggedCustomer((prev) =>
+          prev ? { ...prev, safeScore: newSafeScore } : prev,
+        );
       }
     }
 
+    // Update reservation statuses in local state.
     setReservations((prev) =>
       prev.map((rez) => {
         if (
@@ -510,50 +717,8 @@ function App() {
       }),
     );
 
-    const dayReservations = reservations.filter(
-      (rez) =>
-        rez.businessId === loggedBusiness.id &&
-        rez.status === "accepted" &&
-        rez.date === selectedAcceptedDate,
-    );
-
-    setRegisteredCustomers((prevCustomers) =>
-      prevCustomers.map((customer) => {
-        const customerDayReservations = dayReservations.filter(
-          (rez) => rez.email === customer.email,
-        );
-
-        if (customerDayReservations.length === 0) return customer;
-
-        let scoreChange = 0;
-
-        customerDayReservations.forEach((rez) => {
-          if (checkedInReservations.includes(rez.id)) {
-            scoreChange += 4;
-          } else {
-            scoreChange -= 8;
-          }
-        });
-
-        const currentScore = customer.safeScore ?? 100;
-        const newScore = Math.max(0, Math.min(100, currentScore + scoreChange));
-
-        if (loggedCustomer && loggedCustomer.email === customer.email) {
-          setLoggedCustomer({
-            ...customer,
-            safeScore: newScore,
-          });
-        }
-
-        return {
-          ...customer,
-          safeScore: newScore,
-        };
-      }),
-    );
-
     setCheckedInReservations([]);
-    alert("Day closed successfully.");
+    alert("Gün başarıyla kapatıldı.");
   }
   return (
     <div className="page">
@@ -592,7 +757,7 @@ function App() {
               setMobileMenuOpen(false);
             }}
           >
-            Create Reservation
+            Rezervasyon Oluştur
           </button>
 
           <button
@@ -607,7 +772,7 @@ function App() {
               setMobileMenuOpen(false);
             }}
           >
-            {loggedCustomer ? "My Account" : "Customer Login"}
+            {loggedCustomer ? "Hesabım" : "Müşteri Girişi"}
           </button>
 
           <button
@@ -617,7 +782,17 @@ function App() {
               setMobileMenuOpen(false);
             }}
           >
-            Business Login
+            İşletme Girişi
+          </button>
+
+          <button
+            className="nav-button"
+            onClick={() => {
+              setPage("contact");
+              setMobileMenuOpen(false);
+            }}
+          >
+            İletişim
           </button>
         </div>
       </nav>
@@ -632,33 +807,32 @@ function App() {
       {page === "home" && (
         <section className="hero">
           <div className="hero-text">
-            <h1>Smart reservations for modern businesses.</h1>
+            <h1>Modern işletmeler için akıllı rezervasyon.</h1>
             <p className="description">
-              Customers choose a business, select a date and time, then create a
-              reservation in seconds.
+              İşletmeyi seç, tarih ve saati belirle — saniyeler içinde rezervasyon oluştur.
             </p>
 
             <button
               className="hero-reservation-btn"
               onClick={goToReservationFlow}
             >
-              Create Reservation
+              Rezervasyon Oluştur
             </button>
           </div>
 
           <div className="hero-card">
-            <h3>How it works</h3>
+            <h3>Nasıl çalışır?</h3>
             <div className="card-row">
               <span>1</span>
-              <strong>Login or create account</strong>
+              <strong>Giriş yap veya hesap oluştur</strong>
             </div>
             <div className="card-row">
               <span>2</span>
-              <strong>Choose business</strong>
+              <strong>İşletme seç</strong>
             </div>
             <div className="card-row">
               <span>3</span>
-              <strong>Send request</strong>
+              <strong>İstek gönder</strong>
             </div>
           </div>
         </section>
@@ -667,29 +841,71 @@ function App() {
       {page === "businesses" && (
         <section className="business-section">
           <button className="back-btn" onClick={() => setPage("home")}>
-            ← Back
+            ← Geri
           </button>
 
-          <h1>Choose a business</h1>
+          <h1>İşletme Seç</h1>
           <p className="description">
-            Select where you want to create your reservation.
+            Rezervasyon oluşturmak istediğin işletmeyi seç.
           </p>
+
+          <div className="business-search-wrapper">
+            <span className="business-search-icon">🔍</span>
+            <input
+              className="business-search-input"
+              type="text"
+              placeholder="İşletme ara..."
+              value={businessSearch}
+              onChange={(e) => setBusinessSearch(e.target.value)}
+            />
+            {businessSearch && (
+              <button className="business-search-clear" onClick={() => setBusinessSearch("")}>✕</button>
+            )}
+          </div>
 
           <div className="business-grid">
             {adminBusinesses
-              .filter((business) => business.reservationActive)
-              .map((business) => (
-                <div className="business-card" key={business.id}>
-                  <div className="business-icon">{business.icon}</div>
-                  <h3>{business.name}</h3>
-                  <p>{business.type}</p>
-                  <span>{business.location}</span>
-
-                  <button onClick={() => openReservationForm(business)}>
-                    Select Business
-                  </button>
+              .filter((business) => business.reservationActive &&
+                (businessSearch === "" || business.name.toLowerCase().includes(businessSearch.toLowerCase()) || business.type.toLowerCase().includes(businessSearch.toLowerCase()) || business.location.toLowerCase().includes(businessSearch.toLowerCase()))
+              )
+              .map((business, index) => (
+                <div
+                  className="business-card"
+                  key={business.id}
+                  style={{ animationDelay: `${index * 0.07}s` }}
+                >
+                  <div className="bc-glow" />
+                  <div className="bc-icon-wrap">
+                    <span className="bc-icon">{business.icon}</span>
+                  </div>
+                  <div className="bc-body">
+                    <h3 className="bc-name">{business.name}</h3>
+                    <span className="bc-type-tag">{business.type}</span>
+                    {business.location && (
+                      <p className="bc-location">📍 {business.location}</p>
+                    )}
+                  </div>
+                  <div className="bc-actions">
+                    <button
+                      className="bc-select-btn"
+                      onClick={() => openReservationForm(business)}
+                    >
+                      Rezervasyon Yap <span className="bc-arrow">→</span>
+                    </button>
+                    <button
+                      className="bc-info-btn"
+                      onClick={(e) => { e.stopPropagation(); setSelectedBusinessInfo(business); }}
+                    >
+                      ℹ İşletme Hakkında
+                    </button>
+                  </div>
                 </div>
               ))}
+            {adminBusinesses.filter(b => b.reservationActive && (businessSearch === "" || b.name.toLowerCase().includes(businessSearch.toLowerCase()) || b.type.toLowerCase().includes(businessSearch.toLowerCase()) || b.location.toLowerCase().includes(businessSearch.toLowerCase()))).length === 0 && (
+              <p className="description" style={{ gridColumn: "1/-1" }}>
+                "{businessSearch}" için sonuç bulunamadı.
+              </p>
+            )}
           </div>
         </section>
       )}
@@ -697,102 +913,176 @@ function App() {
       {page === "reservation" && selectedBusiness && loggedCustomer && (
         <section className="reservation-section">
           <button className="back-btn" onClick={() => setPage("businesses")}>
-            ← Back
+            ← Geri
           </button>
 
           <div className="reservation-box">
             <h1>{selectedBusiness.name}</h1>
-            <p className="description">
-              Create your reservation request as{" "}
-              <strong>{loggedCustomer.name}</strong>.
+            <p className="description" style={{ marginTop: 0 }}>
+              {selectedBusiness.type} · {selectedBusiness.location}
             </p>
 
             <form className="reservation-form">
-              <div className="card-row">
-                <span>Name</span>
-                <strong>{loggedCustomer.name}</strong>
+              {/* Ad & E-posta (otomatik) */}
+              <div className="rez-info-row">
+                <div className="rez-info-item">
+                  <span className="rez-info-label">İsim</span>
+                  <span className="rez-info-value">{loggedCustomer.name}</span>
+                </div>
+                <div className="rez-info-item">
+                  <span className="rez-info-label">E-posta</span>
+                  <span className="rez-info-value">{loggedCustomer.email}</span>
+                </div>
               </div>
 
-              <div className="card-row">
-                <span>Email</span>
-                <strong>{loggedCustomer.email}</strong>
-              </div>
-
+              {/* Telefon */}
               <input
                 name="phone"
                 value={reservation.phone}
                 onChange={handleChange}
                 type="tel"
-                placeholder="Phone Number"
+                placeholder="📞 Telefon numarası (zorunlu)"
               />
 
-              <p>
-                Selected Date: <strong>{formatDate(reservation.date)}</strong>
-              </p>
+              {/* Tarih Accordion */}
+              {reservation.phone.trim() !== "" && (
+                <div className="accordion-section">
+                  {!datePickerOpen && reservation.date === "" && (
+                    <button
+                      type="button"
+                      className="accordion-open-btn"
+                      onClick={() => { setDatePickerOpen(true); setTimePickerOpen(false); }}
+                    >
+                      📅 Tarih seç
+                    </button>
+                  )}
 
-              <div className="time-slots">
-                {getAvailableDates().map((date) => (
-                  <button
-                    key={date.fullDate}
-                    type="button"
-                    className={
-                      reservation.date === date.fullDate
-                        ? "selected-time"
-                        : "time-btn"
-                    }
-                    onClick={() =>
-                      setReservation({ ...reservation, date: date.fullDate })
-                    }
-                  >
-                    {date.display}
-                  </button>
-                ))}
-              </div>
+                  {!datePickerOpen && reservation.date !== "" && (
+                    <div
+                      className="accordion-selected"
+                      onClick={() => { setDatePickerOpen(true); setTimePickerOpen(false); setReservation({ ...reservation, time: "" }); }}
+                    >
+                      <span className="accordion-selected-label">📅 Tarih</span>
+                      <span className="accordion-selected-value">{formatDate(reservation.date)}</span>
+                      <span className="accordion-edit">düzenle ✎</span>
+                    </div>
+                  )}
 
-              <p>
-                Selected Time:{" "}
-                <strong>{reservation.time || "Choose time"}</strong>
-              </p>
+                  {datePickerOpen && (
+                    <div className="accordion-picker">
+                      <div className="accordion-picker-header">
+                        <span>📅 Tarih seç</span>
+                        {reservation.date && (
+                          <button type="button" className="accordion-close-btn"
+                            onClick={() => setDatePickerOpen(false)}>✕</button>
+                        )}
+                      </div>
+                      <div className="time-slots" style={{ marginTop: 10 }}>
+                        {getAvailableDates().map((date) => (
+                          <button
+                            key={date.fullDate}
+                            type="button"
+                            className={reservation.date === date.fullDate ? "selected-time" : "time-btn"}
+                            onClick={() => {
+                              setReservation({ ...reservation, date: date.fullDate, time: "" });
+                              setDatePickerOpen(false);
+                              setTimePickerOpen(true);
+                            }}
+                          >
+                            {date.display}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              <div className="time-slots">
-                {(selectedBusiness?.availableTimes?.length
-                  ? selectedBusiness.availableTimes
-                  : availableTimes
-                ).map((time) => (
-                  <button
-                    key={time}
-                    type="button"
-                    className={
-                      reservation.time === time ? "selected-time" : "time-btn"
-                    }
-                    onClick={() => setReservation({ ...reservation, time })}
-                  >
-                    {time}
-                  </button>
-                ))}
-              </div>
+              {/* Saat Accordion */}
+              {reservation.date !== "" && (
+                <div className="accordion-section">
+                  {!timePickerOpen && reservation.time === "" && (
+                    <button
+                      type="button"
+                      className="accordion-open-btn"
+                      onClick={() => { setTimePickerOpen(true); setDatePickerOpen(false); }}
+                    >
+                      🕐 Saat seç
+                    </button>
+                  )}
 
-              <input
-                name="guests"
-                value={reservation.guests}
-                onChange={handleChange}
-                type="number"
-                placeholder="Number of guests"
-                min="1"
-              />
+                  {!timePickerOpen && reservation.time !== "" && (
+                    <div
+                      className="accordion-selected"
+                      onClick={() => { setTimePickerOpen(true); setDatePickerOpen(false); }}
+                    >
+                      <span className="accordion-selected-label">🕐 Saat</span>
+                      <span className="accordion-selected-value">{reservation.time}</span>
+                      <span className="accordion-edit">düzenle ✎</span>
+                    </div>
+                  )}
 
-              <textarea
-                name="note"
-                value={reservation.note}
-                onChange={handleChange}
-                placeholder="Note, table preference or special request"
-              ></textarea>
+                  {timePickerOpen && (
+                    <div className="accordion-picker">
+                      <div className="accordion-picker-header">
+                        <span>🕐 Saat seç</span>
+                        {reservation.time && (
+                          <button type="button" className="accordion-close-btn"
+                            onClick={() => setTimePickerOpen(false)}>✕</button>
+                        )}
+                      </div>
+                      <div className="time-slots" style={{ marginTop: 10 }}>
+                        {(selectedBusiness?.availableTimes?.length
+                          ? selectedBusiness.availableTimes
+                          : availableTimes
+                        ).map((time) => (
+                          <button
+                            key={time}
+                            type="button"
+                            className={reservation.time === time ? "selected-time" : "time-btn"}
+                            onClick={() => {
+                              setReservation({ ...reservation, time });
+                              setTimePickerOpen(false);
+                            }}
+                          >
+                            {time}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Misafir Sayısı */}
+              {reservation.date !== "" && reservation.time !== "" && !datePickerOpen && !timePickerOpen && (
+                <input
+                  name="guests"
+                  value={reservation.guests}
+                  onChange={handleChange}
+                  type="number"
+                  placeholder="👥 Misafir sayısı"
+                  min="1"
+                />
+              )}
+
+              {/* Not */}
+              {reservation.guests !== "" && !datePickerOpen && !timePickerOpen && (
+                <textarea
+                  name="note"
+                  value={reservation.note}
+                  onChange={handleChange}
+                  placeholder="📝 Not, masa tercihi veya özel istek (opsiyonel)"
+                />
+              )}
 
               {error && <p className="error-message">{error}</p>}
 
-              <button type="button" onClick={sendReservation}>
-                Send Reservation Request
-              </button>
+              {reservation.phone && reservation.date && reservation.time && reservation.guests && !datePickerOpen && !timePickerOpen && (
+                <button type="button" onClick={sendReservation}>
+                  Rezervasyon İsteği Gönder →
+                </button>
+              )}
             </form>
           </div>
         </section>
@@ -801,40 +1091,40 @@ function App() {
       {page === "summary" && selectedBusiness && loggedCustomer && (
         <section className="reservation-section">
           <div className="reservation-box">
-            <h1>Reservation Summary</h1>
-            <p className="description">Your request has been created.</p>
+            <h1>Rezervasyon Özeti</h1>
+            <p className="description">İsteğiniz oluşturuldu.</p>
 
             <div className="card-row">
-              <span>Business</span>
+              <span>İşletme</span>
               <strong>{selectedBusiness.name}</strong>
             </div>
             <div className="card-row">
-              <span>Name</span>
+              <span>İsim</span>
               <strong>{loggedCustomer.name}</strong>
             </div>
             <div className="card-row">
-              <span>Email</span>
+              <span>E-posta</span>
               <strong>{loggedCustomer.email}</strong>
             </div>
             <div className="card-row">
-              <span>Phone</span>
+              <span>Telefon</span>
               <strong>{reservation.phone}</strong>
             </div>
             <div className="card-row">
-              <span>Date</span>
+              <span>Tarih</span>
               <strong>{formatDate(reservation.date)}</strong>
             </div>
             <div className="card-row">
-              <span>Time</span>
+              <span>Saat</span>
               <strong>{reservation.time}</strong>
             </div>
             <div className="card-row">
-              <span>Guests</span>
+              <span>Misafir</span>
               <strong>{reservation.guests}</strong>
             </div>
             <div className="card-row">
-              <span>Note</span>
-              <strong>{reservation.note || "No note"}</strong>
+              <span>Not</span>
+              <strong>{reservation.note || "Not yok"}</strong>
             </div>
 
             <button
@@ -846,6 +1136,13 @@ function App() {
                 setIsCreatingReservation(true);
                 const newCode = generateReservationCode();
                 setReservationCode(newCode);
+
+                // Use the logged-in customer's saved profile rather than
+                // the (possibly unsaved / stale) customerProfile state,
+                // so reservations always reflect the customer's actual
+                // stored profile data.
+                const profileToUse =
+                  loggedCustomer.profile || customerProfile;
 
                 const newReservation = {
                   id: Date.now(),
@@ -862,10 +1159,10 @@ function App() {
                   code: newCode,
                   status: "pending",
                   customerProfile: {
-                    gender: customerProfile.gender,
-                    birthDate: customerProfile.birthDate,
-                    job: customerProfile.job,
-                    smoking: customerProfile.smoking,
+                    gender: profileToUse.gender,
+                    birthDate: profileToUse.birthDate,
+                    job: profileToUse.job,
+                    smoking: profileToUse.smoking,
                   },
                 };
 
@@ -887,10 +1184,10 @@ function App() {
                     code: newCode,
                     status: "pending",
 
-                    gender: customerProfile.gender,
-                    birth_date: customerProfile.birthDate,
-                    job: customerProfile.job,
-                    smoking: customerProfile.smoking,
+                    gender: profileToUse.gender,
+                    birth_date: profileToUse.birthDate,
+                    job: profileToUse.job,
+                    smoking: profileToUse.smoking,
 
                     user_email: loggedCustomer.email,
                   },
@@ -909,8 +1206,8 @@ function App() {
               }}
             >
               {isCreatingReservation
-                ? "Creating Reservation..."
-                : "Confirm & Send"}
+                ? "Oluşturuluyor..."
+                : "Onayla ve Gönder"}
             </button>
           </div>
         </section>
@@ -919,20 +1216,20 @@ function App() {
       {page === "success" && selectedBusiness && loggedCustomer && (
         <section className="reservation-section">
           <div className="reservation-box">
-            <h1>Reservation Sent ✅</h1>
+            <h1>Rezervasyon Gönderildi ✅</h1>
 
             <p className="description">
-              Your reservation request has been sent to {selectedBusiness.name}.
-              The business will review your request.
+              Rezervasyon isteğiniz {selectedBusiness.name} işletmesine gönderildi.
+              İşletme isteğinizi inceleyecek.
             </p>
 
             <div className="card-row">
-              <span>Reservation Code</span>
+              <span>Rezervasyon Kodu</span>
               <strong>{reservationCode}</strong>
             </div>
 
             <p className="description">
-              Reservation code sent to: <strong>{loggedCustomer.email}</strong>
+              Rezervasyon kodu şuraya gönderildi: <strong>{loggedCustomer.email}</strong>
             </p>
 
             <button
@@ -950,7 +1247,7 @@ function App() {
                 setPage("customerDashboard");
               }}
             >
-              Go to My Reservations
+              Rezervasyonlarıma Git
             </button>
           </div>
         </section>
@@ -960,11 +1257,11 @@ function App() {
         <section className="reservation-section">
           <div className="reservation-box">
             <h1>
-              {customerMode === "login" ? "Customer Login" : "Create Account"}
+              {customerMode === "login" ? "Müşteri Girişi" : "Hesap Oluştur"}
             </h1>
 
             <p className="description">
-              Login or create an account to manage your reservations.
+              Rezervasyonlarınızı yönetmek için giriş yapın veya hesap oluşturun.
             </p>
 
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
@@ -975,7 +1272,7 @@ function App() {
                 type="button"
                 onClick={() => setCustomerMode("login")}
               >
-                Login
+                Giriş
               </button>
 
               <button
@@ -985,7 +1282,7 @@ function App() {
                 type="button"
                 onClick={() => setCustomerMode("register")}
               >
-                Register
+                Kayıt
               </button>
             </div>
 
@@ -993,7 +1290,7 @@ function App() {
               {customerMode === "register" && (
                 <input
                   type="text"
-                  placeholder="Full Name"
+                  placeholder="Ad Soyad"
                   value={customerForm.name}
                   onChange={(e) =>
                     setCustomerForm({ ...customerForm, name: e.target.value })
@@ -1003,7 +1300,7 @@ function App() {
 
               <input
                 type="email"
-                placeholder="Email Address"
+                placeholder="E-posta Adresi"
                 value={customerForm.email}
                 onChange={(e) =>
                   setCustomerForm({ ...customerForm, email: e.target.value })
@@ -1012,7 +1309,7 @@ function App() {
 
               <input
                 type="password"
-                placeholder="Password"
+                placeholder="Şifre"
                 value={customerForm.password}
                 onChange={(e) =>
                   setCustomerForm({ ...customerForm, password: e.target.value })
@@ -1032,7 +1329,7 @@ function App() {
                       customerForm.email === "" ||
                       customerForm.password === ""
                     ) {
-                      setCustomerAuthError("Please fill all fields.");
+                      setCustomerAuthError("Tüm alanları doldurun.");
                       return;
                     }
 
@@ -1041,12 +1338,61 @@ function App() {
                     );
 
                     if (alreadyExists) {
-                      setCustomerAuthError("This email is already registered.");
+                      setCustomerAuthError("Bu e-posta zaten kayıtlı.");
+                      return;
+                    }
+
+                    // NOTE: The previous flow sent users to a fake
+                    // "verification code" screen that did not actually
+                    // verify anything (any input, including empty,
+                    // completed registration). That step has been
+                    // removed so the UI doesn't promise a security
+                    // guarantee it doesn't provide. Real email
+                    // verification should be implemented via Supabase
+                    // Auth (signUp + email confirmation) rather than a
+                    // custom UI step.
+                    const newCustomer = {
+                      name: customerForm.name,
+                      email: customerForm.email,
+                      password: customerForm.password,
+                      safeScore: 100,
+                      profile: {
+                        phone: "",
+                        gender: "",
+                        birthDate: "",
+                        job: "",
+                        smoking: "",
+                      },
+                    };
+
+                    const { error: insertError } = await supabase
+                      .from("customers")
+                      .insert([
+                        {
+                          name: newCustomer.name,
+                          email: newCustomer.email,
+                          password: newCustomer.password,
+                          safe_score: newCustomer.safeScore,
+                        },
+                      ]);
+
+                    if (insertError) {
+                      console.log("Customer insert error:", insertError);
+                      setCustomerAuthError(
+                        "Hesap oluşturulamadı. Tekrar deneyin.",
+                      );
                       return;
                     }
 
                     setCustomerAuthError("");
-                    setPage("customerVerify");
+                    setRegisteredCustomers([
+                      ...registeredCustomers,
+                      newCustomer,
+                    ]);
+                    setLoggedCustomer(newCustomer);
+                    setCustomerProfile(newCustomer.profile);
+                    setCustomerTab("pending");
+                    setPage("customerDashboard");
                   } else {
                     const { data, error } = await supabase
                       .from("customers")
@@ -1056,7 +1402,7 @@ function App() {
                       .single();
 
                     if (error || !data) {
-                      setCustomerAuthError("Wrong email or password.");
+                      setCustomerAuthError("Hatalı e-posta veya şifre.");
                       return;
                     }
 
@@ -1088,66 +1434,7 @@ function App() {
                   }
                 }}
               >
-                {customerMode === "login" ? "Login" : "Create Account"}
-              </button>
-            </form>
-          </div>
-        </section>
-      )}
-
-      {page === "customerVerify" && (
-        <section className="reservation-section">
-          <div className="reservation-box">
-            <h1>Email Verification</h1>
-
-            <p className="description">
-              We sent a verification code to{" "}
-              <strong>{customerForm.email}</strong>.
-            </p>
-
-            <form className="reservation-form">
-              <input type="text" placeholder="Enter verification code" />
-
-              <button
-                type="button"
-                onClick={async () => {
-                  const newCustomer = {
-                    name: customerForm.name,
-                    email: customerForm.email,
-                    password: customerForm.password,
-                    safeScore: 100,
-                    profile: {
-                      phone: "",
-                      gender: "",
-                      birthDate: "",
-                      job: "",
-                      smoking: "",
-                    },
-                  };
-
-                  const { error } = await supabase.from("customers").insert([
-                    {
-                      name: newCustomer.name,
-                      email: newCustomer.email,
-                      password: newCustomer.password,
-                      safe_score: newCustomer.safeScore,
-                    },
-                  ]);
-
-                  if (error) {
-                    console.log("Customer insert error:", error);
-                    alert("Customer oluşturulamadı.");
-                    return;
-                  }
-
-                  setRegisteredCustomers([...registeredCustomers, newCustomer]);
-                  setLoggedCustomer(newCustomer);
-                  setCustomerProfile(newCustomer.profile);
-                  setCustomerTab("pending");
-                  setPage("customerDashboard");
-                }}
-              >
-                Verify Account
+                {customerMode === "login" ? "Giriş Yap" : "Hesap Oluştur"}
               </button>
             </form>
           </div>
@@ -1157,11 +1444,11 @@ function App() {
       {page === "customerDashboard" && (
         <section className="reservation-section">
           <div className="reservation-box">
-            <h1>Customer Dashboard</h1>
+            <h1>Müşteri Paneli</h1>
 
             {loggedCustomer ? (
               <>
-                <p className="description">Welcome, {loggedCustomer.name}</p>
+                <p className="description">Hoş geldiniz, {loggedCustomer.name}</p>
                 <button
                   className="dashboard-create-btn"
                   onClick={() => {
@@ -1169,7 +1456,7 @@ function App() {
                     goToReservationFlow();
                   }}
                 >
-                  + Create New Reservation
+                  + Yeni Rezervasyon Oluştur
                 </button>
 
                 <div className="panel-tabs">
@@ -1177,34 +1464,34 @@ function App() {
                     className={customerTab === "pending" ? "active-tab" : ""}
                     onClick={() => setCustomerTab("pending")}
                   >
-                    Pending
+                    Bekleyen
                   </button>
 
                   <button
                     className={customerTab === "accepted" ? "active-tab" : ""}
                     onClick={() => setCustomerTab("accepted")}
                   >
-                    Accepted
+                    Kabul Edildi
                   </button>
 
                   <button
                     className={customerTab === "rejected" ? "active-tab" : ""}
                     onClick={() => setCustomerTab("rejected")}
                   >
-                    Rejected
+                    Reddedildi
                   </button>
 
                   <button
                     className={customerTab === "statistics" ? "active-tab" : ""}
                     onClick={() => setCustomerTab("statistics")}
                   >
-                    Statistics
+                    İstatistikler
                   </button>
                   <button
                     className={customerTab === "profile" ? "active-tab" : ""}
                     onClick={() => setCustomerTab("profile")}
                   >
-                    Profile
+                    Profil
                   </button>
 
                   <button
@@ -1213,99 +1500,57 @@ function App() {
                     }
                     onClick={() => setCustomerTab("notifications")}
                   >
-                    Notifications
+                    Bildirimler
                   </button>
                 </div>
 
-                {customerTab === "statistics" && (
-                  <div
-                    className="reservation-box"
-                    style={{ marginTop: "20px" }}
-                  >
-                    <h2>Reservation Statistics</h2>
-
-                    <div className="card-row">
-                      <span>Total Reservations</span>
-                      <strong>
-                        {
-                          reservations.filter(
-                            (rez) => rez.email === loggedCustomer.email,
-                          ).length
-                        }
-                      </strong>
+                {customerTab === "statistics" && (() => {
+                  const myRezs = reservations.filter(rez => rez.email === loggedCustomer.email);
+                  const total = myRezs.length;
+                  const completed = myRezs.filter(r => r.status === "completed").length;
+                  const noshow = myRezs.filter(r => r.status === "no-show").length;
+                  const accepted = myRezs.filter(r => r.status === "accepted").length;
+                  const pending = myRezs.filter(r => r.status === "pending").length;
+                  const rejected = myRezs.filter(r => r.status === "rejected").length;
+                  const cancelled = myRezs.filter(r => r.status === "cancelled").length;
+                  return (
+                    <div style={{ marginTop: 20 }}>
+                      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+                        <div className="stat-card"><span className="stat-icon">📋</span><span>Toplam</span><strong><AnimatedNumber value={total} /></strong></div>
+                        <div className="stat-card"><span className="stat-icon">✅</span><span>Tamamlandı</span><strong><AnimatedNumber value={completed} /></strong></div>
+                        <div className="stat-card"><span className="stat-icon">⏳</span><span>Bekleyen</span><strong><AnimatedNumber value={pending} /></strong></div>
+                        <div className="stat-card"><span className="stat-icon">👍</span><span>Kabul</span><strong><AnimatedNumber value={accepted} /></strong></div>
+                        <div className="stat-card"><span className="stat-icon">❌</span><span>No Show</span><strong><AnimatedNumber value={noshow} /></strong></div>
+                        <div className="stat-card"><span className="stat-icon">🚫</span><span>İptal</span><strong><AnimatedNumber value={rejected + cancelled} /></strong></div>
+                      </div>
+                      {total > 0 && (
+                        <div className="reservation-box" style={{ marginTop: 16 }}>
+                          <h3 style={{ marginBottom: 16 }}>Rezervasyon Dağılımı</h3>
+                          {[
+                            { label: "Tamamlandı", val: completed, color: "green" },
+                            { label: "Kabul Bekliyor", val: pending + accepted, color: "" },
+                            { label: "No Show", val: noshow, color: "orange" },
+                            { label: "İptal/Red", val: rejected + cancelled, color: "pink" },
+                          ].map(item => item.val > 0 && (
+                            <div className="progress-row" key={item.label}>
+                              <div className="progress-label">
+                                <span>{item.label}</span>
+                                <strong>{item.val} ({Math.round(item.val/total*100)}%)</strong>
+                              </div>
+                              <ProgressBar percent={Math.round(item.val/total*100)} color={item.color} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-
-                    <div className="card-row">
-                      <span>Pending</span>
-                      <strong>
-                        {
-                          reservations.filter(
-                            (rez) =>
-                              rez.email === loggedCustomer.email &&
-                              rez.status === "pending",
-                          ).length
-                        }
-                      </strong>
-                    </div>
-
-                    <div className="card-row">
-                      <span>Rejected</span>
-                      <strong>
-                        {
-                          reservations.filter(
-                            (rez) =>
-                              rez.email === loggedCustomer.email &&
-                              rez.status === "rejected",
-                          ).length
-                        }
-                      </strong>
-                    </div>
-                    <div className="card-row">
-                      <span>Completed</span>
-                      <strong>
-                        {
-                          reservations.filter(
-                            (rez) =>
-                              rez.email === loggedCustomer.email &&
-                              rez.status === "completed",
-                          ).length
-                        }
-                      </strong>
-                    </div>
-
-                    <div className="card-row">
-                      <span>No Show</span>
-                      <strong>
-                        {
-                          reservations.filter(
-                            (rez) =>
-                              rez.email === loggedCustomer.email &&
-                              rez.status === "no-show",
-                          ).length
-                        }
-                      </strong>
-                    </div>
-
-                    <div className="card-row">
-                      <span>Cancelled</span>
-                      <strong>
-                        {
-                          reservations.filter(
-                            (rez) =>
-                              rez.email === loggedCustomer.email &&
-                              rez.status === "cancelled",
-                          ).length
-                        }
-                      </strong>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
                 {customerTab === "profile" && (
                   <div
                     className="reservation-box"
                     style={{ marginTop: "20px" }}
                   >
-                    <h2>Customer Profile</h2>
+                    <h2>Müşteri Profili</h2>
                     <div className="safe-score-box">
                       <div
                         className="safe-score-circle"
@@ -1315,30 +1560,27 @@ function App() {
                       >
                         <div className="safe-score-inner">
                           <strong>{loggedCustomer?.safeScore ?? 100}%</strong>
-                          <span>Safe Score</span>
+                          <span>Güven Puanı</span>
                         </div>
                       </div>
 
                       <p className="description">
-                        Your Safe Score increases when you attend reservations
-                        and decreases when you miss them.
+                        Güven puanınız rezervasyonlara katıldığınızda artar, kaçırdığınızda azalır.
                       </p>
                     </div>
                     <p className="description">
-                      Your Safe Score reflects your reservation reliability. A
-                      higher score improves your chances of having future
-                      reservations accepted.
+                      Güven puanınız rezervasyon güvenilirliğinizi yansıtır. Daha yüksek puan,
+                      gelecekteki rezervasyonların kabul edilme şansını artırır.
                     </p>
 
                     <p className="description">
-                      These fields are optional. You can complete your profile
-                      anytime.
+                      Bu alanlar isteğe bağlıdır. Profilinizi istediğiniz zaman tamamlayabilirsiniz.
                     </p>
 
                     <form className="reservation-form">
                       <input
                         type="tel"
-                        placeholder="Phone Number"
+                        placeholder="Telefon Numarası"
                         value={customerProfile.phone}
                         onChange={(e) =>
                           setCustomerProfile({
@@ -1348,7 +1590,7 @@ function App() {
                         }
                       />
 
-                      <h3>Gender</h3>
+                      <h3>Cinsiyet</h3>
 
                       <div className="time-slots">
                         <button
@@ -1365,7 +1607,7 @@ function App() {
                             })
                           }
                         >
-                          Male
+                          {customerProfile.gender === "Male" ? "✓ " : ""}Erkek
                         </button>
 
                         <button
@@ -1382,7 +1624,7 @@ function App() {
                             })
                           }
                         >
-                          Female
+                          {customerProfile.gender === "Female" ? "✓ " : ""}Kadın
                         </button>
 
                         <button
@@ -1399,10 +1641,10 @@ function App() {
                             })
                           }
                         >
-                          Prefer not to say
+                          {customerProfile.gender === "Prefer not to say" ? "✓ " : ""}Belirtmek istemiyorum
                         </button>
                       </div>
-                      <h3 style={{ marginTop: "20px" }}>Birth Date</h3>
+                      <h3 style={{ marginTop: "20px" }}>Doğum Tarihi</h3>
                       <input
                         type="date"
                         value={customerProfile.birthDate}
@@ -1416,7 +1658,7 @@ function App() {
 
                       <input
                         type="text"
-                        placeholder="Job"
+                        placeholder="Meslek"
                         value={customerProfile.job}
                         onChange={(e) =>
                           setCustomerProfile({
@@ -1426,7 +1668,7 @@ function App() {
                         }
                       />
 
-                      <h3 style={{ marginTop: "20px" }}>Smoking Preference</h3>
+                      <h3 style={{ marginTop: "20px" }}>Sigara Tercihi</h3>
 
                       <div className="time-slots">
                         <button
@@ -1443,7 +1685,7 @@ function App() {
                             })
                           }
                         >
-                          Smoker
+                          {customerProfile.smoking === "Smoker" ? "✓ " : ""}İçiyor
                         </button>
 
                         <button
@@ -1460,7 +1702,7 @@ function App() {
                             })
                           }
                         >
-                          Non-smoker
+                          {customerProfile.smoking === "Non-smoker" ? "✓ " : ""}İçmiyor
                         </button>
 
                         <button
@@ -1477,7 +1719,7 @@ function App() {
                             })
                           }
                         >
-                          No Preference
+                          {customerProfile.smoking === "No preference" ? "✓ " : ""}Fark Etmez
                         </button>
                       </div>
 
@@ -1515,10 +1757,10 @@ function App() {
                             ),
                           );
 
-                          alert("Profile saved successfully");
+                          alert("Profil başarıyla kaydedildi.");
                         }}
                       >
-                        Save Profile
+                        Profili Kaydet
                       </button>
                     </form>
                   </div>
@@ -1529,18 +1771,20 @@ function App() {
                     className="reservation-box"
                     style={{ marginTop: "20px" }}
                   >
-                    <h2>Notifications</h2>
+                    <h2>Bildirimler</h2>
 
                     {reservations.filter(
                       (rez) =>
                         rez.email === loggedCustomer.email &&
-                        rez.businessMessage,
+                        rez.businessMessage &&
+                        rez.status !== "cancelled",
                     ).length > 0 ? (
                       reservations
                         .filter(
                           (rez) =>
                             rez.email === loggedCustomer.email &&
-                            rez.businessMessage,
+                            rez.businessMessage &&
+                            rez.status !== "cancelled",
                         )
                         .map((rez) => (
                           <div
@@ -1557,8 +1801,8 @@ function App() {
 
                               <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
                                 {rez.status === "accepted"
-                                  ? "Reservation accepted"
-                                  : "Reservation rejected"}
+                                  ? "Rezervasyon kabul edildi"
+                                  : "Rezervasyon reddedildi"}
                               </p>
 
                               <p style={{ marginTop: "8px", color: "#e5e7eb" }}>
@@ -1577,7 +1821,7 @@ function App() {
                                   e.stopPropagation();
 
                                   if (
-                                    !window.confirm("Cancel this reservation?")
+                                    !window.confirm("Bu rezervasyonu iptal etmek istiyor musunuz?")
                                   ) {
                                     setLoadingReservationId(null);
                                     return;
@@ -1600,28 +1844,21 @@ function App() {
                                   setReservations(
                                     reservations.map((item) =>
                                       item.id === rez.id
-                                        ? {
-                                            ...item,
-                                            status: "cancelled",
-                                            businessMessage:
-                                              "Customer cancelled this reservation.",
-                                          }
+                                        ? { ...item, status: "cancelled", businessMessage: "" }
                                         : item,
                                     ),
                                   );
                                 }}
                               >
-                                {loadingReservationId === rez.id
-                                  ? "Loading..."
-                                  : "Cancel"}
+                                {loadingReservationId === rez.id ? <><Spinner />Yükleniyor</> : "İptal Et"}
                               </button>
                             ) : (
-                              <span>{rez.status}</span>
+                              <StatusBadge status={rez.status} />
                             )}
                           </div>
                         ))
                     ) : (
-                      <p className="description">No notifications yet.</p>
+                      <p className="description">Henüz bildirim yok.</p>
                     )}
                   </div>
                 )}
@@ -1652,7 +1889,7 @@ function App() {
                               </p>
 
                               <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
-                                {rez.guests} guests
+                                {rez.guests} misafir
                               </p>
                             </div>
 
@@ -1664,7 +1901,7 @@ function App() {
                                   e.stopPropagation();
 
                                   if (
-                                    !window.confirm("Cancel this reservation?")
+                                    !window.confirm("Bu rezervasyonu iptal etmek istiyor musunuz?")
                                   ) {
                                     return;
                                   }
@@ -1687,27 +1924,22 @@ function App() {
                                   setReservations(
                                     reservations.map((item) =>
                                       item.id === rez.id
-                                        ? {
-                                            ...item,
-                                            status: "cancelled",
-                                            businessMessage:
-                                              "Customer cancelled this reservation.",
-                                          }
+                                        ? { ...item, status: "cancelled", businessMessage: "" }
                                         : item,
                                     ),
                                   );
                                 }}
                               >
-                                Cancel
+                                İptal Et
                               </button>
                             ) : (
-                              <span>{rez.status}</span>
+                              <StatusBadge status={rez.status} />
                             )}
                           </div>
                         ))
                     ) : (
                       <p className="description">
-                        No {customerTab} reservations found.
+                        {{ pending: "Bekleyen", accepted: "Kabul edilen", rejected: "Reddedilen" }[customerTab] || customerTab} rezervasyon bulunamadı.
                       </p>
                     )}
                   </>
@@ -1729,19 +1961,19 @@ function App() {
                     setPage("home");
                   }}
                 >
-                  Logout
+                  Çıkış
                 </button>
               </>
             ) : (
               <>
                 <p className="description">
-                  Please login to see your reservations.
+                  Rezervasyonlarınızı görmek için giriş yapın.
                 </p>
                 <button
                   className="primary-btn"
                   onClick={() => setPage("customerAuth")}
                 >
-                  Go to Login
+                  Giriş Yap
                 </button>
               </>
             )}
@@ -1752,13 +1984,13 @@ function App() {
       {page === "businessLogin" && (
         <section className="reservation-section">
           <div className="reservation-box">
-            <h1>Business Login</h1>
-            <p className="description">Login to manage reservations.</p>
+            <h1>İşletme Girişi</h1>
+            <p className="description">Rezervasyonları yönetmek için giriş yapın.</p>
 
             <form className="reservation-form">
               <input
                 type="email"
-                placeholder="Business Email"
+                placeholder="İşletme E-postası"
                 value={businessLogin.email}
                 onChange={(e) =>
                   setBusinessLogin({ ...businessLogin, email: e.target.value })
@@ -1767,7 +1999,7 @@ function App() {
 
               <input
                 type="password"
-                placeholder="Password"
+                placeholder="Şifre"
                 value={businessLogin.password}
                 onChange={(e) =>
                   setBusinessLogin({
@@ -1780,7 +2012,7 @@ function App() {
               {loginError && <p className="error-message">{loginError}</p>}
 
               <button type="button" onClick={handleBusinessLogin}>
-                Login
+                Giriş Yap
               </button>
             </form>
           </div>
@@ -1789,13 +2021,13 @@ function App() {
       {page === "adminLogin" && (
         <section className="reservation-section">
           <div className="reservation-box">
-            <h1>Admin Login</h1>
-            <p className="description">RezPoint management panel.</p>
+            <h1>Yönetici Girişi</h1>
+            <p className="description">RezPoint yönetim paneli.</p>
 
             <form className="reservation-form">
               <input
                 type="email"
-                placeholder="Admin Email"
+                placeholder="Yönetici E-postası"
                 value={adminLogin.email}
                 onChange={(e) =>
                   setAdminLogin({ ...adminLogin, email: e.target.value })
@@ -1804,7 +2036,7 @@ function App() {
 
               <input
                 type="password"
-                placeholder="Password"
+                placeholder="Şifre"
                 value={adminLogin.password}
                 onChange={(e) =>
                   setAdminLogin({ ...adminLogin, password: e.target.value })
@@ -1814,7 +2046,7 @@ function App() {
               {adminError && <p className="error-message">{adminError}</p>}
 
               <button type="button" onClick={handleAdminLogin}>
-                Login
+                Giriş Yap
               </button>
             </form>
           </div>
@@ -1825,9 +2057,9 @@ function App() {
         <section className="business-panel-section">
           <div className="business-panel-header">
             <div>
-              <h1>RezPoint Admin Panel</h1>
+              <h1>RezPoint Yönetici Paneli</h1>
               <p className="description">
-                Manage businesses, AI Menu access and platform statistics.
+                İşletmeler, AI Menü erişimi ve platform istatistiklerini yönetin.
               </p>
             </div>
 
@@ -1838,45 +2070,59 @@ function App() {
                 setPage("home");
               }}
             >
-              Logout
+              Çıkış
             </button>
           </div>
 
           <div className="stats-grid">
             <div className="stat-card">
-              <span>Businesses</span>
-              <strong>{adminBusinesses.length}</strong>
+              <span className="stat-icon">🏢</span>
+              <span>İşletmeler</span>
+              <strong><AnimatedNumber value={adminBusinesses.length} /></strong>
             </div>
-
             <div className="stat-card">
-              <span>Customers</span>
-              <strong>{registeredCustomers.length}</strong>
+              <span className="stat-icon">👤</span>
+              <span>Müşteriler</span>
+              <strong><AnimatedNumber value={registeredCustomers.length} /></strong>
             </div>
-
             <div className="stat-card">
-              <span>Reservations</span>
-              <strong>{reservations.length}</strong>
+              <span className="stat-icon">📋</span>
+              <span>Rezervasyonlar</span>
+              <strong><AnimatedNumber value={reservations.length} /></strong>
             </div>
-
             <div className="stat-card">
-              <span>AI Menu Active</span>
-              <strong>
-                {
-                  adminBusinesses.filter((business) => business.aiMenuActive)
-                    .length
-                }
-              </strong>
+              <span className="stat-icon">✅</span>
+              <span>Kabul Edilen</span>
+              <strong><AnimatedNumber value={reservations.filter(r => r.status === "accepted").length} /></strong>
+            </div>
+          </div>
+
+          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3,1fr)", marginTop: 0 }}>
+            <div className="stat-card">
+              <span className="stat-icon">⏳</span>
+              <span>Bekleyen</span>
+              <strong><AnimatedNumber value={reservations.filter(r => r.status === "pending").length} /></strong>
+            </div>
+            <div className="stat-card">
+              <span className="stat-icon">❌</span>
+              <span>No Show</span>
+              <strong><AnimatedNumber value={reservations.filter(r => r.status === "no-show").length} /></strong>
+            </div>
+            <div className="stat-card">
+              <span className="stat-icon">🤖</span>
+              <span>AI Menu Aktif</span>
+              <strong><AnimatedNumber value={adminBusinesses.filter(b => b.aiMenuActive).length} /></strong>
             </div>
           </div>
 
           <div className="reservation-box" style={{ marginTop: "24px" }}>
-            <h2>Businesses</h2>
+            <h2>İşletmeler</h2>
             <button
               className="primary-btn"
               style={{ marginBottom: "20px" }}
               onClick={() => setShowAddBusinessForm(!showAddBusinessForm)}
             >
-              + Add Business
+              + İşletme Ekle
             </button>
             {showAddBusinessForm && (
               <form
@@ -1885,7 +2131,7 @@ function App() {
               >
                 <input
                   type="text"
-                  placeholder="Business Name"
+                  placeholder="İşletme Adı"
                   value={newBusinessForm.name}
                   onChange={(e) =>
                     setNewBusinessForm({
@@ -1897,7 +2143,7 @@ function App() {
 
                 <input
                   type="text"
-                  placeholder="Business Type"
+                  placeholder="İşletme Türü"
                   value={newBusinessForm.type}
                   onChange={(e) =>
                     setNewBusinessForm({
@@ -1909,7 +2155,7 @@ function App() {
 
                 <input
                   type="text"
-                  placeholder="Location"
+                  placeholder="Konum"
                   value={newBusinessForm.location}
                   onChange={(e) =>
                     setNewBusinessForm({
@@ -1921,7 +2167,7 @@ function App() {
 
                 <input
                   type="text"
-                  placeholder="Icon emoji e.g. 🍸"
+                  placeholder="İkon emoji ör. 🍸"
                   value={newBusinessForm.icon}
                   onChange={(e) =>
                     setNewBusinessForm({
@@ -1933,7 +2179,7 @@ function App() {
 
                 <input
                   type="email"
-                  placeholder="Business Login Email"
+                  placeholder="İşletme Giriş E-postası"
                   value={newBusinessForm.email}
                   onChange={(e) =>
                     setNewBusinessForm({
@@ -1945,7 +2191,7 @@ function App() {
 
                 <input
                   type="password"
-                  placeholder="Business Login Password"
+                  placeholder="İşletme Giriş Şifresi"
                   value={newBusinessForm.password}
                   onChange={(e) =>
                     setNewBusinessForm({
@@ -1965,7 +2211,7 @@ function App() {
                       !newBusinessForm.email ||
                       !newBusinessForm.password
                     ) {
-                      alert("Please fill all required fields.");
+                      alert("Lütfen tüm zorunlu alanları doldurun.");
                       return;
                     }
 
@@ -1998,9 +2244,15 @@ function App() {
                       reservationActive: addedBusiness.reservation_enabled,
                       aiMenuActive: addedBusiness.ai_menu_enabled,
                       menuText: "",
+                      description: "",
+                      menu: "",
+                      phone: "",
                       type: newBusinessForm.type || "Business",
                       location: newBusinessForm.location || "",
                       icon: newBusinessForm.icon || "🏢",
+                      availabilityMode: "selected",
+                      availableDays: ["Friday", "Saturday"],
+                      availableTimes: ["18:00", "19:00", "20:30"],
                     };
 
                     setAdminBusinesses([...adminBusinesses, formattedBusiness]);
@@ -2017,144 +2269,146 @@ function App() {
                     setShowAddBusinessForm(false);
                   }}
                 >
-                  Create Business
+                  İşletme Oluştur
                 </button>
               </form>
             )}
 
-            {adminBusinesses.map((business) => (
-              <div className="accepted-list-item" key={business.id}>
-                <div>
-                  <strong>{business.name}</strong>
-                  <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
-                    {business.type} • {business.location}
-                  </p>
-
-                  <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
-                    Reservations:{" "}
-                    {business.reservationActive ? "Active" : "Disabled"}
-                  </p>
-
-                  <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
-                    AI Menu: {business.aiMenuActive ? "Active" : "Disabled"}
-                  </p>
-                </div>
-
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  <button
-                    className={
-                      business.reservationActive ? "selected-time" : "time-btn"
-                    }
-                    onClick={async () => {
-                      const newValue = !business.reservationActive;
-
-                      const { error } = await supabase
-                        .from("businesses")
-                        .update({
-                          reservation_enabled: newValue,
-                        })
-                        .eq("id", business.id);
-
-                      if (error) {
-                        console.log(error);
-                        alert("Reservation durumu güncellenemedi.");
-                        return;
-                      }
-
-                      setAdminBusinesses(
-                        adminBusinesses.map((item) =>
-                          item.id === business.id
-                            ? {
-                                ...item,
-                                reservationActive: !item.reservationActive,
-                              }
-                            : item,
-                        ),
-                      );
-                    }}
-                  >
-                    Reservation {business.reservationActive ? "ON" : "OFF"}
-                  </button>
-
-                  <button
-                    className={
-                      business.aiMenuActive ? "selected-time" : "time-btn"
-                    }
-                    onClick={async () => {
-                      const newValue = !business.aiMenuActive;
-
-                      const { error } = await supabase
-                        .from("businesses")
-                        .update({
-                          ai_menu_enabled: newValue,
-                        })
-                        .eq("id", business.id);
-
-                      if (error) {
-                        console.log(error);
-                        alert("AI Menu durumu güncellenemedi.");
-                        return;
-                      }
-
-                      setAdminBusinesses(
-                        adminBusinesses.map((item) =>
-                          item.id === business.id
-                            ? {
-                                ...item,
-                                aiMenuActive: !item.aiMenuActive,
-                              }
-                            : item,
-                        ),
-                      );
-                    }}
-                  >
-                    AI Menu {business.aiMenuActive ? "ON" : "OFF"}
-                  </button>
-                  <button
-                    className="time-btn"
-                    style={{ color: "#fca5a5", borderColor: "#fca5a5" }}
-                    onClick={async () => {
-                      const confirmDelete = window.confirm(
-                        `${business.name} işletmesini silmek istediğine emin misin? Bu işletmeye ait rezervasyonlar da silinecek.`,
-                      );
-
-                      if (!confirmDelete) return;
-
-                      const { error } = await supabase
-                        .from("businesses")
-                        .delete()
-                        .eq("id", business.id);
-
-                      if (error) {
-                        console.log("Delete business error:", error);
-                        alert("Business silinirken hata oldu.");
-                        return;
-                      }
-
-                      setAdminBusinesses(
-                        adminBusinesses.filter(
-                          (item) => item.id !== business.id,
-                        ),
-                      );
-
-                      setReservations(
-                        reservations.filter(
-                          (rez) => rez.businessId !== business.id,
-                        ),
-                      );
-
-                      if (loggedBusiness?.id === business.id) {
-                        setLoggedBusiness(null);
-                        setPage("home");
-                      }
-                    }}
-                  >
-                    Delete Business
-                  </button>
-                </div>
-              </div>
-            ))}
+            <table className="admin-table" style={{ marginTop: 8 }}>
+              <thead>
+                <tr>
+                  <th>İşletme</th>
+                  <th>Tür / Konum</th>
+                  <th>Rezervasyon</th>
+                  <th>AI Menu</th>
+                  <th>İşlemler</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adminBusinesses.map((business) => (
+                  <tr key={business.id}>
+                    <td>
+                      <span style={{ fontSize: 20, marginRight: 8 }}>{business.icon}</span>
+                      <strong>{business.name}</strong>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{business.email}</div>
+                    </td>
+                    <td style={{ color: "#94a3b8" }}>
+                      {business.type}<br />
+                      <span style={{ fontSize: 11 }}>{business.location}</span>
+                    </td>
+                    <td>
+                      <button
+                        className={business.reservationActive ? "selected-time" : "time-btn"}
+                        style={{ fontSize: 12, padding: "6px 12px" }}
+                        onClick={async () => {
+                          const newValue = !business.reservationActive;
+                          const { error } = await supabase.from("businesses").update({ reservation_enabled: newValue }).eq("id", business.id);
+                          if (error) { alert("Güncellenemedi."); return; }
+                          setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, reservationActive: newValue } : item));
+                        }}
+                      >
+                        {business.reservationActive ? "✓ Aktif" : "✕ Kapalı"}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        className={business.aiMenuActive ? "selected-time" : "time-btn"}
+                        style={{ fontSize: 12, padding: "6px 12px" }}
+                        onClick={async () => {
+                          const newValue = !business.aiMenuActive;
+                          const { error } = await supabase.from("businesses").update({ ai_menu_enabled: newValue }).eq("id", business.id);
+                          if (error) { alert("Güncellenemedi."); return; }
+                          setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, aiMenuActive: newValue } : item));
+                        }}
+                      >
+                        {business.aiMenuActive ? "✓ Aktif" : "✕ Kapalı"}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        className="reject-btn"
+                        style={{ fontSize: 12, padding: "6px 12px" }}
+                        onClick={async () => {
+                          if (!window.confirm(`${business.name} silinsin mi? Rezervasyonlar da silinecek.`)) return;
+                          const { error } = await supabase.from("businesses").delete().eq("id", business.id);
+                          if (error) { alert("Silinemedi."); return; }
+                          setAdminBusinesses(adminBusinesses.filter(item => item.id !== business.id));
+                          setReservations(reservations.filter(rez => rez.businessId !== business.id));
+                          if (loggedBusiness?.id === business.id) { setLoggedBusiness(null); setPage("home"); }
+                        }}
+                      >
+                        Sil
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        </section>
+      )}
+
+      {page === "contact" && (
+        <section className="contact-page">
+          <div className="contact-hero">
+            <div className="contact-hero-icon">💬</div>
+            <h1>Yardıma mı İhtiyacınız Var?</h1>
+            <p className="contact-hero-desc">
+              RezPoint ile ilgili tüm soru, öneri ve destek talepleriniz için bizimle iletişime geçebilirsiniz.
+            </p>
+          </div>
+
+          <div className="contact-cards">
+            <a
+              className="contact-card"
+              href="mailto:rezpointsupport@gmail.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div className="contact-card-icon">✉️</div>
+              <div className="contact-card-body">
+                <div className="contact-card-label">E-posta</div>
+                <div className="contact-card-value">rezpointsupport@gmail.com</div>
+              </div>
+              <span className="contact-card-arrow">→</span>
+            </a>
+
+            <a
+              className="contact-card"
+              href="https://instagram.com/rezpoint.rp"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div className="contact-card-icon">📸</div>
+              <div className="contact-card-body">
+                <div className="contact-card-label">Instagram</div>
+                <div className="contact-card-value">@rezpoint.rp</div>
+              </div>
+              <span className="contact-card-arrow">→</span>
+            </a>
+          </div>
+
+          <div className="contact-business-box">
+            <div className="contact-business-icon">🏢</div>
+            <h2>İşletmenizi RezPoint'e Ekleyin</h2>
+            <p>
+              İşletmenizi RezPoint ağına dahil etmek, rezervasyon süreçlerinizi dijitalleştirmek
+              ve müşterilerinizi daha yakından tanımak için bizimle iletişime geçebilirsiniz.
+              Size özel kurulum ve destek süreci için hemen yazın.
+            </p>
+            <a
+              className="primary-btn contact-cta"
+              href="mailto:rezpointsupport@gmail.com?subject=RezPoint%20İşletme%20Başvurusu"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Başvuru Yap →
+            </a>
+          </div>
+
+          <button className="back-btn" onClick={() => setPage("home")} style={{ marginTop: 32 }}>
+            ← Ana Sayfa
+          </button>
         </section>
       )}
 
@@ -2163,10 +2417,10 @@ function App() {
           <div className="business-panel-header">
             <div>
               <h1>
-                {loggedBusiness ? loggedBusiness.name : "Business Dashboard"}
+                {loggedBusiness ? loggedBusiness.name : "İşletme Paneli"}
               </h1>
               <p className="description">
-                Manage your reservations and business settings.
+                Rezervasyonlarınızı ve işletme ayarlarınızı yönetin.
               </p>
             </div>
 
@@ -2178,7 +2432,7 @@ function App() {
                 setPage("home");
               }}
             >
-              Logout
+              Çıkış
             </button>
           </div>
 
@@ -2187,28 +2441,28 @@ function App() {
               className={panelTab === "incoming" ? "active-tab" : ""}
               onClick={() => setPanelTab("incoming")}
             >
-              Incoming Requests ({getBusinessReservationCount("pending")})
+              Gelen İstekler ({getBusinessReservationCount("pending")})
             </button>
 
             <button
               className={panelTab === "accepted" ? "active-tab" : ""}
               onClick={() => setPanelTab("accepted")}
             >
-              Accepted ({getBusinessReservationCount("accepted")})
+              Kabul Edildi ({getBusinessReservationCount("accepted")})
             </button>
 
             <button
               className={panelTab === "rejected" ? "active-tab" : ""}
               onClick={() => setPanelTab("rejected")}
             >
-              Rejected ({getBusinessReservationCount("rejected")})
+              Reddedildi ({getBusinessReservationCount("rejected")})
             </button>
 
             <button
               className={panelTab === "completed" ? "active-tab" : ""}
               onClick={() => setPanelTab("completed")}
             >
-              Completed ({getBusinessReservationCount("completed")})
+              Tamamlandı ({getBusinessReservationCount("completed")})
             </button>
 
             <button
@@ -2222,14 +2476,14 @@ function App() {
               className={panelTab === "settings" ? "active-tab" : ""}
               onClick={() => setPanelTab("settings")}
             >
-              Availability
+              Müsaitlik
             </button>
 
             <button
               className={panelTab === "profile" ? "active-tab" : ""}
               onClick={() => setPanelTab("profile")}
             >
-              Business Profile
+              İşletme Profili
             </button>
 
             <button
@@ -2243,139 +2497,114 @@ function App() {
           <div className="panel-content">
             {panelTab === "incoming" && (
               <div className="reservation-box">
-                <h2>Incoming Reservation Requests</h2>
+                <h2>Gelen Rezervasyon İstekleri</h2>
 
-                {reservations.filter((rez) => rez.status === "pending").length >
-                0 ? (
+                {/*
+                  FIX: previously this checked
+                  reservations.filter(rez => rez.status === "pending").length
+                  across ALL businesses, which could show "no requests"
+                  styling incorrectly when a different business had pending
+                  items but this one didn't (or vice versa). Now scoped to
+                  the logged-in business and includes "cancelled" so the
+                  empty-state message and the list stay in sync.
+                */}
+                {loggedBusiness &&
+                reservations.filter(
+                  (rez) =>
+                    rez.status === "pending" &&
+                    rez.businessId === loggedBusiness.id,
+                ).length > 0 ? (
                   reservations
                     .filter(
                       (rez) =>
-                        (rez.status === "pending" ||
-                          rez.status === "cancelled") &&
+                        rez.status === "pending" &&
                         loggedBusiness &&
                         rez.businessId === loggedBusiness.id,
                     )
                     .map((rez) => (
                       <div
                         key={rez.id}
-                        className="accepted-list-item"
-                        style={{ marginTop: "15px" }}
+                        className="incoming-req-item"
                         onClick={() => setSelectedReservation(rez)}
                       >
-                        <div>
-                          <strong>
-                            {rez.time} - {rez.fullName}
-                          </strong>
-
-                          <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
-                            {formatDate(rez.date)}
-                          </p>
-
-                          <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
-                            {rez.guests} guests
-                          </p>
-
-                          <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
-                            Note: {rez.note || "No note"}
-                          </p>
+                        <div className="incoming-req-info">
+                          <span className="incoming-req-name">{rez.fullName}</span>
+                          <span className="incoming-req-meta">
+                            {formatDate(rez.date)} · {rez.time} · {rez.guests} kişi
+                          </span>
                         </div>
 
-                        {rez.status === "cancelled" ? (
-                          <span style={{ color: "#fca5a5", fontWeight: "700" }}>
-                            Cancelled by customer
-                          </span>
-                        ) : (
-                          <div style={{ display: "flex", gap: "10px" }}>
-                            <button
-                              className="primary-btn"
-                              disabled={loadingReservationId === rez.id}
-                              onClick={async (e) => {
-                                e.stopPropagation();
+                        <div className="incoming-req-actions" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className="req-accept-btn"
+                            disabled={loadingReservationId === rez.id}
+                            title="Kabul Et"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setLoadingReservationId(rez.id);
 
-                                setLoadingReservationId(rez.id);
+                              const { error } = await supabase
+                                .from("reservations")
+                                .update({ status: "accepted" })
+                                .eq("id", rez.id)
+                                .select();
 
-                                const { data, error } = await supabase
-                                  .from("reservations")
-                                  .update({
-                                    status: "accepted",
-                                  })
-                                  .eq("id", rez.id)
-                                  .select();
-
-                                if (error) {
-                                  console.log("Accept error:", error);
-                                  alert("Rezervasyon kabul edilemedi.");
-                                  setLoadingReservationId(null);
-                                  return;
-                                }
-
-                                setReservations((prev) =>
-                                  prev.map((item) =>
-                                    item.id === rez.id
-                                      ? {
-                                          ...item,
-                                          status: "accepted",
-                                          businessMessage:
-                                            "Rezervasyonunuz oluşturuldu. Sizi bekliyoruz ❤️",
-                                        }
-                                      : item,
-                                  ),
-                                );
-
+                              if (error) {
+                                alert("Rezervasyon kabul edilemedi.");
                                 setLoadingReservationId(null);
-                              }}
-                            >
-                              {loadingReservationId === rez.id
-                                ? "Accepting..."
-                                : "Accept"}
-                            </button>
-                            <button
-                              className="reject-btn"
-                              disabled={loadingReservationId === rez.id}
-                              onClick={async (e) => {
-                                setLoadingReservationId(rez.id);
-                                e.stopPropagation();
+                                return;
+                              }
 
-                                const { error } = await supabase
-                                  .from("reservations")
-                                  .update({
-                                    status: "rejected",
-                                  })
-                                  .eq("id", rez.id);
+                              setReservations((prev) =>
+                                prev.map((item) =>
+                                  item.id === rez.id
+                                    ? { ...item, status: "accepted", businessMessage: "Rezervasyonunuz oluşturuldu. Sizi bekliyoruz ❤️" }
+                                    : item,
+                                ),
+                              );
+                              setLoadingReservationId(null);
+                            }}
+                          >
+                            {loadingReservationId === rez.id ? <Spinner /> : "✓"}
+                          </button>
 
-                                setLoadingReservationId(null);
+                          <button
+                            className="req-reject-btn"
+                            disabled={loadingReservationId === rez.id}
+                            title="Reddet"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setLoadingReservationId(rez.id);
 
-                                if (error) {
-                                  console.log("Reject error:", error);
-                                  alert("Rezervasyon reddedilemedi.");
-                                  return;
-                                }
+                              const { error } = await supabase
+                                .from("reservations")
+                                .update({ status: "rejected" })
+                                .eq("id", rez.id);
 
-                                setReservations(
-                                  reservations.map((item) =>
-                                    item.id === rez.id
-                                      ? {
-                                          ...item,
-                                          status: "rejected",
-                                          businessMessage:
-                                            "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️",
-                                        }
-                                      : item,
-                                  ),
-                                );
-                              }}
-                            >
-                              {loadingReservationId === rez.id
-                                ? "Loading..."
-                                : "Reject"}
-                            </button>
-                          </div>
-                        )}
+                              setLoadingReservationId(null);
+
+                              if (error) {
+                                alert("Rezervasyon reddedilemedi.");
+                                return;
+                              }
+
+                              setReservations(
+                                reservations.map((item) =>
+                                  item.id === rez.id
+                                    ? { ...item, status: "rejected", businessMessage: "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️" }
+                                    : item,
+                                ),
+                              );
+                            }}
+                          >
+                            {loadingReservationId === rez.id ? <Spinner /> : "✗"}
+                          </button>
+                        </div>
                       </div>
                     ))
                 ) : (
-                  <p className="description">
-                    No incoming reservation requests.
+                  <p className="description" style={{ padding: "20px 0" }}>
+                    📭 Bekleyen rezervasyon isteği yok.
                   </p>
                 )}
               </div>
@@ -2383,9 +2612,9 @@ function App() {
 
             {panelTab === "accepted" && (
               <div className="reservation-box">
-                <h2>Accepted Reservations</h2>
+                <h2>Kabul Edilen Rezervasyonlar</h2>
                 <p className="description">
-                  Select a date to view accepted reservations.
+                  Kabul edilen rezervasyonları görmek için tarih seçin.
                 </p>
 
                 <div className="time-slots">
@@ -2410,7 +2639,7 @@ function App() {
                       >
                         {date.display}
                         <br />
-                        <small>{count} reservations</small>
+                        <small>{count} rezervasyon</small>
                       </button>
                     );
                   })}
@@ -2446,7 +2675,7 @@ function App() {
                                 {rez.time} - {rez.fullName}
                               </strong>
                               <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
-                                {rez.guests} guests
+                                {rez.guests} misafir
                               </p>
                             </div>
 
@@ -2474,14 +2703,14 @@ function App() {
                         ))
                     ) : (
                       <p className="description">
-                        No accepted reservations for this date.
+                        Bu tarih için kabul edilen rezervasyon yok.
                       </p>
                     )}
                     <button
                       className="close-day-btn"
                       onClick={closeDayReservations}
                     >
-                      Close Day
+                      Günü Kapat
                     </button>
                   </div>
                 )}
@@ -2490,13 +2719,17 @@ function App() {
 
             {panelTab === "rejected" && (
               <div className="reservation-box">
-                <h2>Rejected Reservations</h2>
+                <h2>Reddedilen Rezervasyonlar</h2>
                 <p className="description">
-                  Rejected reservation requests will appear here.
+                  Reddedilen rezervasyon istekleri burada görünür.
                 </p>
 
-                {reservations.filter((rez) => rez.status === "rejected")
-                  .length > 0 ? (
+                {reservations.filter(
+                  (rez) =>
+                    rez.status === "rejected" &&
+                    loggedBusiness &&
+                    rez.businessId === loggedBusiness.id,
+                ).length > 0 ? (
                   reservations
                     .filter(
                       (rez) =>
@@ -2518,22 +2751,22 @@ function App() {
                             {formatDate(rez.date)}
                           </p>
                           <p style={{ marginTop: "6px", color: "#cbd5e1" }}>
-                            Note: {rez.note || "No note"}
+                            Not: {rez.note || "Not yok"}
                           </p>
                         </div>
 
-                        <span>{rez.guests} guests</span>
+                        <span>{rez.guests} misafir</span>
                       </div>
                     ))
                 ) : (
-                  <p className="description">No rejected reservations yet.</p>
+                  <p className="description">Henüz reddedilen rezervasyon yok.</p>
                 )}
               </div>
             )}
 
             {panelTab === "completed" && (
               <div className="reservation-box">
-                <h2>Completed Reservations</h2>
+                <h2>Tamamlanan Rezervasyonlar</h2>
 
                 {reservations.filter(
                   (rez) =>
@@ -2563,18 +2796,18 @@ function App() {
                           </p>
                         </div>
 
-                        <span>✓ Completed</span>
+                        <span>✓ Tamamlandı</span>
                       </div>
                     ))
                 ) : (
-                  <p className="description">No completed reservations yet.</p>
+                  <p className="description">Henüz tamamlanan rezervasyon yok.</p>
                 )}
               </div>
             )}
 
             {panelTab === "noShow" && (
               <div className="reservation-box">
-                <h2>No Show Reservations</h2>
+                <h2>No Show Rezervasyonlar</h2>
 
                 {reservations.filter(
                   (rez) =>
@@ -2608,19 +2841,19 @@ function App() {
                       </div>
                     ))
                 ) : (
-                  <p className="description">No no-show reservations yet.</p>
+                  <p className="description">Henüz no-show rezervasyon yok.</p>
                 )}
               </div>
             )}
 
             {panelTab === "settings" && (
               <div className="reservation-box">
-                <h2>Availability Settings</h2>
+                <h2>Müsaitlik Ayarları</h2>
                 <p className="description">
-                  Edit available days and time slots.
+                  Müsait gün ve saatleri düzenleyin.
                 </p>
 
-                <h3>Reservation Mode</h3>
+                <h3>Rezervasyon Modu</h3>
 
                 <div className="time-slots">
                   <button
@@ -2631,7 +2864,7 @@ function App() {
                     }
                     onClick={() => setAvailabilityMode("everyday")}
                   >
-                    Everyday
+                    Her Gün
                   </button>
 
                   <button
@@ -2642,49 +2875,49 @@ function App() {
                     }
                     onClick={() => setAvailabilityMode("selected")}
                   >
-                    Selected Week Days
+                    Seçili Günler
                   </button>
                 </div>
 
                 {availabilityMode === "selected" && (
                   <>
-                    <h3 style={{ marginTop: "24px" }}>Available Days</h3>
+                    <h3 style={{ marginTop: "24px" }}>Müsait Günler</h3>
 
                     <div className="time-slots">
                       {[
-                        "Monday",
-                        "Tuesday",
-                        "Wednesday",
-                        "Thursday",
-                        "Friday",
-                        "Saturday",
-                        "Sunday",
-                      ].map((day) => (
+                        { value: "Monday", label: "Pazartesi" },
+                        { value: "Tuesday", label: "Salı" },
+                        { value: "Wednesday", label: "Çarşamba" },
+                        { value: "Thursday", label: "Perşembe" },
+                        { value: "Friday", label: "Cuma" },
+                        { value: "Saturday", label: "Cumartesi" },
+                        { value: "Sunday", label: "Pazar" },
+                      ].map(({ value, label }) => (
                         <button
-                          key={day}
+                          key={value}
                           className={
-                            availableDays.includes(day)
+                            availableDays.includes(value)
                               ? "selected-time"
                               : "time-btn"
                           }
                           onClick={() => {
-                            if (availableDays.includes(day)) {
+                            if (availableDays.includes(value)) {
                               setAvailableDays(
-                                availableDays.filter((d) => d !== day),
+                                availableDays.filter((d) => d !== value),
                               );
                             } else {
-                              setAvailableDays([...availableDays, day]);
+                              setAvailableDays([...availableDays, value]);
                             }
                           }}
                         >
-                          {day}
+                          {label}
                         </button>
                       ))}
                     </div>
                   </>
                 )}
 
-                <h3 style={{ marginTop: "24px" }}>Available Times</h3>
+                <h3 style={{ marginTop: "24px" }}>Müsait Saatler</h3>
 
                 <div className="time-slots">
                   {["18:00", "19:00", "20:30", "22:00"].map((time) => (
@@ -2726,6 +2959,8 @@ function App() {
                   className="save-changes-btn"
                   style={{ marginTop: "20px" }}
                   onClick={async () => {
+                    if (!loggedBusiness) return;
+
                     const { error } = await supabase
                       .from("businesses")
                       .update({
@@ -2741,352 +2976,461 @@ function App() {
                       return;
                     }
 
-                    setSavedMessage("Changes updated successfully ✅");
+                    // Keep local copy of the business in sync so other
+                    // views (e.g. customer reservation flow) reflect the
+                    // updated availability immediately.
+                    const updatedBusiness = {
+                      ...loggedBusiness,
+                      availabilityMode,
+                      availableDays,
+                      availableTimes,
+                    };
+
+                    setLoggedBusiness(updatedBusiness);
+
+                    setAdminBusinesses((prev) =>
+                      prev.map((b) =>
+                        b.id === loggedBusiness.id ? updatedBusiness : b,
+                      ),
+                    );
+
+                    setSavedMessage("Değişiklikler başarıyla kaydedildi ✅");
 
                     setTimeout(() => {
                       setSavedMessage("");
                     }, 3000);
                   }}
                 >
-                  Save Changes
+                  Değişiklikleri Kaydet
                 </button>
               </div>
             )}
 
             {panelTab === "profile" && (
               <div className="reservation-box">
-                <h2>Business Profile</h2>
-                <p className="description">Edit business information.</p>
+                <h2>İşletme Profili</h2>
+                <p className="description">İşletme bilgilerini ve menü bilgilerini düzenleyin.</p>
 
                 <form className="reservation-form">
-                  <input type="text" placeholder="Business Name" />
-                  <input type="text" placeholder="Location" />
-                  <input type="tel" placeholder="Phone Number" />
-                  <textarea placeholder="Business Description"></textarea>
-                  <button type="button">Save Profile</button>
+                  <input
+                    type="text"
+                    placeholder="İşletme Adı"
+                    value={businessProfileForm.name}
+                    onChange={(e) => setBusinessProfileForm({ ...businessProfileForm, name: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Konum"
+                    value={businessProfileForm.location}
+                    onChange={(e) => setBusinessProfileForm({ ...businessProfileForm, location: e.target.value })}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Telefon Numarası"
+                    value={businessProfileForm.phone}
+                    onChange={(e) => setBusinessProfileForm({ ...businessProfileForm, phone: e.target.value })}
+                  />
+                  <textarea
+                    placeholder="İşletme Açıklaması (müşterilere görünür)"
+                    value={businessProfileForm.description}
+                    onChange={(e) => setBusinessProfileForm({ ...businessProfileForm, description: e.target.value })}
+                    rows={4}
+                  />
+                  <textarea
+                    placeholder="Menü (link veya metin — müşterilere görünür)"
+                    value={businessProfileForm.menu}
+                    onChange={(e) => setBusinessProfileForm({ ...businessProfileForm, menu: e.target.value })}
+                    rows={4}
+                  />
+                  {businessProfileSaved && (
+                    <p style={{ color: "#86efac", fontWeight: "bold", marginTop: 8 }}>{businessProfileSaved}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!loggedBusiness) return;
+
+                      // Step 1: Save name & location (columns guaranteed to exist)
+                      const { error: basicError } = await supabase
+                        .from("businesses")
+                        .update({
+                          name: businessProfileForm.name,
+                          location: businessProfileForm.location,
+                        })
+                        .eq("id", loggedBusiness.id);
+
+                      if (basicError) {
+                        console.log("Business profile save error:", basicError);
+                        alert("Profil kaydedilemedi: " + basicError.message);
+                        return;
+                      }
+
+                      // Step 2: Try to save description/menu/phone via menu_text (optional column)
+                      const menuData = JSON.stringify({
+                        description: businessProfileForm.description,
+                        menu: businessProfileForm.menu,
+                        phone: businessProfileForm.phone,
+                      });
+                      const { error: menuError } = await supabase
+                        .from("businesses")
+                        .update({ menu_text: menuData })
+                        .eq("id", loggedBusiness.id);
+
+                      const updatedBusiness = {
+                        ...loggedBusiness,
+                        name: businessProfileForm.name,
+                        location: businessProfileForm.location,
+                        phone: businessProfileForm.phone,
+                        description: businessProfileForm.description,
+                        menu: businessProfileForm.menu,
+                        menuText: menuError ? loggedBusiness.menuText : menuData,
+                      };
+                      setLoggedBusiness(updatedBusiness);
+                      setAdminBusinesses((prev) =>
+                        prev.map((b) => b.id === loggedBusiness.id ? updatedBusiness : b)
+                      );
+
+                      if (menuError) {
+                        setBusinessProfileSaved("İsim/konum kaydedildi ✅ — Açıklama/menü için Supabase'de şu SQL'i çalıştırın: ALTER TABLE businesses ADD COLUMN menu_text text;");
+                      } else {
+                        setBusinessProfileSaved("Profil başarıyla kaydedildi ✅");
+                      }
+                      setTimeout(() => setBusinessProfileSaved(""), 8000);
+                    }}
+                  >
+                    Profili Kaydet
+                  </button>
                 </form>
               </div>
             )}
 
             {panelTab === "insights" && (
-              <div className="reservation-box">
-                <h2>Müşterini Tanı</h2>
-                <p className="description">
-                  Demo insights are shown for presentation. Real analytics will
-                  appear after enough customer data is collected.
-                </p>
-
-                <div className="panel-tabs" style={{ marginTop: "20px" }}>
-                  <button
-                    className={customerInsightTab === "age" ? "active-tab" : ""}
-                    onClick={() => setCustomerInsightTab("age")}
-                  >
-                    Yaş Aralığı
-                  </button>
-
-                  <button
-                    className={
-                      customerInsightTab === "gender" ? "active-tab" : ""
-                    }
-                    onClick={() => setCustomerInsightTab("gender")}
-                  >
-                    Cinsiyet
-                  </button>
-
-                  <button
-                    className={
-                      customerInsightTab === "firstTimers" ? "active-tab" : ""
-                    }
-                    onClick={() => setCustomerInsightTab("firstTimers")}
-                  >
-                    İlk Kez Gelenler
-                  </button>
-
-                  <button
-                    className={
-                      customerInsightTab === "topCustomers" ? "active-tab" : ""
-                    }
-                    onClick={() => setCustomerInsightTab("topCustomers")}
-                  >
-                    En Çok Gelenler
-                  </button>
-
-                  <button
-                    className={
-                      customerInsightTab === "smoking" ? "active-tab" : ""
-                    }
-                    onClick={() => setCustomerInsightTab("smoking")}
-                  >
-                    Sigara
-                  </button>
-
-                  <button
-                    className={
-                      customerInsightTab === "busyDays" ? "active-tab" : ""
-                    }
-                    onClick={() => setCustomerInsightTab("busyDays")}
-                  >
-                    Yoğun Günler
-                  </button>
-
-                  <button
-                    className={
-                      customerInsightTab === "busyHours" ? "active-tab" : ""
-                    }
-                    onClick={() => setCustomerInsightTab("busyHours")}
-                  >
-                    Yoğun Saatler
-                  </button>
+              <div className="reservation-box insight-box">
+                <div className="insight-header">
+                  <div>
+                    <h2>Müşterini Tanı</h2>
+                    <p className="description" style={{ marginBottom: 0 }}>
+                      Kabul edilen rezervasyonlardan elde edilen müşteri analizleri.
+                    </p>
+                  </div>
+                  <div className="insight-total-badge">
+                    <AnimatedNumber value={getBusinessAcceptedReservations().length} /> kabul
+                  </div>
                 </div>
 
-                {customerInsightTab === "age" && (
-                  <div style={{ marginTop: "24px" }}>
-                    <h3>Yaş Aralığı</h3>
+                <div className="insight-tab-grid">
+                  {[
+                    { key: "age", icon: "🎂", label: "Yaş" },
+                    { key: "gender", icon: "👥", label: "Cinsiyet" },
+                    { key: "firstTimers", icon: "🌟", label: "İlk Kez" },
+                    { key: "topCustomers", icon: "🏆", label: "VIP" },
+                    { key: "smoking", icon: "🚬", label: "Sigara" },
+                    { key: "busyDays", icon: "📅", label: "Günler" },
+                    { key: "busyHours", icon: "🕐", label: "Saatler" },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      className={`insight-tab-btn${customerInsightTab === tab.key ? " active" : ""}`}
+                      onClick={() => setCustomerInsightTab(tab.key)}
+                    >
+                      <span className="insight-tab-icon">{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
 
-                    {getDistributionList("age").length > 0 ? (
-                      getDistributionList("age").map((item) => (
-                        <div className="card-row" key={item.label}>
-                          <span>{item.label}</span>
-                          <strong>
-                            {item.count} customers • {item.percent}%
-                          </strong>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="description">
-                        Yaş dağılımı için kabul edilmiş rezervasyon gerekiyor.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {customerInsightTab === "gender" && (
-                  <div style={{ marginTop: "24px" }}>
-                    <h3>Cinsiyet Dağılımı</h3>
-
-                    {getDistributionList("gender").length > 0 ? (
-                      getDistributionList("gender").map((item) => (
-                        <div className="card-row" key={item.label}>
-                          <span>{item.label}</span>
-                          <strong>
-                            {item.count} customers • {item.percent}%
-                          </strong>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="description">
-                        Cinsiyet dağılımı için kabul edilmiş rezervasyon
-                        gerekiyor.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {customerInsightTab === "firstTimers" && (
-                  <div style={{ marginTop: "24px" }}>
-                    <h3>İlk Kez Gelenler</h3>
-
-                    {getCustomerFrequencyList().filter(
-                      (customer) => customer.count === 1,
-                    ).length > 0 ? (
-                      getCustomerFrequencyList()
-                        .filter((customer) => customer.count === 1)
-                        .map((customer) => (
-                          <div
-                            className="accepted-list-item"
-                            key={customer.email}
-                          >
-                            <strong>{customer.name}</strong>
-                            <span>1 accepted reservation</span>
+                <div className="insight-content">
+                  {customerInsightTab === "age" && (() => {
+                    const list = getDistributionList("age");
+                    return list.length > 0 ? (
+                      <div>
+                        <div className="insight-section-title">🎂 Yaş Aralığı Dağılımı</div>
+                        {list.map((item, i) => (
+                          <div className="insight-progress-row" key={item.label} style={{ animationDelay: `${i * 0.07}s` }}>
+                            <div className="insight-progress-label">
+                              <span>{item.label}</span>
+                              <strong>{item.count} kişi <em>•</em> {item.percent}%</strong>
+                            </div>
+                            <div className="insight-track">
+                              <div className="insight-fill" style={{ width: `${item.percent}%`, animationDelay: `${i * 0.07 + 0.1}s` }} />
+                            </div>
                           </div>
-                        ))
-                    ) : (
-                      <p className="description">
-                        İlk kez gelen müşteri verisi henüz yok.
-                      </p>
-                    )}
-                  </div>
-                )}
+                        ))}
+                      </div>
+                    ) : <p className="insight-empty">Yaş dağılımı için kabul edilmiş rezervasyon gerekiyor.</p>;
+                  })()}
 
-                {customerInsightTab === "topCustomers" && (
-                  <div style={{ marginTop: "24px" }}>
-                    <h3>En Çok Gelenler</h3>
-
-                    {getCustomerFrequencyList().filter(
-                      (customer) => customer.count > 1,
-                    ).length > 0 ? (
-                      getCustomerFrequencyList()
-                        .filter((customer) => customer.count > 1)
-                        .map((customer) => (
-                          <div
-                            className="accepted-list-item"
-                            key={customer.email}
-                          >
-                            <strong>{customer.name}</strong>
-                            <span>{customer.count} accepted reservations</span>
+                  {customerInsightTab === "gender" && (() => {
+                    const list = getDistributionList("gender");
+                    return list.length > 0 ? (
+                      <div>
+                        <div className="insight-section-title">👥 Cinsiyet Dağılımı</div>
+                        {list.map((item, i) => (
+                          <div className="insight-progress-row" key={item.label} style={{ animationDelay: `${i * 0.07}s` }}>
+                            <div className="insight-progress-label">
+                              <span>{item.label}</span>
+                              <strong>{item.count} kişi <em>•</em> {item.percent}%</strong>
+                            </div>
+                            <div className="insight-track">
+                              <div className="insight-fill pink" style={{ width: `${item.percent}%`, animationDelay: `${i * 0.07 + 0.1}s` }} />
+                            </div>
                           </div>
-                        ))
-                    ) : (
-                      <p className="description">
-                        Tekrar gelen müşteri verisi henüz yok.
-                      </p>
-                    )}
-                  </div>
-                )}
+                        ))}
+                      </div>
+                    ) : <p className="insight-empty">Cinsiyet dağılımı için kabul edilmiş rezervasyon gerekiyor.</p>;
+                  })()}
 
-                {customerInsightTab === "smoking" && (
-                  <div style={{ marginTop: "24px" }}>
-                    <h3>Sigara İçme Dağılımı</h3>
+                  {customerInsightTab === "firstTimers" && (() => {
+                    const list = getCustomerFrequencyList().filter(c => c.count === 1);
+                    return (
+                      <div>
+                        <div className="insight-section-title">🌟 İlk Kez Gelenler <span className="insight-count-badge">{list.length}</span></div>
+                        {list.length > 0 ? list.map((c, i) => (
+                          <div className="insight-customer-row" key={c.email} style={{ animationDelay: `${i * 0.06}s` }}>
+                            <div className="insight-avatar">{c.name[0].toUpperCase()}</div>
+                            <div>
+                              <strong>{c.name}</strong>
+                              <p>{c.email}</p>
+                            </div>
+                            <span className="insight-badge new">İlk ziyaret</span>
+                          </div>
+                        )) : <p className="insight-empty">İlk kez gelen müşteri verisi henüz yok.</p>}
+                      </div>
+                    );
+                  })()}
 
-                    {getDistributionList("smoking").length > 0 ? (
-                      getDistributionList("smoking").map((item) => (
-                        <div className="card-row" key={item.label}>
-                          <span>{item.label}</span>
-                          <strong>
-                            {item.count} customers • {item.percent}%
-                          </strong>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="description">
-                        Sigara dağılımı için kabul edilmiş rezervasyon
-                        gerekiyor.
-                      </p>
-                    )}
-                  </div>
-                )}
+                  {customerInsightTab === "topCustomers" && (() => {
+                    const list = getCustomerFrequencyList().filter(c => c.count > 1);
+                    const maxCount = list[0]?.count || 1;
+                    return (
+                      <div>
+                        <div className="insight-section-title">🏆 En Çok Gelenler <span className="insight-count-badge">{list.length}</span></div>
+                        {list.length > 0 ? list.map((c, i) => (
+                          <div className="insight-vip-row" key={c.email} style={{ animationDelay: `${i * 0.07}s` }}>
+                            <div className="insight-rank">#{i + 1}</div>
+                            <div className="insight-vip-info">
+                              <div className="insight-progress-label">
+                                <span>{c.name}</span>
+                                <strong>{c.count} ziyaret</strong>
+                              </div>
+                              <div className="insight-track">
+                                <div className="insight-fill gold" style={{ width: `${Math.round(c.count/maxCount*100)}%`, animationDelay: `${i * 0.07 + 0.1}s` }} />
+                              </div>
+                            </div>
+                          </div>
+                        )) : <p className="insight-empty">Tekrar gelen müşteri verisi henüz yok.</p>}
+                      </div>
+                    );
+                  })()}
 
-                {customerInsightTab === "busyDays" && (
-                  <div style={{ marginTop: "24px" }}>
-                    <h3>En Yoğun Günler</h3>
+                  {customerInsightTab === "smoking" && (() => {
+                    const list = getDistributionList("smoking");
+                    return list.length > 0 ? (
+                      <div>
+                        <div className="insight-section-title">🚬 Sigara İçme Dağılımı</div>
+                        {list.map((item, i) => (
+                          <div className="insight-progress-row" key={item.label} style={{ animationDelay: `${i * 0.07}s` }}>
+                            <div className="insight-progress-label">
+                              <span>{item.label}</span>
+                              <strong>{item.count} kişi <em>•</em> {item.percent}%</strong>
+                            </div>
+                            <div className="insight-track">
+                              <div className="insight-fill orange" style={{ width: `${item.percent}%`, animationDelay: `${i * 0.07 + 0.1}s` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="insight-empty">Sigara dağılımı için kabul edilmiş rezervasyon gerekiyor.</p>;
+                  })()}
 
-                    {getBusyDaysList().length > 0 ? (
-                      getBusyDaysList().map((item) => (
-                        <div className="card-row" key={item.day}>
-                          <span>{item.day}</span>
-                          <strong>{item.count} accepted reservations</strong>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="description">
-                        Yoğun gün verisi için kabul edilmiş rezervasyon
-                        gerekiyor.
-                      </p>
-                    )}
-                  </div>
-                )}
+                  {customerInsightTab === "busyDays" && (() => {
+                    const list = getBusyDaysList();
+                    const max = list[0]?.count || 1;
+                    return list.length > 0 ? (
+                      <div>
+                        <div className="insight-section-title">📅 En Yoğun Günler</div>
+                        {list.map((item, i) => (
+                          <div className="insight-progress-row" key={item.day} style={{ animationDelay: `${i * 0.07}s` }}>
+                            <div className="insight-progress-label">
+                              <span>{item.day}</span>
+                              <strong>{item.count} rezervasyon</strong>
+                            </div>
+                            <div className="insight-track">
+                              <div className="insight-fill green" style={{ width: `${Math.round(item.count/max*100)}%`, animationDelay: `${i * 0.07 + 0.1}s` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="insight-empty">Yoğun gün verisi için kabul edilmiş rezervasyon gerekiyor.</p>;
+                  })()}
 
-                {customerInsightTab === "busyHours" && (
-                  <div style={{ marginTop: "24px" }}>
-                    <h3>En Yoğun Saatler</h3>
-
-                    {getBusyHoursList().length > 0 ? (
-                      getBusyHoursList().map((item) => (
-                        <div className="card-row" key={item.time}>
-                          <span>{item.time}</span>
-                          <strong>{item.count} accepted reservations</strong>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="description">
-                        Yoğun saat verisi için kabul edilmiş rezervasyon
-                        gerekiyor.
-                      </p>
-                    )}
-                  </div>
-                )}
+                  {customerInsightTab === "busyHours" && (() => {
+                    const list = getBusyHoursList();
+                    const max = list[0]?.count || 1;
+                    return list.length > 0 ? (
+                      <div>
+                        <div className="insight-section-title">🕐 En Yoğun Saatler</div>
+                        {list.map((item, i) => (
+                          <div className="insight-progress-row" key={item.time} style={{ animationDelay: `${i * 0.07}s` }}>
+                            <div className="insight-progress-label">
+                              <span>🕐 {item.time}</span>
+                              <strong>{item.count} rezervasyon</strong>
+                            </div>
+                            <div className="insight-track">
+                              <div className="insight-fill purple" style={{ width: `${Math.round(item.count/max*100)}%`, animationDelay: `${i * 0.07 + 0.1}s` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="insight-empty">Yoğun saat verisi için kabul edilmiş rezervasyon gerekiyor.</p>;
+                  })()}
+                </div>
               </div>
             )}
           </div>
         </section>
       )}
 
+      {selectedBusinessInfo && (
+        <div className="popup-overlay" onClick={() => setSelectedBusinessInfo(null)}>
+          <div className="popup-box business-info-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="business-info-icon">{selectedBusinessInfo.icon}</div>
+            <h2>{selectedBusinessInfo.name}</h2>
+            <p style={{ color: "#94a3b8", marginBottom: 20 }}>{selectedBusinessInfo.type} · {selectedBusinessInfo.location}</p>
+
+            {selectedBusinessInfo.phone && (
+              <div className="card-row">
+                <span>📞 Telefon</span>
+                <strong>{selectedBusinessInfo.phone}</strong>
+              </div>
+            )}
+
+            {selectedBusinessInfo.description ? (
+              <div className="business-info-section">
+                <div className="business-info-label">📋 Hakkımızda</div>
+                <p className="business-info-text">{selectedBusinessInfo.description}</p>
+              </div>
+            ) : (
+              <p className="business-info-empty">Açıklama henüz girilmemiş.</p>
+            )}
+
+            {selectedBusinessInfo.menu ? (
+              <div className="business-info-section">
+                <div className="business-info-label">🍽 Menü</div>
+                {selectedBusinessInfo.menu.startsWith("http") ? (
+                  <a
+                    href={selectedBusinessInfo.menu}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="business-info-link"
+                  >
+                    Menüyü Görüntüle →
+                  </a>
+                ) : (
+                  <p className="business-info-text">{selectedBusinessInfo.menu}</p>
+                )}
+              </div>
+            ) : (
+              <p className="business-info-empty">Menü henüz eklenmemiş.</p>
+            )}
+
+            <button
+              className="primary-btn"
+              style={{ marginTop: 20 }}
+              onClick={() => setSelectedBusinessInfo(null)}
+            >
+              Kapat
+            </button>
+          </div>
+        </div>
+      )}
+
       {selectedReservation && (
         <div className="popup-overlay">
           <div className="popup-box">
-            <h2>Reservation Details</h2>
+            <h2>Rezervasyon Detayları</h2>
 
             <div className="card-row">
-              <span>Name</span>
+              <span>İsim</span>
               <strong>{selectedReservation.fullName}</strong>
             </div>
 
             <div className="card-row">
-              <span>Email</span>
+              <span>E-posta</span>
               <strong>{selectedReservation.email}</strong>
             </div>
 
             <div className="card-row">
-              <span>Phone</span>
+              <span>Telefon</span>
               <strong>{selectedReservation.phone}</strong>
             </div>
 
             <div className="card-row">
-              <span>Business</span>
+              <span>İşletme</span>
               <strong>{selectedReservation.business}</strong>
             </div>
 
             <div className="card-row">
-              <span>Date</span>
+              <span>Tarih</span>
               <strong>{formatDate(selectedReservation.date)}</strong>
             </div>
 
             <div className="card-row">
-              <span>Time</span>
+              <span>Saat</span>
               <strong>{selectedReservation.time}</strong>
             </div>
 
             <div className="card-row">
-              <span>Guests</span>
+              <span>Misafir</span>
               <strong>{selectedReservation.guests}</strong>
             </div>
 
             <div className="card-row">
-              <span>Status</span>
+              <span>Durum</span>
               <strong>{selectedReservation.status}</strong>
             </div>
             <div className="card-row">
-              <span>Safe Score</span>
+              <span>Güven Puanı</span>
               <strong>{selectedReservation.safeScore ?? 100}/100</strong>
             </div>
             <div className="card-row">
-              <span>Reservation Code</span>
+              <span>Rezervasyon Kodu</span>
               <strong style={{ color: "#a855f7" }}>
                 {selectedReservation.code}
               </strong>
             </div>
 
             <div className="card-row">
-              <span>Gender</span>
+              <span>Cinsiyet</span>
               <strong>
-                {selectedReservation.customerProfile?.gender || "Not provided"}
+                {selectedReservation.customerProfile?.gender || "Belirtilmedi"}
               </strong>
             </div>
 
             <div className="card-row">
-              <span>Birth Date</span>
+              <span>Doğum Tarihi</span>
               <strong>
                 {selectedReservation.customerProfile?.birthDate ||
-                  "Not provided"}
+                  "Belirtilmedi"}
               </strong>
             </div>
 
             <div className="card-row">
-              <span>Job</span>
+              <span>Meslek</span>
               <strong>
-                {selectedReservation.customerProfile?.job || "Not provided"}
+                {selectedReservation.customerProfile?.job || "Belirtilmedi"}
               </strong>
             </div>
 
             <div className="card-row">
-              <span>Smoking</span>
+              <span>Sigara</span>
               <strong>
-                {selectedReservation.customerProfile?.smoking || "Not provided"}
+                {selectedReservation.customerProfile?.smoking || "Belirtilmedi"}
               </strong>
             </div>
             <div className="card-row">
-              <span>Note</span>
-              <strong>{selectedReservation.note || "No note"}</strong>
+              <span>Not</span>
+              <strong>{selectedReservation.note || "Not yok"}</strong>
             </div>
 
             <button
@@ -3094,7 +3438,7 @@ function App() {
               style={{ marginTop: "20px" }}
               onClick={() => setSelectedReservation(null)}
             >
-              Close
+              Kapat
             </button>
           </div>
         </div>
