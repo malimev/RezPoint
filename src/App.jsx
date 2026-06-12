@@ -1424,15 +1424,6 @@ function App() {
                       return;
                     }
 
-                    const alreadyExists = registeredCustomers.some(
-                      (customer) => customer.email === customerForm.email,
-                    );
-
-                    if (alreadyExists) {
-                      setCustomerAuthError("Bu e-posta zaten kayıtlı.");
-                      return;
-                    }
-
                     // Register via Supabase Auth — secure hashing,
                     // automatic email verification mail handled by Supabase.
                     const { data: authData, error: authError } =
@@ -1446,25 +1437,48 @@ function App() {
                       return;
                     }
 
-                    const { error: insertError } = await supabase
+                    // Check if a customer record already exists for this email
+                    // (migration case: user registered before Supabase Auth).
+                    const { data: existingCust } = await supabase
                       .from("customers")
-                      .insert([{
-                        name: customerForm.name,
-                        email: customerForm.email,
-                        auth_user_id: authData.user.id,
-                        safe_score: 100,
-                      }]);
+                      .select("id, safe_score")
+                      .eq("email", customerForm.email)
+                      .single();
 
-                    if (insertError) {
-                      setCustomerAuthError("Hesap oluşturulamadı. Tekrar deneyin.");
-                      return;
+                    let custId, safeScore;
+                    if (existingCust) {
+                      // Link existing record to the new Auth user
+                      await supabase
+                        .from("customers")
+                        .update({ auth_user_id: authData.user.id })
+                        .eq("id", existingCust.id);
+                      custId = existingCust.id;
+                      safeScore = existingCust.safe_score || 100;
+                    } else {
+                      const { data: inserted, error: insertError } = await supabase
+                        .from("customers")
+                        .insert([{
+                          name: customerForm.name,
+                          email: customerForm.email,
+                          auth_user_id: authData.user.id,
+                          safe_score: 100,
+                        }])
+                        .select("id")
+                        .single();
+
+                      if (insertError) {
+                        setCustomerAuthError("Hesap oluşturulamadı. Tekrar deneyin.");
+                        return;
+                      }
+                      custId = inserted.id;
+                      safeScore = 100;
                     }
 
                     const newCustomer = {
-                      id: authData.user.id,
+                      id: custId,
                       name: customerForm.name,
                       email: customerForm.email,
-                      safeScore: 100,
+                      safeScore,
                     };
                     setCustomerAuthError("");
                     setLoggedCustomer(newCustomer);
