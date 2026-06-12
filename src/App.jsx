@@ -415,14 +415,14 @@ function App() {
 
     return reservations.filter(
       (rez) =>
-        rez.businessId === loggedBusiness.id && rez.status === "accepted",
+        String(rez.businessId) === String(loggedBusiness.id) && rez.status === "accepted",
     );
   }
   function getBusinessReservationCount(status) {
     if (!loggedBusiness) return 0;
 
     return reservations.filter(
-      (rez) => rez.businessId === loggedBusiness.id && rez.status === status,
+      (rez) => String(rez.businessId) === String(loggedBusiness.id) && rez.status === status,
     ).length;
   }
 
@@ -677,7 +677,7 @@ function App() {
     if (!window.confirm("Seçili tarihi kapat? attendance_status güncellenmemiş rezervasyonlar 'no_show' sayılır.")) return;
 
     const targetReservations = reservations.filter(
-      (rez) => rez.businessId === loggedBusiness.id && rez.status === "accepted" && rez.date === selectedAcceptedDate,
+      (rez) => String(rez.businessId) === String(loggedBusiness.id) && rez.status === "accepted" && rez.date === selectedAcceptedDate,
     );
     if (targetReservations.length === 0) { alert("Bu tarih için kabul edilmiş rezervasyon yok."); return; }
 
@@ -704,7 +704,7 @@ function App() {
     }
 
     setReservations(prev => prev.map(rez => {
-      if (rez.businessId === loggedBusiness.id && rez.status === "accepted" && rez.date === selectedAcceptedDate && rez.attendanceStatus === "pending") {
+      if (String(rez.businessId) === String(loggedBusiness.id) && rez.status === "accepted" && rez.date === selectedAcceptedDate && rez.attendanceStatus === "pending") {
         return { ...rez, attendanceStatus: "no_show" };
       }
       return rez;
@@ -2381,14 +2381,14 @@ function App() {
                 reservations.filter(
                   (rez) =>
                     rez.status === "pending" &&
-                    rez.businessId === loggedBusiness.id,
+                    String(rez.businessId) === String(loggedBusiness.id),
                 ).length > 0 ? (
                   reservations
                     .filter(
                       (rez) =>
                         rez.status === "pending" &&
                         loggedBusiness &&
-                        rez.businessId === loggedBusiness.id,
+                        String(rez.businessId) === String(loggedBusiness.id),
                     )
                     .map((rez) => (
                       <div
@@ -2415,11 +2415,10 @@ function App() {
                               const { error } = await supabase
                                 .from("reservations")
                                 .update({ status: "accepted", business_message: "Rezervasyonunuz oluşturuldu. Sizi bekliyoruz ❤️" })
-                                .eq("id", rez.id)
-                                .select();
+                                .eq("id", rez.id);
 
                               if (error) {
-                                alert("Rezervasyon kabul edilemedi.");
+                                alert(`Rezervasyon kabul edilemedi: ${error.message}`);
                                 setLoadingReservationId(null);
                                 return;
                               }
@@ -2460,10 +2459,9 @@ function App() {
                                 .update({ status: "rejected", business_message: "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️" })
                                 .eq("id", rez.id);
 
-                              setLoadingReservationId(null);
-
                               if (error) {
-                                alert("Rezervasyon reddedilemedi.");
+                                alert(`Rezervasyon reddedilemedi: ${error.message}`);
+                                setLoadingReservationId(null);
                                 return;
                               }
 
@@ -2477,13 +2475,14 @@ function App() {
                                 }]);
                               }
 
-                              setReservations(
-                                reservations.map((item) =>
+                              setReservations((prev) =>
+                                prev.map((item) =>
                                   item.id === rez.id
                                     ? { ...item, status: "rejected", businessMessage: "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️" }
                                     : item,
                                 ),
                               );
+                              setLoadingReservationId(null);
                             }}
                           >
                             {loadingReservationId === rez.id ? <Spinner /> : "✗"}
@@ -2507,7 +2506,7 @@ function App() {
                 <div className="time-slots">
                   {getAvailableDates().map((date) => {
                     const count = reservations.filter(
-                      (rez) => rez.status === "accepted" && rez.date === date.fullDate && loggedBusiness && rez.businessId === loggedBusiness.id,
+                      (rez) => rez.status === "accepted" && rez.date === date.fullDate && loggedBusiness && String(rez.businessId) === String(loggedBusiness.id),
                     ).length;
                     return (
                       <button key={date.fullDate}
@@ -2521,7 +2520,7 @@ function App() {
 
                 {selectedAcceptedDate && (() => {
                   const dateRezs = reservations.filter(
-                    (rez) => rez.status === "accepted" && rez.date === selectedAcceptedDate && loggedBusiness && rez.businessId === loggedBusiness.id,
+                    (rez) => rez.status === "accepted" && rez.date === selectedAcceptedDate && loggedBusiness && String(rez.businessId) === String(loggedBusiness.id),
                   );
                   return (
                     <div style={{ marginTop: 25 }}>
@@ -2593,14 +2592,14 @@ function App() {
                   (rez) =>
                     rez.status === "rejected" &&
                     loggedBusiness &&
-                    rez.businessId === loggedBusiness.id,
+                    String(rez.businessId) === String(loggedBusiness.id),
                 ).length > 0 ? (
                   reservations
                     .filter(
                       (rez) =>
                         rez.status === "rejected" &&
                         loggedBusiness &&
-                        rez.businessId === loggedBusiness.id,
+                        String(rez.businessId) === String(loggedBusiness.id),
                     )
                     .map((rez) => (
                       <div
@@ -2637,14 +2636,14 @@ function App() {
                   (rez) =>
                     rez.status === "completed" &&
                     loggedBusiness &&
-                    rez.businessId === loggedBusiness.id,
+                    String(rez.businessId) === String(loggedBusiness.id),
                 ).length > 0 ? (
                   reservations
                     .filter(
                       (rez) =>
                         rez.status === "completed" &&
                         loggedBusiness &&
-                        rez.businessId === loggedBusiness.id,
+                        String(rez.businessId) === String(loggedBusiness.id),
                     )
                     .map((rez) => (
                       <div
@@ -2678,14 +2677,14 @@ function App() {
                   (rez) =>
                     rez.status === "no-show" &&
                     loggedBusiness &&
-                    rez.businessId === loggedBusiness.id,
+                    String(rez.businessId) === String(loggedBusiness.id),
                 ).length > 0 ? (
                   reservations
                     .filter(
                       (rez) =>
                         rez.status === "no-show" &&
                         loggedBusiness &&
-                        rez.businessId === loggedBusiness.id,
+                        String(rez.businessId) === String(loggedBusiness.id),
                     )
                     .map((rez) => (
                       <div

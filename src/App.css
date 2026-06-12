@@ -592,7 +592,7 @@ textarea {
   gap: 14px;
   width: 100%;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 .reservation-form input,
 .reservation-form textarea {
@@ -647,6 +647,36 @@ textarea {
 .reservation-form button:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 8px 22px rgba(124,58,237,0.45);
+}
+
+/* Strip butonları form'un genel button stilini geçersiz kılar */
+.reservation-form .strip-btn {
+  background: rgba(255,255,255,0.92);
+  border: 1.5px solid rgba(124,58,237,0.18);
+  color: var(--text-dim);
+  box-shadow: 0 2px 6px rgba(124,58,237,0.07);
+  padding: 8px 12px;
+  transform: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.reservation-form .strip-btn:hover:not(.active) {
+  background: rgba(109,40,217,0.08);
+  border-color: var(--purple-light);
+  color: var(--purple);
+  transform: none;
+  box-shadow: none;
+}
+.reservation-form .strip-btn.active {
+  background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+  border-color: var(--purple-light);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(109,40,217,0.4);
+  transform: none;
+}
+.reservation-form .strip-btn.active .strip-day,
+.reservation-form .strip-btn.active .strip-date {
+  color: #ffffff;
 }
 
 .error-message {
@@ -1090,7 +1120,9 @@ textarea {
 .rez-info-value {
   font-size: 14px;
   font-weight: 600;
-  color: white;
+  color: var(--text-main);
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 /* ── Accordion ── */
