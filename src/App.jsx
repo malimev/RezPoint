@@ -2109,6 +2109,7 @@ function App() {
               </form>
             )}
 
+            <div className="admin-table-wrap">
             <table className="admin-table" style={{ marginTop: 8 }}>
               <thead>
                 <tr>
@@ -2179,6 +2180,7 @@ function App() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* ── Business Types ── */}
