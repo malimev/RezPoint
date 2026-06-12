@@ -46,6 +46,19 @@ function AnimatedNumber({ value }) {
   return <>{display}</>;
 }
 
+const ALL_TIME_SLOTS = (() => {
+  const slots = [];
+  for (let h = 8; h < 24; h++) {
+    slots.push(`${String(h).padStart(2, "0")}:00`);
+    slots.push(`${String(h).padStart(2, "0")}:30`);
+  }
+  for (let h = 0; h < 8; h++) {
+    slots.push(`${String(h).padStart(2, "0")}:00`);
+    slots.push(`${String(h).padStart(2, "0")}:30`);
+  }
+  return slots;
+})();
+
 function App() {
   const [page, setPage] = useState("home");
   const [selectedBusiness, setSelectedBusiness] = useState(null);
@@ -95,6 +108,11 @@ function App() {
   });
   const [businessProfileSaved, setBusinessProfileSaved] = useState("");
   const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
+
+  const [searchLocation, setSearchLocation] = useState("Hepsi");
+  const [searchDate, setSearchDate] = useState("");
+  const [searchTime, setSearchTime] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
 
   const [adminLogin, setAdminLogin] = useState({
     email: "",
@@ -146,6 +164,33 @@ function App() {
   // ---------------------------------------------------------------------
   useEffect(() => {
     const loadInitialData = async () => {
+      // Restore Supabase Auth session if one exists
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: custData } = await supabase
+          .from("customers")
+          .select("*")
+          .eq("auth_user_id", session.user.id)
+          .single();
+        if (custData) {
+          setLoggedCustomer({
+            id: custData.id,
+            name: custData.name,
+            email: custData.email,
+            safeScore: custData.safe_score || 100,
+          });
+          setCustomerProfile({
+            phone: custData.phone || "",
+            gender: custData.gender || "",
+            birthDate: custData.birth_date || "",
+            job: custData.job || "",
+            smoking: custData.smoking || "",
+          });
+          setCustomerForm({ name: custData.name, email: custData.email, password: "" });
+          setEmailVerified(!!session.user.email_confirmed_at);
+        }
+      }
+
       // Businesses
       const { data: businessData, error: businessError } = await supabase
         .from("businesses")
@@ -262,6 +307,14 @@ function App() {
     };
 
     loadInitialData();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        setLoggedCustomer(null);
+        setEmailVerified(false);
+      }
+    });
+    return () => subscription?.unsubscribe();
   }, []);
 
   // ---------------------------------------------------------------------
@@ -300,34 +353,27 @@ function App() {
   function getAvailableDates() {
     const dates = [];
 
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 30; i++) {
       const date = new Date();
       date.setHours(0, 0, 0, 0);
       date.setDate(date.getDate() + i);
 
-      const dayName = date.toLocaleDateString("en-US", {
-        weekday: "long",
-      });
-
-      const businessAvailabilityMode =
-        selectedBusiness?.availabilityMode || availabilityMode;
-
+      const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
+      const businessAvailabilityMode = selectedBusiness?.availabilityMode || availabilityMode;
       const businessAvailableDays = selectedBusiness?.availableDays?.length
         ? selectedBusiness.availableDays
         : availableDays;
-
       const shouldInclude =
         businessAvailabilityMode === "everyday" ||
         businessAvailableDays.includes(dayName);
 
       if (shouldInclude) {
+        const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
         dates.push({
-          fullDate: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
-          display: date.toLocaleDateString("tr-TR", {
-            day: "2-digit",
-            month: "2-digit",
-            weekday: "long",
-          }),
+          fullDate,
+          display: date.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", weekday: "long" }),
+          dayShort: date.toLocaleDateString("tr-TR", { weekday: "short" }),
+          dateShort: date.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" }),
         });
       }
     }
@@ -509,6 +555,11 @@ function App() {
       setError("Rezervasyon oluşturmak için giriş yapın.");
       setCustomerMode("login");
       setPage("customerAuth");
+      return;
+    }
+
+    if (!emailVerified) {
+      setError("Rezervasyon oluşturmak için e-posta adresinizi doğrulayın.");
       return;
     }
 
@@ -809,15 +860,64 @@ function App() {
           <div className="hero-text">
             <h1>Modern işletmeler için akıllı rezervasyon.</h1>
             <p className="description">
-              İşletmeyi seç, tarih ve saati belirle — saniyeler içinde rezervasyon oluştur.
+              Konum ve zaman seç, müsait işletmeleri gör — saniyeler içinde rezervasyon oluştur.
             </p>
 
-            <button
-              className="hero-reservation-btn"
-              onClick={goToReservationFlow}
-            >
-              Rezervasyon Oluştur
-            </button>
+            <div className="search-panel">
+              <div className="search-fields">
+                <div className="search-field">
+                  <label className="search-label">📍 Konum</label>
+                  <select
+                    className="search-select"
+                    value={searchLocation}
+                    onChange={(e) => setSearchLocation(e.target.value)}
+                  >
+                    <option value="Hepsi">Hepsi</option>
+                    <option value="İskele">İskele</option>
+                    <option value="Mağusa">Mağusa</option>
+                  </select>
+                </div>
+
+                <div className="search-field">
+                  <label className="search-label">📅 Tarih</label>
+                  <input
+                    type="date"
+                    className="search-input"
+                    value={searchDate}
+                    onChange={(e) => setSearchDate(e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                    max={(() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 30);
+                      return d.toISOString().split("T")[0];
+                    })()}
+                  />
+                </div>
+
+                <div className="search-field">
+                  <label className="search-label">🕐 Saat</label>
+                  <select
+                    className="search-select"
+                    value={searchTime}
+                    onChange={(e) => setSearchTime(e.target.value)}
+                  >
+                    <option value="">Fark etmez</option>
+                    {ALL_TIME_SLOTS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <button
+                className="search-btn"
+                onClick={() => setPage("businesses")}
+              >
+                {searchDate
+                  ? `${formatDate(searchDate)}${searchTime ? ` saat ${searchTime}` : ""} için müsait işletmeleri gör`
+                  : "Tüm işletmeleri gör"}
+              </button>
+            </div>
           </div>
 
           <div className="hero-card">
@@ -863,11 +963,38 @@ function App() {
             )}
           </div>
 
+          {(searchLocation !== "Hepsi" || searchDate || searchTime) && (
+            <div className="search-active-bar">
+              {searchLocation !== "Hepsi" && <span className="search-chip">📍 {searchLocation}</span>}
+              {searchDate && <span className="search-chip">📅 {formatDate(searchDate)}</span>}
+              {searchTime && <span className="search-chip">🕐 {searchTime}</span>}
+              <button
+                className="search-chip-clear"
+                onClick={() => { setSearchLocation("Hepsi"); setSearchDate(""); setSearchTime(""); }}
+              >
+                ✕ Filtreyi Temizle
+              </button>
+            </div>
+          )}
+
           <div className="business-grid">
             {adminBusinesses
-              .filter((business) => business.reservationActive &&
-                (businessSearch === "" || business.name.toLowerCase().includes(businessSearch.toLowerCase()) || business.type.toLowerCase().includes(businessSearch.toLowerCase()) || business.location.toLowerCase().includes(businessSearch.toLowerCase()))
-              )
+              .filter((business) => {
+                if (!business.reservationActive) return false;
+                const q = businessSearch.toLowerCase();
+                if (q && !business.name.toLowerCase().includes(q) && !business.type.toLowerCase().includes(q) && !business.location.toLowerCase().includes(q)) return false;
+                if (searchLocation !== "Hepsi" && business.location !== searchLocation) return false;
+                if (searchDate) {
+                  const dayName = new Date(searchDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
+                  const dayOk = business.availabilityMode === "everyday" || business.availableDays.includes(dayName);
+                  if (!dayOk) return false;
+                }
+                if (searchDate && searchTime) {
+                  const timeOk = business.availableTimes.includes(searchTime);
+                  if (!timeOk) return false;
+                }
+                return true;
+              })
               .map((business, index) => (
                 <div
                   className="business-card"
@@ -901,9 +1028,20 @@ function App() {
                   </div>
                 </div>
               ))}
-            {adminBusinesses.filter(b => b.reservationActive && (businessSearch === "" || b.name.toLowerCase().includes(businessSearch.toLowerCase()) || b.type.toLowerCase().includes(businessSearch.toLowerCase()) || b.location.toLowerCase().includes(businessSearch.toLowerCase()))).length === 0 && (
+            {adminBusinesses.filter((b) => {
+              if (!b.reservationActive) return false;
+              const q = businessSearch.toLowerCase();
+              if (q && !b.name.toLowerCase().includes(q) && !b.type.toLowerCase().includes(q) && !b.location.toLowerCase().includes(q)) return false;
+              if (searchLocation !== "Hepsi" && b.location !== searchLocation) return false;
+              if (searchDate) {
+                const dayName = new Date(searchDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
+                if (b.availabilityMode !== "everyday" && !b.availableDays.includes(dayName)) return false;
+              }
+              if (searchDate && searchTime && !b.availableTimes.includes(searchTime)) return false;
+              return true;
+            }).length === 0 && (
               <p className="description" style={{ gridColumn: "1/-1" }}>
-                "{businessSearch}" için sonuç bulunamadı.
+                {businessSearch ? `"${businessSearch}" için` : "Seçili filtrelerle eşleşen"} işletme bulunamadı.
               </p>
             )}
           </div>
@@ -919,8 +1057,28 @@ function App() {
           <div className="reservation-box">
             <h1>{selectedBusiness.name}</h1>
             <p className="description" style={{ marginTop: 0 }}>
-              {selectedBusiness.type} · {selectedBusiness.location}
+              {selectedBusiness.type}{selectedBusiness.location ? ` · ${selectedBusiness.location}` : ""}
             </p>
+
+            {!emailVerified && (
+              <div className="email-verify-warning">
+                <span>⚠️</span>
+                <div>
+                  <strong>E-postanız doğrulanmamış</strong>
+                  <p>Rezervasyon oluşturmak için e-posta adresinizi doğrulayın.</p>
+                </div>
+                <button
+                  type="button"
+                  className="resend-btn"
+                  onClick={async () => {
+                    await supabase.auth.resend({ type: "signup", email: loggedCustomer.email });
+                    alert("Doğrulama maili gönderildi!");
+                  }}
+                >
+                  📧 Tekrar Gönder
+                </button>
+              </div>
+            )}
 
             <form className="reservation-form">
               {/* Ad & E-posta (otomatik) */}
@@ -935,154 +1093,87 @@ function App() {
                 </div>
               </div>
 
+              {/* Tarih + Saat yan yana strip */}
+              <div className="date-time-row">
+                <div className="strip-section">
+                  <div className="strip-label">📅 Tarih</div>
+                  <div className="date-strip">
+                    {getAvailableDates().map((date) => (
+                      <button
+                        key={date.fullDate}
+                        type="button"
+                        className={reservation.date === date.fullDate ? "strip-btn active" : "strip-btn"}
+                        onClick={() => setReservation({ ...reservation, date: date.fullDate, time: "" })}
+                      >
+                        <span className="strip-day">{date.dayShort}</span>
+                        <span className="strip-date">{date.dateShort}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="strip-section">
+                  <div className="strip-label">🕐 Saat</div>
+                  <div className="time-strip">
+                    {(selectedBusiness?.availableTimes?.length
+                      ? selectedBusiness.availableTimes
+                      : availableTimes
+                    ).map((time) => (
+                      <button
+                        key={time}
+                        type="button"
+                        className={reservation.time === time ? "strip-btn active" : "strip-btn"}
+                        onClick={() => setReservation({ ...reservation, time })}
+                      >
+                        {time}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Kişi sayısı */}
+              <input
+                name="guests"
+                value={reservation.guests}
+                onChange={handleChange}
+                type="number"
+                placeholder="👥 Kişi sayısı (1-20)"
+                min="1"
+                max="20"
+              />
+
               {/* Telefon */}
               <input
                 name="phone"
                 value={reservation.phone}
                 onChange={handleChange}
                 type="tel"
-                placeholder="📞 Telefon numarası (zorunlu)"
+                placeholder="📞 Telefon numarası"
               />
 
-              {/* Tarih Accordion */}
-              {reservation.phone.trim() !== "" && (
-                <div className="accordion-section">
-                  {!datePickerOpen && reservation.date === "" && (
-                    <button
-                      type="button"
-                      className="accordion-open-btn"
-                      onClick={() => { setDatePickerOpen(true); setTimePickerOpen(false); }}
-                    >
-                      📅 Tarih seç
-                    </button>
-                  )}
-
-                  {!datePickerOpen && reservation.date !== "" && (
-                    <div
-                      className="accordion-selected"
-                      onClick={() => { setDatePickerOpen(true); setTimePickerOpen(false); setReservation({ ...reservation, time: "" }); }}
-                    >
-                      <span className="accordion-selected-label">📅 Tarih</span>
-                      <span className="accordion-selected-value">{formatDate(reservation.date)}</span>
-                      <span className="accordion-edit">düzenle ✎</span>
-                    </div>
-                  )}
-
-                  {datePickerOpen && (
-                    <div className="accordion-picker">
-                      <div className="accordion-picker-header">
-                        <span>📅 Tarih seç</span>
-                        {reservation.date && (
-                          <button type="button" className="accordion-close-btn"
-                            onClick={() => setDatePickerOpen(false)}>✕</button>
-                        )}
-                      </div>
-                      <div className="time-slots" style={{ marginTop: 10 }}>
-                        {getAvailableDates().map((date) => (
-                          <button
-                            key={date.fullDate}
-                            type="button"
-                            className={reservation.date === date.fullDate ? "selected-time" : "time-btn"}
-                            onClick={() => {
-                              setReservation({ ...reservation, date: date.fullDate, time: "" });
-                              setDatePickerOpen(false);
-                              setTimePickerOpen(true);
-                            }}
-                          >
-                            {date.display}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Saat Accordion */}
-              {reservation.date !== "" && (
-                <div className="accordion-section">
-                  {!timePickerOpen && reservation.time === "" && (
-                    <button
-                      type="button"
-                      className="accordion-open-btn"
-                      onClick={() => { setTimePickerOpen(true); setDatePickerOpen(false); }}
-                    >
-                      🕐 Saat seç
-                    </button>
-                  )}
-
-                  {!timePickerOpen && reservation.time !== "" && (
-                    <div
-                      className="accordion-selected"
-                      onClick={() => { setTimePickerOpen(true); setDatePickerOpen(false); }}
-                    >
-                      <span className="accordion-selected-label">🕐 Saat</span>
-                      <span className="accordion-selected-value">{reservation.time}</span>
-                      <span className="accordion-edit">düzenle ✎</span>
-                    </div>
-                  )}
-
-                  {timePickerOpen && (
-                    <div className="accordion-picker">
-                      <div className="accordion-picker-header">
-                        <span>🕐 Saat seç</span>
-                        {reservation.time && (
-                          <button type="button" className="accordion-close-btn"
-                            onClick={() => setTimePickerOpen(false)}>✕</button>
-                        )}
-                      </div>
-                      <div className="time-slots" style={{ marginTop: 10 }}>
-                        {(selectedBusiness?.availableTimes?.length
-                          ? selectedBusiness.availableTimes
-                          : availableTimes
-                        ).map((time) => (
-                          <button
-                            key={time}
-                            type="button"
-                            className={reservation.time === time ? "selected-time" : "time-btn"}
-                            onClick={() => {
-                              setReservation({ ...reservation, time });
-                              setTimePickerOpen(false);
-                            }}
-                          >
-                            {time}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Misafir Sayısı */}
-              {reservation.date !== "" && reservation.time !== "" && !datePickerOpen && !timePickerOpen && (
-                <input
-                  name="guests"
-                  value={reservation.guests}
-                  onChange={handleChange}
-                  type="number"
-                  placeholder="👥 Misafir sayısı"
-                  min="1"
-                />
-              )}
-
               {/* Not */}
-              {reservation.guests !== "" && !datePickerOpen && !timePickerOpen && (
-                <textarea
-                  name="note"
-                  value={reservation.note}
-                  onChange={handleChange}
-                  placeholder="📝 Not, masa tercihi veya özel istek (opsiyonel)"
-                />
-              )}
+              <textarea
+                name="note"
+                value={reservation.note}
+                onChange={handleChange}
+                placeholder="📝 Not, masa tercihi veya özel istek (opsiyonel)"
+              />
 
               {error && <p className="error-message">{error}</p>}
 
-              {reservation.phone && reservation.date && reservation.time && reservation.guests && !datePickerOpen && !timePickerOpen && (
-                <button type="button" onClick={sendReservation}>
-                  Rezervasyon İsteği Gönder →
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={!emailVerified || !reservation.date || !reservation.time || !reservation.guests || !reservation.phone}
+                onClick={sendReservation}
+                style={{ opacity: (!emailVerified || !reservation.date || !reservation.time || !reservation.guests || !reservation.phone) ? 0.5 : 1 }}
+              >
+                Rezervasyon İsteği Gönder →
+              </button>
+
+              <p className="rez-terms">
+                Rezervasyon oluşturarak RezPoint kullanım koşullarını kabul etmiş olursunuz.
+              </p>
             </form>
           </div>
         </section>
@@ -1342,94 +1433,86 @@ function App() {
                       return;
                     }
 
-                    // NOTE: The previous flow sent users to a fake
-                    // "verification code" screen that did not actually
-                    // verify anything (any input, including empty,
-                    // completed registration). That step has been
-                    // removed so the UI doesn't promise a security
-                    // guarantee it doesn't provide. Real email
-                    // verification should be implemented via Supabase
-                    // Auth (signUp + email confirmation) rather than a
-                    // custom UI step.
-                    const newCustomer = {
-                      name: customerForm.name,
-                      email: customerForm.email,
-                      password: customerForm.password,
-                      safeScore: 100,
-                      profile: {
-                        phone: "",
-                        gender: "",
-                        birthDate: "",
-                        job: "",
-                        smoking: "",
-                      },
-                    };
+                    // Register via Supabase Auth — secure hashing,
+                    // automatic email verification mail handled by Supabase.
+                    const { data: authData, error: authError } =
+                      await supabase.auth.signUp({
+                        email: customerForm.email,
+                        password: customerForm.password,
+                      });
 
-                    const { error: insertError } = await supabase
-                      .from("customers")
-                      .insert([
-                        {
-                          name: newCustomer.name,
-                          email: newCustomer.email,
-                          password: newCustomer.password,
-                          safe_score: newCustomer.safeScore,
-                        },
-                      ]);
-
-                    if (insertError) {
-                      console.log("Customer insert error:", insertError);
-                      setCustomerAuthError(
-                        "Hesap oluşturulamadı. Tekrar deneyin.",
-                      );
+                    if (authError) {
+                      setCustomerAuthError(authError.message);
                       return;
                     }
 
+                    const { error: insertError } = await supabase
+                      .from("customers")
+                      .insert([{
+                        name: customerForm.name,
+                        email: customerForm.email,
+                        auth_user_id: authData.user.id,
+                        safe_score: 100,
+                      }]);
+
+                    if (insertError) {
+                      setCustomerAuthError("Hesap oluşturulamadı. Tekrar deneyin.");
+                      return;
+                    }
+
+                    const newCustomer = {
+                      id: authData.user.id,
+                      name: customerForm.name,
+                      email: customerForm.email,
+                      safeScore: 100,
+                    };
                     setCustomerAuthError("");
-                    setRegisteredCustomers([
-                      ...registeredCustomers,
-                      newCustomer,
-                    ]);
                     setLoggedCustomer(newCustomer);
-                    setCustomerProfile(newCustomer.profile);
+                    setCustomerProfile({ phone: "", gender: "", birthDate: "", job: "", smoking: "" });
+                    setEmailVerified(false);
                     setCustomerTab("pending");
                     setPage("customerDashboard");
                   } else {
-                    const { data, error } = await supabase
-                      .from("customers")
-                      .select("*")
-                      .eq("email", customerForm.email)
-                      .eq("password", customerForm.password)
-                      .single();
+                    const { data: authData, error: authError } =
+                      await supabase.auth.signInWithPassword({
+                        email: customerForm.email,
+                        password: customerForm.password,
+                      });
 
-                    if (error || !data) {
+                    if (authError) {
                       setCustomerAuthError("Hatalı e-posta veya şifre.");
                       return;
                     }
 
+                    const { data: custData, error: custError } = await supabase
+                      .from("customers")
+                      .select("*")
+                      .eq("auth_user_id", authData.user.id)
+                      .single();
+
+                    if (custError || !custData) {
+                      setCustomerAuthError("Hesap bilgileri alınamadı.");
+                      return;
+                    }
+
                     const foundCustomer = {
-                      id: data.id,
-                      name: data.name,
-                      email: data.email,
-                      password: data.password,
-                      safeScore: data.safe_score,
-                      profile: {
-                        phone: data.phone || "",
-                        gender: data.gender || "",
-                        birthDate: data.birth_date || "",
-                        job: data.job || "",
-                        smoking: data.smoking || "",
-                      },
+                      id: custData.id,
+                      name: custData.name,
+                      email: custData.email,
+                      safeScore: custData.safe_score || 100,
                     };
 
                     setCustomerAuthError("");
-                    setCustomerForm({
-                      name: foundCustomer.name,
-                      email: foundCustomer.email,
-                      password: foundCustomer.password,
-                    });
-
+                    setCustomerForm({ name: custData.name, email: custData.email, password: "" });
                     setLoggedCustomer(foundCustomer);
-                    setCustomerProfile(foundCustomer.profile);
+                    setCustomerProfile({
+                      phone: custData.phone || "",
+                      gender: custData.gender || "",
+                      birthDate: custData.birth_date || "",
+                      job: custData.job || "",
+                      smoking: custData.smoking || "",
+                    });
+                    setEmailVerified(!!authData.user.email_confirmed_at);
                     setPage("customerDashboard");
                   }
                 }}
@@ -1948,8 +2031,10 @@ function App() {
                 <button
                   className="primary-btn"
                   style={{ marginTop: "20px" }}
-                  onClick={() => {
+                  onClick={async () => {
+                    await supabase.auth.signOut();
                     setLoggedCustomer(null);
+                    setEmailVerified(false);
                     setCustomerForm({ name: "", email: "", password: "" });
                     setCustomerProfile({
                       phone: "",
@@ -2918,23 +3003,20 @@ function App() {
                 )}
 
                 <h3 style={{ marginTop: "24px" }}>Müsait Saatler</h3>
+                <p className="description" style={{ fontSize: 12, margin: "4px 0 10px" }}>
+                  08:00'den başlayarak yarım saatlik dilimlerle seçin. Seçili saatler müşterilere gösterilir.
+                </p>
 
-                <div className="time-slots">
-                  {["18:00", "19:00", "20:30", "22:00"].map((time) => (
+                <div className="time-slots-grid">
+                  {ALL_TIME_SLOTS.map((time) => (
                     <button
                       key={time}
-                      className={
-                        availableTimes.includes(time)
-                          ? "selected-time"
-                          : "time-btn"
-                      }
+                      className={availableTimes.includes(time) ? "selected-time" : "time-btn"}
                       onClick={() => {
                         if (availableTimes.includes(time)) {
-                          setAvailableTimes(
-                            availableTimes.filter((t) => t !== time),
-                          );
+                          setAvailableTimes(availableTimes.filter((t) => t !== time));
                         } else {
-                          setAvailableTimes([...availableTimes, time]);
+                          setAvailableTimes([...availableTimes, time].sort());
                         }
                       }}
                     >
