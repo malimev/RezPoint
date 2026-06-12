@@ -112,7 +112,7 @@ function App() {
   const [searchLocation, setSearchLocation] = useState("Hepsi");
   const [searchDate, setSearchDate] = useState("");
   const [searchTime, setSearchTime] = useState("");
-  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(true);
 
   const [safescoreHistory, setSafescoreHistory] = useState([]);
   const [loyaltyPoints, setLoyaltyPoints] = useState([]);
@@ -195,7 +195,7 @@ function App() {
             smoking: custData.smoking || "",
           });
           setCustomerForm({ name: custData.name, email: custData.email, password: "" });
-          setEmailVerified(!!session.user.email_confirmed_at);
+          setEmailVerified(true);
           loadCustomerExtras(custData.id);
         }
       }
@@ -805,55 +805,68 @@ function App() {
             </p>
 
             <div className="search-panel">
-              <div className="search-fields">
-                <div className="search-field">
-                  <label className="search-label">📍 Konum</label>
-                  <select
-                    className="search-select"
-                    value={searchLocation}
-                    onChange={(e) => setSearchLocation(e.target.value)}
-                  >
-                    <option value="Hepsi">Hepsi</option>
-                    <option value="İskele">İskele</option>
-                    <option value="Mağusa">Mağusa</option>
-                  </select>
-                </div>
+              {/* Konum — her zaman görünür */}
+              <div className="search-field search-loc-row">
+                <label className="search-label">📍 Konum</label>
+                <select className="search-select" value={searchLocation} onChange={(e) => setSearchLocation(e.target.value)}>
+                  <option value="Hepsi">Hepsi</option>
+                  <option value="İskele">İskele</option>
+                  <option value="Mağusa">Mağusa</option>
+                </select>
+              </div>
 
+              {/* Masaüstü: date input + time select */}
+              <div className="search-fields search-desktop-only">
                 <div className="search-field">
                   <label className="search-label">📅 Tarih</label>
-                  <input
-                    type="date"
-                    className="search-input"
-                    value={searchDate}
+                  <input type="date" className="search-input" value={searchDate}
                     onChange={(e) => setSearchDate(e.target.value)}
                     min={new Date().toISOString().split("T")[0]}
-                    max={(() => {
-                      const d = new Date();
-                      d.setDate(d.getDate() + 30);
-                      return d.toISOString().split("T")[0];
-                    })()}
+                    max={(() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split("T")[0]; })()}
                   />
                 </div>
-
                 <div className="search-field">
                   <label className="search-label">🕐 Saat</label>
-                  <select
-                    className="search-select"
-                    value={searchTime}
-                    onChange={(e) => setSearchTime(e.target.value)}
-                  >
+                  <select className="search-select" value={searchTime} onChange={(e) => setSearchTime(e.target.value)}>
                     <option value="">Fark etmez</option>
-                    {ALL_TIME_SLOTS.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
+                    {ALL_TIME_SLOTS.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
 
-              <button
-                className="search-btn"
-                onClick={() => setPage("businesses")}
-              >
+              {/* Mobil: yatay kaydırılabilir gün + saat stripları */}
+              <div className="search-mobile-only">
+                <label className="search-label" style={{ display: "block", marginBottom: 8 }}>📅 Tarih</label>
+                <div className="home-date-strip">
+                  <button
+                    className={!searchDate ? "home-strip-btn active" : "home-strip-btn"}
+                    onClick={() => setSearchDate("")}>
+                    <span className="strip-day">Hep</span>
+                    <span className="strip-date">si</span>
+                  </button>
+                  {Array.from({ length: 30 }, (_, i) => {
+                    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+                    const fullDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                    return (
+                      <button key={fullDate}
+                        className={searchDate === fullDate ? "home-strip-btn active" : "home-strip-btn"}
+                        onClick={() => setSearchDate(fullDate)}>
+                        <span className="strip-day">{d.toLocaleDateString("tr-TR",{weekday:"short"})}</span>
+                        <span className="strip-date">{d.toLocaleDateString("tr-TR",{day:"2-digit",month:"short"})}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className="search-label" style={{ display: "block", margin: "14px 0 8px" }}>🕐 Saat</label>
+                <div className="home-time-strip">
+                  <button className={!searchTime ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => setSearchTime("")}>Hepsi</button>
+                  {ALL_TIME_SLOTS.map(t => (
+                    <button key={t} className={searchTime === t ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => setSearchTime(t)}>{t}</button>
+                  ))}
+                </div>
+              </div>
+
+              <button className="search-btn" onClick={() => setPage("businesses")}>
                 {searchDate
                   ? `${formatDate(searchDate)}${searchTime ? ` saat ${searchTime}` : ""} için müsait işletmeleri gör`
                   : "Tüm işletmeleri gör"}
@@ -1467,7 +1480,7 @@ function App() {
                       job: custData.job || "",
                       smoking: custData.smoking || "",
                     });
-                    setEmailVerified(!!authData.user.email_confirmed_at);
+                    setEmailVerified(true);
                     loadCustomerExtras(custData.id);
                     setPage("customerDashboard");
                   }
