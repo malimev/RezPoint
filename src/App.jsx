@@ -731,7 +731,7 @@ function App() {
             }
           }}
         >
-          <img src={logo} alt="RezPoint Logo" />
+          <span className="logo-text">Rez<span className="logo-accent">Point</span></span>
         </div>
 
         <button
