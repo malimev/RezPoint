@@ -1437,8 +1437,8 @@ function App() {
                     setCustomerAuthError("");
                     setLoggedCustomer(newCustomer);
                     setCustomerProfile({ phone: "", gender: "", birthDate: "", job: "", smoking: "" });
-                    setEmailVerified(false);
-                    setCustomerTab("pending");
+                    setEmailVerified(true);
+                    setCustomerTab("reservations");
                     setPage("customerDashboard");
                   } else {
                     const { data: authData, error: authError } =
@@ -2527,51 +2527,49 @@ function App() {
                       <h3>{formatDate(selectedAcceptedDate)}</h3>
                       {dateRezs.length > 0 ? dateRezs.map((rez) => (
                         <div className="accepted-list-item" key={rez.id} onClick={() => setSelectedReservation(rez)}>
-                          <div>
+                          <div className="accepted-list-info">
                             <strong>{rez.time} — {rez.fullName}</strong>
-                            <p style={{ marginTop: 4, color: "var(--text-muted)", fontSize: 13 }}>{rez.guests} misafir · {rez.smoking || "—"}</p>
+                            <p style={{ marginTop: 4, color: "var(--text-muted)", fontSize: 13 }}>{rez.guests} misafir</p>
                           </div>
-                          <div style={{ display: "flex", gap: 8, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                            <button type="button"
-                              className={rez.attendanceStatus === "attended" ? "checkin-btn checked" : "checkin-btn"}
-                              disabled={rez.attendanceStatus !== "pending"}
-                              onClick={async () => {
-                                if (rez.attendanceStatus !== "pending") return;
-                                const { error } = await supabase.from("reservations").update({ attendance_status: "attended" }).eq("id", rez.id);
+                          <button
+                            type="button"
+                            className={`attend-check${rez.attendanceStatus === "attended" ? " attended" : rez.attendanceStatus === "no_show" ? " no-show" : ""}`}
+                            disabled={rez.attendanceStatus === "no_show"}
+                            title={rez.attendanceStatus === "attended" ? "Katıldı — geri almak için tıkla" : rez.attendanceStatus === "no_show" ? "Katılmadı (gün kapatıldı)" : "Tıkla: Katıldı olarak işaretle"}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (rez.attendanceStatus === "no_show") return;
+
+                              if (rez.attendanceStatus === "attended") {
+                                // Geri al — sadece durumu sıfırla, safescore değişmez
+                                const { error } = await supabase.from("reservations").update({ attendance_status: "pending" }).eq("id", rez.id);
                                 if (error) { alert("Güncellenemedi."); return; }
-                                const { data: cust } = await supabase.from("customers").select("id, safe_score").eq("email", rez.email).single();
-                                if (cust) {
-                                  const newScore = Math.min(100, (cust.safe_score ?? 100) + 2);
-                                  await supabase.from("customers").update({ safe_score: newScore }).eq("id", cust.id);
-                                  await supabase.from("safescore_history").insert([{ customer_id: cust.id, reservation_id: rez.id, delta: 2, reason: "attended" }]);
-                                  const { data: existing } = await supabase.from("loyalty_points").select("id, points").eq("customer_id", cust.id).eq("business_id", rez.businessId).single();
-                                  if (existing) {
-                                    await supabase.from("loyalty_points").update({ points: existing.points + 2 }).eq("id", existing.id);
-                                  } else {
-                                    await supabase.from("loyalty_points").insert([{ customer_id: cust.id, business_id: rez.businessId, points: 2 }]);
-                                  }
-                                  if (loggedCustomer?.email === rez.email) setLoggedCustomer(prev => prev ? { ...prev, safeScore: newScore } : prev);
+                                setReservations(prev => prev.map(r => r.id === rez.id ? { ...r, attendanceStatus: "pending" } : r));
+                                return;
+                              }
+
+                              // Katıldı olarak işaretle
+                              const { error } = await supabase.from("reservations").update({ attendance_status: "attended" }).eq("id", rez.id);
+                              if (error) { alert("Güncellenemedi."); return; }
+                              const { data: cust } = await supabase.from("customers").select("id, safe_score").eq("email", rez.email).single();
+                              if (cust) {
+                                const newScore = Math.min(100, (cust.safe_score ?? 100) + 2);
+                                await supabase.from("customers").update({ safe_score: newScore }).eq("id", cust.id);
+                                await supabase.from("safescore_history").insert([{ customer_id: cust.id, reservation_id: rez.id, delta: 2, reason: "attended" }]);
+                                const { data: existing } = await supabase.from("loyalty_points").select("id, points").eq("customer_id", cust.id).eq("business_id", rez.businessId).single();
+                                if (existing) {
+                                  await supabase.from("loyalty_points").update({ points: existing.points + 2 }).eq("id", existing.id);
+                                } else {
+                                  await supabase.from("loyalty_points").insert([{ customer_id: cust.id, business_id: rez.businessId, points: 2 }]);
                                 }
-                                setReservations(prev => prev.map(r => r.id === rez.id ? { ...r, attendanceStatus: "attended" } : r));
-                              }}>✓ Katıldı</button>
-                            <button type="button"
-                              className={rez.attendanceStatus === "no_show" ? "checkin-btn no-show" : "checkin-btn outline"}
-                              disabled={rez.attendanceStatus !== "pending"}
-                              onClick={async () => {
-                                if (rez.attendanceStatus !== "pending") return;
-                                const { error } = await supabase.from("reservations").update({ attendance_status: "no_show" }).eq("id", rez.id);
-                                if (error) { alert("Güncellenemedi."); return; }
-                                const { data: cust } = await supabase.from("customers").select("id, safe_score").eq("email", rez.email).single();
-                                if (cust) {
-                                  const newScore = Math.max(0, (cust.safe_score ?? 100) - 8);
-                                  await supabase.from("customers").update({ safe_score: newScore }).eq("id", cust.id);
-                                  await supabase.from("safescore_history").insert([{ customer_id: cust.id, reservation_id: rez.id, delta: -8, reason: "no_show" }]);
-                                  await supabase.from("notifications").insert([{ customer_id: cust.id, title: "Rezervasyona katılmadınız", message: `${loggedBusiness.name} — ${formatDate(rez.date)} ${rez.time} rezervasyonuna katılmadınız. SafeScore -8.`, is_read: false }]);
-                                  if (loggedCustomer?.email === rez.email) setLoggedCustomer(prev => prev ? { ...prev, safeScore: newScore } : prev);
-                                }
-                                setReservations(prev => prev.map(r => r.id === rez.id ? { ...r, attendanceStatus: "no_show" } : r));
-                              }}>✕ Katılmadı</button>
-                          </div>
+                                if (loggedCustomer?.email === rez.email) setLoggedCustomer(prev => prev ? { ...prev, safeScore: newScore } : prev);
+                              }
+                              setReservations(prev => prev.map(r => r.id === rez.id ? { ...r, attendanceStatus: "attended" } : r));
+                            }}
+                          >
+                            {rez.attendanceStatus === "attended" && "✓"}
+                            {rez.attendanceStatus === "no_show" && "✕"}
+                          </button>
                         </div>
                       )) : <p className="description">Bu tarih için kabul edilen rezervasyon yok.</p>}
                       <button className="close-day-btn" style={{ marginTop: 20 }} onClick={closeDayReservations}>🔒 Günü Kapat</button>
