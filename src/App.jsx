@@ -1262,7 +1262,7 @@ function App() {
 
                 if (error) {
                   console.log("Reservation insert error:", error);
-                  alert("Rezervasyon oluşturulamadı.");
+                  alert(`Rezervasyon oluşturulamadı: ${error.message}`);
                   setIsCreatingReservation(false);
                   return;
                 }
