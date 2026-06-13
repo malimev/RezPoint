@@ -668,49 +668,71 @@ function App() {
   }
 
   async function closeDayReservations() {
-    if (!selectedAcceptedDate) { alert("Önce bir tarih seçin."); return; }
-
-    const pin = prompt("Günü kapatmak için PIN'i girin:");
-    const expectedPin = loggedBusiness?.closingPin || "0000";
-    if (pin !== expectedPin) { alert("Hatalı PIN."); return; }
-
-    if (!window.confirm("Seçili tarihi kapat? attendance_status güncellenmemiş rezervasyonlar 'no_show' sayılır.")) return;
+    if (!selectedAcceptedDate) return;
 
     const targetReservations = reservations.filter(
-      (rez) => String(rez.businessId) === String(loggedBusiness.id) && rez.status === "accepted" && rez.date === selectedAcceptedDate,
+      (rez) => String(rez.businessId) === String(loggedBusiness.id) &&
+               rez.status === "accepted" &&
+               rez.date === selectedAcceptedDate,
     );
-    if (targetReservations.length === 0) { alert("Bu tarih için kabul edilmiş rezervasyon yok."); return; }
+    if (targetReservations.length === 0) return;
+
+    setActionLoading(true);
 
     for (const rez of targetReservations) {
-      if (rez.attendanceStatus !== "pending") continue;
-      const { error } = await supabase.from("reservations").update({ attendance_status: "no_show" }).eq("id", rez.id);
-      if (error) { console.log("no_show update error:", error); continue; }
+      if (rez.attendanceStatus === "pending") {
+        // Tiklenmeyen → katılmadı
+        const { error } = await supabase.from("reservations")
+          .update({ attendance_status: "no_show", status: "completed" })
+          .eq("id", rez.id);
+        if (error) { console.log("no_show error:", error); continue; }
 
-      const { data: cust } = await supabase.from("customers").select("id, safe_score").eq("email", rez.email).single();
-      if (cust) {
-        const newScore = Math.max(0, (cust.safe_score ?? 100) - 8);
-        await supabase.from("customers").update({ safe_score: newScore }).eq("id", cust.id);
-        await supabase.from("safescore_history").insert([{ customer_id: cust.id, reservation_id: rez.id, delta: -8, reason: "no_show" }]);
-        await supabase.from("notifications").insert([{
-          customer_id: cust.id,
-          title: "Rezervasyona katılmadınız",
-          message: `${rez.business} — ${formatDate(rez.date)} ${rez.time} rezervasyonuna katılmadınız. SafeScore'unuz 8 puan azaldı.`,
-          is_read: false,
-        }]);
-        if (loggedCustomer?.email === rez.email) {
-          setLoggedCustomer(prev => prev ? { ...prev, safeScore: newScore } : prev);
+        const { data: cust } = await supabase.from("customers")
+          .select("id, safe_score").eq("email", rez.email).single();
+        if (cust) {
+          const newScore = Math.max(0, (cust.safe_score ?? 100) - 8);
+          await supabase.from("customers").update({ safe_score: newScore }).eq("id", cust.id);
+          await supabase.from("safescore_history").insert([{
+            customer_id: cust.id, reservation_id: rez.id, delta: -8, reason: "no_show",
+          }]);
+          await supabase.from("notifications").insert([{
+            customer_id: cust.id,
+            title: "Rezervasyona katılmadınız",
+            message: `${rez.business} — ${formatDate(rez.date)} ${rez.time} rezervasyonuna katılmadınız. SafeScore'unuz 8 puan azaldı.`,
+            is_read: false,
+          }]);
+          if (loggedCustomer?.email === rez.email) {
+            setLoggedCustomer(prev => prev ? { ...prev, safeScore: newScore } : prev);
+          }
         }
+      } else if (rez.attendanceStatus === "attended") {
+        // Tiklenmiş → tamamlandı olarak işaretle (safescore zaten verildi)
+        await supabase.from("reservations")
+          .update({ status: "completed" })
+          .eq("id", rez.id);
       }
     }
 
+    // Listeyi temizle: tüm o gün kayıtları local state'de completed yap
     setReservations(prev => prev.map(rez => {
-      if (String(rez.businessId) === String(loggedBusiness.id) && rez.status === "accepted" && rez.date === selectedAcceptedDate && rez.attendanceStatus === "pending") {
-        return { ...rez, attendanceStatus: "no_show" };
+      if (
+        String(rez.businessId) === String(loggedBusiness.id) &&
+        rez.status === "accepted" &&
+        rez.date === selectedAcceptedDate
+      ) {
+        return {
+          ...rez,
+          status: "completed",
+          attendanceStatus: rez.attendanceStatus === "pending" ? "no_show" : rez.attendanceStatus,
+        };
       }
       return rez;
     }));
 
-    alert("Gün başarıyla kapatıldı.");
+    setSelectedAcceptedDate("");
+    setActionLoading(false);
+    setSavedMessage(`${formatDate(selectedAcceptedDate)} günü başarıyla kapatıldı.`);
+    setTimeout(() => setSavedMessage(""), 3000);
   }
   return (
     <div className="page">
@@ -2572,7 +2594,17 @@ function App() {
                           </button>
                         </div>
                       )) : <p className="description">Bu tarih için kabul edilen rezervasyon yok.</p>}
-                      <button className="close-day-btn" style={{ marginTop: 20 }} onClick={closeDayReservations}>🔒 Günü Kapat</button>
+                      {savedMessage && (
+                        <p style={{ color: "var(--green)", fontWeight: 700, marginTop: 12, fontSize: 14 }}>{savedMessage}</p>
+                      )}
+                      <button
+                        className="close-day-btn"
+                        style={{ marginTop: 12 }}
+                        disabled={actionLoading}
+                        onClick={closeDayReservations}
+                      >
+                        {actionLoading ? <Spinner /> : "🔒 Günü Kapat"}
+                      </button>
                     </div>
                   );
                 })()}
