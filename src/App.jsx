@@ -59,14 +59,25 @@ const ALL_TIME_SLOTS = (() => {
   return slots;
 })();
 
+const SAFE_PAGES = ["home","businesses","contact","customerAuth","businessLogin","adminLogin","businessProfile"];
+const CUSTOMER_PAGES = ["customerDashboard"];
+const BUSINESS_PAGES = ["businessPanel"];
+const NO_RESTORE = ["reservation","summary","success","adminPanel"];
+
+function getSavedPage() {
+  const p = localStorage.getItem("rp_page");
+  if (!p || NO_RESTORE.includes(p)) return "home";
+  return p;
+}
+
 function App() {
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState(getSavedPage);
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [error, setError] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [panelTab, setPanelTab] = useState("incoming");
+  const [panelTab, setPanelTab] = useState(() => localStorage.getItem("rp_panel_tab") || "incoming");
   const [customerInsightTab, setCustomerInsightTab] = useState("age");
-  const [customerTab, setCustomerTab] = useState("reservations");
+  const [customerTab, setCustomerTab] = useState(() => localStorage.getItem("rp_customer_tab") || "reservations");
 
   const [availableTimes, setAvailableTimes] = useState([
     "18:00",
@@ -172,7 +183,17 @@ function App() {
   // ---------------------------------------------------------------------
   useEffect(() => {
     const loadInitialData = async () => {
-      // Restore Supabase Auth session if one exists
+      const parseMenuText = (raw) => {
+        if (!raw) return { description: "", menu: "", phone: "" };
+        try {
+          const p = JSON.parse(raw);
+          if (p && typeof p === "object") return { description: p.description || "", menu: p.menu || "", phone: p.phone || "" };
+        } catch {}
+        return { description: "", menu: raw, phone: "" };
+      };
+
+      // 1. Restore Supabase Auth customer session
+      let sessionCustomer = null;
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: custData } = await supabase
@@ -181,6 +202,7 @@ function App() {
           .eq("auth_user_id", session.user.id)
           .single();
         if (custData) {
+          sessionCustomer = custData;
           setLoggedCustomer({
             id: custData.id,
             name: custData.name,
@@ -200,26 +222,15 @@ function App() {
         }
       }
 
-      // Businesses
+      // 2. Load businesses
       const { data: businessData, error: businessError } = await supabase
         .from("businesses")
         .select("*");
+      if (businessError) console.log("Businesses fetch error:", businessError);
 
-      if (businessError) {
-        console.log("Businesses fetch error:", businessError);
-      }
-
+      let formattedBusinesses = [];
       if (businessData) {
-        const parseMenuText = (raw) => {
-          if (!raw) return { description: "", menu: "", phone: "" };
-          try {
-            const p = JSON.parse(raw);
-            if (p && typeof p === "object") return { description: p.description || "", menu: p.menu || "", phone: p.phone || "" };
-          } catch {}
-          return { description: "", menu: raw, phone: "" };
-        };
-
-        const formattedBusinesses = businessData.map((business) => {
+        formattedBusinesses = businessData.map((business) => {
           const parsed = parseMenuText(business.menu_text);
           return {
             id: business.id,
@@ -245,20 +256,36 @@ function App() {
             closingPin: business.closing_pin || "0000",
           };
         });
-
         setAdminBusinesses(formattedBusinesses);
       }
 
-      // Reservations
-      const { data: reservationData, error: reservationError } =
-        await supabase.from("reservations").select("*");
-
-      if (reservationError) {
-        console.log("Reservations fetch error:", reservationError);
+      // 3. Restore business login from localStorage
+      let restoredBusiness = null;
+      const savedBizId = localStorage.getItem("rp_biz_id");
+      if (savedBizId) {
+        restoredBusiness = formattedBusinesses.find(b => String(b.id) === String(savedBizId));
+        if (restoredBusiness) {
+          setLoggedBusiness(restoredBusiness);
+          setAvailabilityMode(restoredBusiness.availabilityMode || "selected");
+          setAvailableDays(restoredBusiness.availableDays || []);
+          setAvailableTimes(restoredBusiness.availableTimes || []);
+          setBusinessProfileForm({
+            name: restoredBusiness.name || "",
+            location: restoredBusiness.location || "",
+            phone: restoredBusiness.phone || "",
+            description: restoredBusiness.description || "",
+            menu: restoredBusiness.menu || "",
+          });
+        }
       }
 
+      // 4. Load reservations
+      const { data: reservationData, error: reservationError } =
+        await supabase.from("reservations").select("*");
+      if (reservationError) console.log("Reservations fetch error:", reservationError);
+
       if (reservationData) {
-        const formattedReservations = reservationData.map((rez) => ({
+        setReservations(reservationData.map((rez) => ({
           id: rez.id,
           business: rez.business,
           businessId: rez.business_id,
@@ -274,6 +301,7 @@ function App() {
           status: rez.status,
           businessMessage: rez.business_message || "",
           attendanceStatus: rez.attendance_status || "pending",
+          createdAt: rez.created_at || "",
           businessNote: rez.business_note || "",
           customerProfile: {
             gender: rez.gender,
@@ -281,25 +309,17 @@ function App() {
             job: rez.job,
             smoking: rez.smoking,
           },
-        }));
-
-        setReservations(formattedReservations);
+        })));
       }
 
-      // Customers
-      // NOTE: previously this state was never populated, which meant
-      // safe-score updates inside closeDayReservations() never reached
-      // any actual customer record in local state.
+      // 5. Load customers
       const { data: customerData, error: customerError } = await supabase
         .from("customers")
         .select("*");
-
-      if (customerError) {
-        console.log("Customers fetch error:", customerError);
-      }
+      if (customerError) console.log("Customers fetch error:", customerError);
 
       if (customerData) {
-        const formattedCustomers = customerData.map((customer) => ({
+        setRegisteredCustomers(customerData.map((customer) => ({
           id: customer.id,
           name: customer.name,
           email: customer.email,
@@ -312,10 +332,22 @@ function App() {
             job: customer.job || "",
             smoking: customer.smoking || "",
           },
-        }));
-
-        setRegisteredCustomers(formattedCustomers);
+        })));
       }
+
+      // 6. Validate page — if required session is missing, fall back to home
+      const currentPage = localStorage.getItem("rp_page") || "home";
+      const savedSelBizId = localStorage.getItem("rp_sel_biz_id");
+      if (BUSINESS_PAGES.includes(currentPage) && !restoredBusiness) {
+        setPage("home");
+      } else if (CUSTOMER_PAGES.includes(currentPage) && !sessionCustomer) {
+        setPage("home");
+      } else if (currentPage === "businessProfile" && savedSelBizId) {
+        const selBiz = formattedBusinesses.find(b => String(b.id) === String(savedSelBizId));
+        if (selBiz) setSelectedBusiness(selBiz);
+        else setPage("businesses");
+      }
+      // All other pages: already set correctly via getSavedPage() initializer
     };
 
     loadInitialData();
@@ -341,6 +373,68 @@ function App() {
     });
     return () => subscription?.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const formatRez = (rez) => ({
+      id: rez.id,
+      business: rez.business,
+      businessId: rez.business_id,
+      fullName: rez.full_name,
+      email: rez.email,
+      phone: rez.phone,
+      date: rez.date,
+      time: rez.time,
+      guests: rez.guests,
+      note: rez.note,
+      safeScore: rez.safe_score,
+      code: rez.code,
+      status: rez.status,
+      businessMessage: rez.business_message || "",
+      attendanceStatus: rez.attendance_status || "pending",
+      createdAt: rez.created_at || "",
+      businessNote: rez.business_note || "",
+      customerProfile: {
+        gender: rez.gender,
+        birthDate: rez.birth_date,
+        job: rez.job,
+        smoking: rez.smoking,
+      },
+    });
+
+    const channel = supabase
+      .channel("reservations-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reservations" }, (payload) => {
+        const incoming = payload.new;
+        setReservations(prev => {
+          // If we already added this optimistically (matched by code), just update the ID
+          const optimisticIdx = prev.findIndex(r => r.code === incoming.code);
+          if (optimisticIdx >= 0) {
+            return prev.map((r, i) => i === optimisticIdx ? { ...r, id: incoming.id, createdAt: incoming.created_at || r.createdAt } : r);
+          }
+          if (prev.some(r => r.id === incoming.id)) return prev;
+          return [...prev, formatRez(incoming)];
+        });
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "reservations" }, (payload) => {
+        const updated = payload.new;
+        setReservations(prev => prev.map(r => r.id === updated.id ? {
+          ...r,
+          status: updated.status,
+          businessMessage: updated.business_message || "",
+          attendanceStatus: updated.attendance_status || "pending",
+        } : r));
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  useEffect(() => { localStorage.setItem("rp_page", page); }, [page]);
+  useEffect(() => { localStorage.setItem("rp_panel_tab", panelTab); }, [panelTab]);
+  useEffect(() => { localStorage.setItem("rp_customer_tab", customerTab); }, [customerTab]);
+  useEffect(() => {
+    if (selectedBusiness?.id) localStorage.setItem("rp_sel_biz_id", selectedBusiness.id);
+  }, [selectedBusiness]);
 
   // ---------------------------------------------------------------------
   // Helpers
@@ -640,6 +734,7 @@ function App() {
         menu: business.menu || "",
       });
 
+      localStorage.setItem("rp_biz_id", business.id);
       setLoginError("");
       setPanelTab("incoming");
       setPage("businessPanel");
@@ -1225,6 +1320,8 @@ function App() {
                   safeScore: loggedCustomer.safeScore ?? 100,
                   code: newCode,
                   status: "pending",
+                  attendanceStatus: "pending",
+                  createdAt: new Date().toISOString(),
                   customerProfile: {
                     gender: profileToUse.gender,
                     birthDate: profileToUse.birthDate,
@@ -1310,7 +1407,7 @@ function App() {
                   note: "",
                 });
                 setSelectedBusiness(null);
-                setCustomerTab("pending");
+                setCustomerTab("reservations");
                 setPage("customerDashboard");
               }}
             >
@@ -1545,15 +1642,13 @@ function App() {
                 {customerTab === "reservations" && (() => {
                   const now = new Date();
                   const myRezs = reservations.filter(r => r.email === loggedCustomer.email);
-                  const active = myRezs.filter(r => {
-                    if (r.status === "cancelled" || r.status === "rejected") return false;
-                    const d = parseLocalDate(r.date);
-                    if (!d) return true;
-                    const [h, m] = (r.time || "00:00").split(":").map(Number);
-                    d.setHours(h, m + 60);
-                    return d > now;
-                  });
-                  const history = myRezs.filter(r => !active.includes(r));
+                  const byDate = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
+                  const active = myRezs
+                    .filter(r => r.status === "pending" || r.status === "accepted")
+                    .sort(byDate);
+                  const history = myRezs
+                    .filter(r => r.status !== "pending" && r.status !== "accepted")
+                    .sort(byDate);
                   const getAlertBadge = (rez) => {
                     const d = parseLocalDate(rez.date);
                     if (!d) return null;
@@ -1805,6 +1900,7 @@ function App() {
                   style={{ marginTop: "20px" }}
                   onClick={async () => {
                     await supabase.auth.signOut();
+                    localStorage.setItem("rp_page", "home");
                     setLoggedCustomer(null);
                     setEmailVerified(false);
                     setCustomerForm({ name: "", email: "", password: "" });
@@ -1963,7 +2059,7 @@ function App() {
             <div className="stat-card">
               <span className="stat-icon">❌</span>
               <span>No Show</span>
-              <strong><AnimatedNumber value={reservations.filter(r => r.status === "no-show").length} /></strong>
+              <strong><AnimatedNumber value={reservations.filter(r => r.attendanceStatus === "no_show").length} /></strong>
             </div>
             <div className="stat-card">
               <span className="stat-icon">🤖</span>
@@ -2318,6 +2414,8 @@ function App() {
             <button
               className="nav-button"
               onClick={() => {
+                localStorage.removeItem("rp_biz_id");
+                localStorage.setItem("rp_page", "home");
                 setLoggedBusiness(null);
                 setBusinessLogin({ email: "", password: "" });
                 setPage("home");
@@ -2353,14 +2451,14 @@ function App() {
               className={panelTab === "completed" ? "active-tab" : ""}
               onClick={() => setPanelTab("completed")}
             >
-              Tamamlandı ({getBusinessReservationCount("completed")})
+              Tamamlandı ({reservations.filter(r => String(r.businessId) === String(loggedBusiness?.id) && r.status === "completed" && r.attendanceStatus === "attended").length})
             </button>
 
             <button
               className={panelTab === "noShow" ? "active-tab" : ""}
               onClick={() => setPanelTab("noShow")}
             >
-              No Show ({getBusinessReservationCount("no-show")})
+              No Show ({reservations.filter(r => String(r.businessId) === String(loggedBusiness?.id) && r.status === "completed" && r.attendanceStatus === "no_show").length})
             </button>
 
             <button
@@ -2492,7 +2590,7 @@ function App() {
                                 await supabase.from("notifications").insert([{
                                   customer_id: custReject.id,
                                   title: "Rezervasyonunuz reddedildi",
-                                  message: `${loggedBusiness.name} — ${formatDate(rez.date)} ${rez.time} rezervasyonunuz için uygun yer bulunamadı.`,
+                                  message: `${loggedBusiness.name} — ${formatDate(rez.date)} ${rez.time} rezervasyonunuz için uygun masa bulunamadı, yine bekleriz ❤️`,
                                   is_read: false,
                                 }]);
                               }
@@ -2526,18 +2624,33 @@ function App() {
                 <p className="description">Tarih seçin, ardından her rezervasyon için Katıldı / Katılmadı işaretleyin.</p>
 
                 <div className="time-slots">
-                  {getAvailableDates().map((date) => {
-                    const count = reservations.filter(
-                      (rez) => rez.status === "accepted" && rez.date === date.fullDate && loggedBusiness && String(rez.businessId) === String(loggedBusiness.id),
-                    ).length;
-                    return (
-                      <button key={date.fullDate}
-                        className={selectedAcceptedDate === date.fullDate ? "selected-time" : "time-btn"}
-                        onClick={() => setSelectedAcceptedDate(date.fullDate)}>
-                        {date.display}<br /><small>{count} rezervasyon</small>
-                      </button>
-                    );
-                  })}
+                  {(() => {
+                    const futureDates = getAvailableDates();
+                    const futureDateSet = new Set(futureDates.map(d => d.fullDate));
+                    const pastAcceptedDates = [...new Set(
+                      reservations
+                        .filter(r => r.status === "accepted" && loggedBusiness && String(r.businessId) === String(loggedBusiness.id) && !futureDateSet.has(r.date))
+                        .map(r => r.date)
+                    )].sort().map(d => {
+                      const parsed = parseLocalDate(d);
+                      return {
+                        fullDate: d,
+                        display: parsed ? parsed.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", weekday: "long" }) : d,
+                      };
+                    });
+                    return [...pastAcceptedDates, ...futureDates].map((date) => {
+                      const count = reservations.filter(
+                        (rez) => rez.status === "accepted" && rez.date === date.fullDate && loggedBusiness && String(rez.businessId) === String(loggedBusiness.id),
+                      ).length;
+                      return (
+                        <button key={date.fullDate}
+                          className={selectedAcceptedDate === date.fullDate ? "selected-time" : "time-btn"}
+                          onClick={() => setSelectedAcceptedDate(date.fullDate)}>
+                          {date.display}<br /><small>{count} rezervasyon</small>
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
 
                 {selectedAcceptedDate && (() => {
@@ -2665,6 +2778,7 @@ function App() {
                 {reservations.filter(
                   (rez) =>
                     rez.status === "completed" &&
+                    rez.attendanceStatus === "attended" &&
                     loggedBusiness &&
                     String(rez.businessId) === String(loggedBusiness.id),
                 ).length > 0 ? (
@@ -2672,6 +2786,7 @@ function App() {
                     .filter(
                       (rez) =>
                         rez.status === "completed" &&
+                        rez.attendanceStatus === "attended" &&
                         loggedBusiness &&
                         String(rez.businessId) === String(loggedBusiness.id),
                     )
@@ -2690,7 +2805,7 @@ function App() {
                           </p>
                         </div>
 
-                        <span>✓ Tamamlandı</span>
+                        <span>✓ Katıldı</span>
                       </div>
                     ))
                 ) : (
@@ -2705,14 +2820,16 @@ function App() {
 
                 {reservations.filter(
                   (rez) =>
-                    rez.status === "no-show" &&
+                    rez.status === "completed" &&
+                    rez.attendanceStatus === "no_show" &&
                     loggedBusiness &&
                     String(rez.businessId) === String(loggedBusiness.id),
                 ).length > 0 ? (
                   reservations
                     .filter(
                       (rez) =>
-                        rez.status === "no-show" &&
+                        rez.status === "completed" &&
+                        rez.attendanceStatus === "no_show" &&
                         loggedBusiness &&
                         String(rez.businessId) === String(loggedBusiness.id),
                     )
@@ -3241,7 +3358,7 @@ function App() {
           <div className="biz-profile-cta">
             {loggedCustomer
               ? <button className="primary-btn" onClick={() => openReservationForm(selectedBusiness)}>Rezervasyon Yap →</button>
-              : <button className="primary-btn" onClick={() => setPage("customerLogin")}>Giriş Yaparak Rezervasyon Yap →</button>}
+              : <button className="primary-btn" onClick={() => setPage("customerAuth")}>Giriş Yaparak Rezervasyon Yap →</button>}
           </div>
         </section>
       )}
