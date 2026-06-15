@@ -224,6 +224,8 @@ function App() {
   const [searchTime, setSearchTime] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
   const [authConfirmMsg, setAuthConfirmMsg] = useState("");
+  const [forgotPasswordMsg, setForgotPasswordMsg] = useState("");
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [emailPending, setEmailPending] = useState(false);
 
   const [bizLoginAttempts, setBizLoginAttempts] = useState(0);
@@ -435,6 +437,12 @@ function App() {
       if (event === "SIGNED_OUT") {
         setLoggedCustomer(null);
         setEmailVerified(false);
+      }
+      if (event === "PASSWORD_RECOVERY") {
+        window.location.hash = "";
+        setIsPasswordRecovery(true);
+        setCustomerMode("login");
+        setPage("customerAuth");
       }
       if (event === "SIGNED_IN") {
         const hash = window.location.hash;
@@ -1659,34 +1667,40 @@ function App() {
             </div>
 
             <form className="reservation-form">
-              {customerMode === "register" && (
-                <input
-                  type="text"
-                  placeholder="Ad Soyad"
-                  value={customerForm.name}
-                  onChange={(e) =>
-                    setCustomerForm({ ...customerForm, name: e.target.value })
-                  }
-                />
+              {isPasswordRecovery ? (
+                <>
+                  <p className="description" style={{ marginBottom: 8 }}>Hesabınız için yeni şifrenizi girin.</p>
+                  <input
+                    type="password"
+                    placeholder="Yeni Şifre (en az 6 karakter)"
+                    value={customerForm.password}
+                    onChange={(e) => setCustomerForm({ ...customerForm, password: e.target.value })}
+                  />
+                </>
+              ) : (
+                <>
+                  {customerMode === "register" && (
+                    <input
+                      type="text"
+                      placeholder="Ad Soyad"
+                      value={customerForm.name}
+                      onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
+                    />
+                  )}
+                  <input
+                    type="email"
+                    placeholder="E-posta Adresi"
+                    value={customerForm.email}
+                    onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Şifre"
+                    value={customerForm.password}
+                    onChange={(e) => setCustomerForm({ ...customerForm, password: e.target.value })}
+                  />
+                </>
               )}
-
-              <input
-                type="email"
-                placeholder="E-posta Adresi"
-                value={customerForm.email}
-                onChange={(e) =>
-                  setCustomerForm({ ...customerForm, email: e.target.value })
-                }
-              />
-
-              <input
-                type="password"
-                placeholder="Şifre"
-                value={customerForm.password}
-                onChange={(e) =>
-                  setCustomerForm({ ...customerForm, password: e.target.value })
-                }
-              />
 
               {customerAuthError && (
                 <p className="error-message">{customerAuthError}</p>
@@ -1695,6 +1709,19 @@ function App() {
               <button
                 type="button"
                 onClick={async () => {
+                  if (isPasswordRecovery) {
+                    if (customerForm.password.length < 6) {
+                      setCustomerAuthError("Şifre en az 6 karakter olmalı.");
+                      return;
+                    }
+                    const { error } = await supabase.auth.updateUser({ password: customerForm.password });
+                    if (error) { setCustomerAuthError("Şifre güncellenemedi: " + error.message); return; }
+                    setIsPasswordRecovery(false);
+                    setCustomerForm(f => ({ ...f, password: "" }));
+                    setAuthConfirmMsg("Şifreniz başarıyla güncellendi! Şimdi giriş yapabilirsiniz.");
+                    setCustomerAuthError("");
+                    return;
+                  }
                   if (customerMode === "register") {
                     if (
                       customerForm.name === "" ||
@@ -1782,8 +1809,28 @@ function App() {
                   }
                 }}
               >
-                {customerMode === "login" ? "Giriş Yap" : "Hesap Oluştur"}
+                  {isPasswordRecovery ? "Şifreyi Güncelle" : customerMode === "login" ? "Giriş Yap" : "Hesap Oluştur"}
               </button>
+              {customerMode === "login" && !isPasswordRecovery && (
+                <p style={{ textAlign: "center", marginTop: 12, fontSize: 13 }}>
+                  <button
+                    type="button"
+                    style={{ background: "none", border: "none", color: "var(--purple)", cursor: "pointer", fontSize: 13, textDecoration: "underline" }}
+                    onClick={async () => {
+                      const email = customerForm.email.trim();
+                      if (!email) { setForgotPasswordMsg("Önce e-posta adresinizi girin."); return; }
+                      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: "https://getrezpoint.com" });
+                      if (error) { setForgotPasswordMsg("Gönderilemedi: " + error.message); return; }
+                      setForgotPasswordMsg("Şifre sıfırlama bağlantısı e-postanıza gönderildi.");
+                    }}
+                  >Şifremi Unuttum</button>
+                </p>
+              )}
+              {forgotPasswordMsg && (
+                <p style={{ textAlign: "center", marginTop: 8, fontSize: 13, color: forgotPasswordMsg.startsWith("Gönderilemedi") ? "var(--red)" : "var(--green)", fontWeight: 600 }}>
+                  {forgotPasswordMsg}
+                </p>
+              )}
             </form>
               </>
             )}
@@ -2739,6 +2786,20 @@ function App() {
                           }}
                         >
                           ↺ Sıfırla
+                        </button>
+                        <button
+                          className="time-btn"
+                          style={{ fontSize: 12, padding: "6px 12px", color: "#3b82f6", borderColor: "#3b82f6" }}
+                          onClick={async () => {
+                            const newPwd = window.prompt(`${business.name} için yeni şifre girin (en az 6 karakter):`);
+                            if (!newPwd) return;
+                            if (newPwd.length < 6) { alert("Şifre en az 6 karakter olmalı."); return; }
+                            const { error } = await supabase.rpc("admin_reset_business_password", { p_admin_password: adminPassword, p_business_id: business.id, p_new_password: newPwd });
+                            if (error) { alert("Şifre sıfırlanamadı: " + error.message); return; }
+                            alert(`${business.name} şifresi güncellendi.`);
+                          }}
+                        >
+                          🔑 Şifre
                         </button>
                         <button
                           className="reject-btn"
