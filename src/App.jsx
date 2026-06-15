@@ -494,6 +494,27 @@ function App() {
   }, []);
 
   useEffect(() => { localStorage.setItem("rp_page", page); }, [page]);
+
+  useEffect(() => {
+    if (page !== "home") return;
+    const checkVisible = () => {
+      document.querySelectorAll(".lp-animate").forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const inView = rect.top < window.innerHeight - 20 && rect.bottom > 20;
+        el.classList.toggle("lp-visible", inView);
+      });
+    };
+    const timer = setTimeout(checkVisible, 100);
+    window.addEventListener("scroll", checkVisible, { passive: true });
+    const pageDiv = document.querySelector(".page");
+    if (pageDiv) pageDiv.addEventListener("scroll", checkVisible, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", checkVisible);
+      if (pageDiv) pageDiv.removeEventListener("scroll", checkVisible);
+    };
+  }, [page]);
+
   useEffect(() => { localStorage.setItem("rp_panel_tab", panelTab); }, [panelTab]);
   useEffect(() => { localStorage.setItem("rp_customer_tab", customerTab); }, [customerTab]);
   useEffect(() => {
@@ -1014,6 +1035,7 @@ function App() {
       )}
 
       {page === "home" && (
+        <>
         <section className="hero">
           <div className="hero-text">
             <h1>Modern işletmeler için akıllı rezervasyon.</h1>
@@ -1107,6 +1129,90 @@ function App() {
             </div>
           </div>
         </section>
+
+        {/* ── Nasıl Çalışır? ── */}
+        <section className="lp-section">
+          <div className="lp-section-header lp-animate">
+            <h2>Üç adımda rezervasyon</h2>
+            <p>Hesap oluştur, işletme seç, yerinizi anında ayırt.</p>
+          </div>
+          <div className="lp-steps-grid">
+            <div className="lp-step lp-animate" style={{ transitionDelay: "0.05s" }}>
+              <div className="lp-step-num">1</div>
+              <div className="lp-step-icon">🔍</div>
+              <h3>İşletme Seç</h3>
+              <p>Konumuna ve saatine göre müsait işletmeleri filtrele, beğendiğini seç.</p>
+            </div>
+            <div className="lp-step lp-animate" style={{ transitionDelay: "0.15s" }}>
+              <div className="lp-step-num">2</div>
+              <div className="lp-step-icon">📋</div>
+              <h3>İstek Gönder</h3>
+              <p>Tarih, saat ve kişi sayısını gir. Rezervasyon talebini saniyeler içinde gönder.</p>
+            </div>
+            <div className="lp-step lp-animate" style={{ transitionDelay: "0.25s" }}>
+              <div className="lp-step-num">3</div>
+              <div className="lp-step-icon">✅</div>
+              <h3>Onay Al</h3>
+              <p>İşletme talebini kabul ettiğinde anında bildirim alırsın. Hepsi bu kadar.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Neden RezPoint? ── */}
+        <section className="lp-section">
+          <div className="lp-section-header lp-animate">
+            <h2>Neden RezPoint?</h2>
+            <p>Sadece rezervasyon değil, tam bir deneyim.</p>
+          </div>
+          <div className="lp-features-grid">
+            <div className="lp-feature lp-animate" style={{ transitionDelay: "0.05s" }}>
+              <div className="lp-feature-icon">🛡️</div>
+              <h3>SafeScore</h3>
+              <p>Rezervasyon geçmişine göre güven puanı. İşletmeler güvenilir müşterileri önceliklendirir.</p>
+            </div>
+            <div className="lp-feature lp-animate" style={{ transitionDelay: "0.12s" }}>
+              <div className="lp-feature-icon">⚡</div>
+              <h3>Anlık Onay</h3>
+              <p>Beklemek yok. İşletmeler talebini gerçek zamanlı kabul eder, sen anında haberdar olursun.</p>
+            </div>
+            <div className="lp-feature lp-animate" style={{ transitionDelay: "0.19s" }}>
+              <div className="lp-feature-icon">💎</div>
+              <h3>Sadakat Puanı</h3>
+              <p>Her onaylı rezervasyona puan kazan. Düzenli müşteriler özel avantajlardan faydalanır.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Değer önerileri ── */}
+        <section className="lp-section">
+          <div className="lp-props-grid">
+            <div className="lp-prop lp-animate" style={{ transitionDelay: "0.05s" }}>
+              <div className="lp-prop-icon">⏱️</div>
+              <div className="lp-prop-title">Sıfır Bekleme</div>
+              <div className="lp-prop-desc">Telefon bekleme, e-posta gönderme yok. Anında rezervasyon.</div>
+            </div>
+            <div className="lp-prop lp-animate" style={{ transitionDelay: "0.15s" }}>
+              <div className="lp-prop-icon">📱</div>
+              <div className="lp-prop-title">%100 Dijital</div>
+              <div className="lp-prop-desc">Kağıt, kalem, telefon yok. Her şey tek ekranda, her cihazdan.</div>
+            </div>
+            <div className="lp-prop lp-animate" style={{ transitionDelay: "0.25s" }}>
+              <div className="lp-prop-icon">🔒</div>
+              <div className="lp-prop-title">Güvenli Altyapı</div>
+              <div className="lp-prop-desc">Verilerın şifreli, hesabın korumalı. Gizliliğine saygı duyuyoruz.</div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Final CTA ── */}
+        <section className="lp-cta-section lp-animate">
+          <h2>Rezervasyonunuzu şimdi oluşturun</h2>
+          <p>Saniyeler içinde kaydol, müsait işletmeleri gör, yerinizi ayırtın.</p>
+          <button className="lp-cta-btn" onClick={() => setPage("businesses")}>
+            Hemen Başla →
+          </button>
+        </section>
+        </>
       )}
 
       {page === "businesses" && (
