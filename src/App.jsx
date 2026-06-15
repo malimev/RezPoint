@@ -133,6 +133,9 @@ function formatBusiness(b) {
     availableDays: b.available_days ? b.available_days.split(",") : ["Friday", "Saturday"],
     specificDates: b.specific_dates ? b.specific_dates.split(",") : [],
     availableTimes: b.available_times ? b.available_times.split(",") : ["18:00", "19:00", "20:30"],
+    dateTimes: Object.fromEntries(
+      Object.entries(b.date_times || {}).map(([d, v]) => [d, (v || "").split(",").filter(Boolean)])
+    ),
     closingPin: b.closing_pin || "",
     meetingTimes: b.meeting_times ? b.meeting_times.split(",") : [],
     meetingDates: b.meeting_dates ? b.meeting_dates.split(",") : [],
@@ -158,6 +161,9 @@ function App() {
   const [availableDays, setAvailableDays] = useState(["Friday", "Saturday"]);
   const [availabilityMode, setAvailabilityMode] = useState("weekly");
   const [specificDates, setSpecificDates] = useState([]);
+  const [dateTimesMap, setDateTimesMap] = useState({});
+  const [expandedDateForTimes, setExpandedDateForTimes] = useState(null);
+  const [availableSlotsForDate, setAvailableSlotsForDate] = useState(null);
   const [savedMessage, setSavedMessage] = useState("");
 
   const [selectedAcceptedDate, setSelectedAcceptedDate] = useState("");
@@ -356,6 +362,7 @@ function App() {
           setAvailableDays(restoredBusiness.availableDays || []);
           setSpecificDates(restoredBusiness.specificDates || []);
           setAvailableTimes(restoredBusiness.availableTimes || []);
+          setDateTimesMap(restoredBusiness.dateTimes || {});
           setMeetingAvailableTimes(restoredBusiness.meetingTimes || []);
           setMeetingAvailableDays(restoredBusiness.meetingDates || []);
           setBusinessProfileForm({
@@ -833,6 +840,7 @@ function App() {
     setAvailableDays(business.availableDays || []);
     setSpecificDates(business.specificDates || []);
     setAvailableTimes(business.availableTimes || []);
+    setDateTimesMap(business.dateTimes || {});
     setMeetingAvailableTimes(business.meetingTimes || []);
     setMeetingAvailableDays(business.meetingDates || []);
     setBusinessProfileForm({
@@ -1417,16 +1425,10 @@ function App() {
                   <div className="strip-scroll-wrap">
                     <button type="button" className="strip-arrow" onClick={() => timeStripRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
                     <div className="time-strip" ref={timeStripRef}>
-                      {(selectedBusiness?.availableTimes?.length
-                        ? selectedBusiness.availableTimes
-                        : availableTimes
-                      ).map((time) => (
-                        <button
-                          key={time}
-                          type="button"
+                      {(selectedBusiness?.availableTimes?.length ? selectedBusiness.availableTimes : availableTimes).map((time) => (
+                        <button key={time} type="button"
                           className={reservation.time === time ? "strip-btn active" : "strip-btn"}
-                          onClick={() => setReservation({ ...reservation, time })}
-                        >
+                          onClick={() => setReservation({ ...reservation, time })}>
                           {time}
                         </button>
                       ))}
@@ -3295,7 +3297,7 @@ function App() {
                         ))}
                       </div>
 
-                      <p className="description" style={{ marginBottom: 10 }}>🕐 Müsait saatler</p>
+                      <p className="description" style={{ marginBottom: 10 }}>🕐 Genel müsait saatler (tarihe özel saat ayarlanmayan günlerde kullanılır)</p>
                       <div className="time-slots-grid" style={{ maxHeight: "none", marginBottom: 16 }}>
                         {ALL_TIME_SLOTS.map(slot => (
                           <button key={slot} type="button"
@@ -3306,17 +3308,70 @@ function App() {
                         ))}
                       </div>
 
+                      {meetingAvailableDays.length > 0 && (
+                        <>
+                          <p className="description" style={{ marginBottom: 10, marginTop: 20 }}>📆 Tarihe Özel Saatler</p>
+                          <p className="description" style={{ fontSize: 12, marginBottom: 12 }}>Her randevu günü için farklı saat dilimleri ayarlayabilirsiniz.</p>
+                          {meetingAvailableDays.filter(d => new Date(d + "T00:00:00") >= new Date().setHours(0,0,0,0)).sort().map(date => {
+                            const customTimes = dateTimesMap[date] || [];
+                            const isExpanded = expandedDateForTimes === date;
+                            const d = new Date(date + "T00:00:00");
+                            const label = d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", weekday: "short" });
+                            return (
+                              <div key={date} style={{ marginBottom: 8 }}>
+                                <button className="time-btn"
+                                  style={{ width: "100%", textAlign: "left", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                                  onClick={() => setExpandedDateForTimes(isExpanded ? null : date)}>
+                                  <span><strong>{label}</strong> — {customTimes.length > 0 ? customTimes.join(", ") : <em style={{ color: "#9ca3af" }}>genel saatler</em>}</span>
+                                  <span>{isExpanded ? "▲" : "▼"}</span>
+                                </button>
+                                {isExpanded && (
+                                  <div style={{ background: "rgba(109,40,217,0.04)", border: "1px solid rgba(109,40,217,0.12)", borderRadius: 12, padding: "12px 10px", marginTop: 4 }}>
+                                    <div className="time-slots-grid">
+                                      {ALL_TIME_SLOTS.map(time => (
+                                        <button key={time}
+                                          className={customTimes.includes(time) ? "selected-time" : "time-btn"}
+                                          onClick={() => {
+                                            const updated = customTimes.includes(time) ? customTimes.filter(t => t !== time) : [...customTimes, time].sort();
+                                            setDateTimesMap(prev => {
+                                              if (updated.length === 0) { const next = { ...prev }; delete next[date]; return next; }
+                                              return { ...prev, [date]: updated };
+                                            });
+                                          }}>
+                                          {time}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    {customTimes.length > 0 && (
+                                      <button className="time-btn" style={{ marginTop: 8, fontSize: 12 }}
+                                        onClick={() => setDateTimesMap(prev => { const next = { ...prev }; delete next[date]; return next; })}>
+                                        ✕ Genel saatlere dön
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+
                       {meetingTimeSaved && <p style={{ color: "#16a34a", fontWeight: 700, marginBottom: 8 }}>{meetingTimeSaved}</p>}
-                      <button type="button" className="primary-btn" onClick={async () => {
+                      <button type="button" className="primary-btn" style={{ marginTop: 16 }} onClick={async () => {
                         const { error } = await supabase.rpc("business_save_meeting_availability", {
                           p_token: bizSessionToken,
                           p_business_id: loggedBusiness.id,
                           p_meeting_times: meetingAvailableTimes.join(","),
                           p_meeting_dates: meetingAvailableDays.join(","),
+                          p_meeting_date_times: JSON.stringify(
+                            Object.fromEntries(
+                              Object.entries(dateTimesMap).filter(([,arr]) => arr.length > 0).map(([d,arr]) => [d, arr.join(",")])
+                            )
+                          ),
                         });
                         if (error) { alert("Kaydedilemedi: " + error.message); return; }
-                        setLoggedBusiness(prev => ({ ...prev, meetingTimes: meetingAvailableTimes, meetingDates: meetingAvailableDays }));
-                        setAdminBusinesses(prev => prev.map(b => b.id === loggedBusiness.id ? { ...b, meetingTimes: meetingAvailableTimes, meetingDates: meetingAvailableDays } : b));
+                        setLoggedBusiness(prev => ({ ...prev, meetingTimes: meetingAvailableTimes, meetingDates: meetingAvailableDays, dateTimes: dateTimesMap }));
+                        setAdminBusinesses(prev => prev.map(b => b.id === loggedBusiness.id ? { ...b, meetingTimes: meetingAvailableTimes, meetingDates: meetingAvailableDays, dateTimes: dateTimesMap } : b));
                         setMeetingTimeSaved("Müsaitlik kaydedildi ✅");
                         setTimeout(() => setMeetingTimeSaved(""), 4000);
                       }}>Kaydet</button>
@@ -3328,14 +3383,20 @@ function App() {
                   <div className="popup-overlay" onClick={() => setMeetingDetailPopup(null)}>
                     <div className="popup-box" onClick={e => e.stopPropagation()}>
                       <h2>Randevu Detayları</h2>
+                      <div style={{ display: "flex", gap: 10, justifyContent: "center", margin: "12px 0 18px" }}>
+                        <span style={{ background: "rgba(109,40,217,0.1)", color: "#6d28d9", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.95rem" }}>
+                          📅 {formatDate(meetingDetailPopup.date)}
+                        </span>
+                        <span style={{ background: "rgba(109,40,217,0.1)", color: "#6d28d9", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.95rem" }}>
+                          🕐 {meetingDetailPopup.time}
+                        </span>
+                      </div>
                       {[
                         ["İsim Soyisim", meetingDetailPopup.fullName],
                         ["E-posta", meetingDetailPopup.email],
                         ["Telefon", meetingDetailPopup.phone],
                         ["Şirket", meetingDetailPopup.company || "—"],
                         ["Görüşme Sebebi", REASON_LABELS[meetingDetailPopup.reason] || meetingDetailPopup.reason],
-                        ["Tarih", formatDate(meetingDetailPopup.date)],
-                        ["Saat", meetingDetailPopup.time],
                         ["Not", meetingDetailPopup.note || "—"],
                         ["Durum", meetingDetailPopup.status === "accepted" ? "Kabul Edildi" : meetingDetailPopup.status === "rejected" ? "Reddedildi" : "Bekliyor"],
                       ].map(([k, v]) => (
@@ -3795,6 +3856,7 @@ function App() {
                         ));
                       })()}
                     </div>
+
                   </>
                 )}
 
@@ -3886,6 +3948,7 @@ function App() {
                       availableDays,
                       availableTimes,
                       specificDates,
+                      dateTimes: dateTimesMap,
                     };
 
                     setLoggedBusiness(updatedBusiness);
@@ -4308,7 +4371,15 @@ function App() {
                             return (
                               <button key={d} type="button"
                                 className={meetingForm.date === d ? "strip-btn active" : "strip-btn"}
-                                onClick={() => setMeetingForm(p => ({ ...p, date: d, time: "" }))}>
+                                onClick={async () => {
+                                  setMeetingForm(p => ({ ...p, date: d, time: "" }));
+                                  setAvailableSlotsForDate(null);
+                                  const { data: slots } = await supabase.rpc("get_available_meeting_slots", {
+                                    p_business_id: meetingFormBusiness.id,
+                                    p_date: d,
+                                  });
+                                  setAvailableSlotsForDate(slots ? slots.split(",").filter(Boolean) : []);
+                                }}>
                                 <span className="strip-day">{parsed.toLocaleDateString("tr-TR", { weekday: "short" })}</span>
                                 <span className="strip-date">{parsed.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}</span>
                               </button>
@@ -4325,16 +4396,23 @@ function App() {
                   <div className="strip-scroll-wrap">
                     <button type="button" className="strip-arrow" onClick={() => meetingTimeRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
                     <div className="time-strip" ref={meetingTimeRef}>
-                      {(() => {
-                        const bookedTimes = meetings.filter(m => String(m.businessId) === String(meetingFormBusiness.id) && m.date === meetingForm.date && m.status !== "rejected").map(m => m.time);
-                        return (meetingFormBusiness.meetingTimes || []).filter(t => !bookedTimes.includes(t)).map(time => (
+                      {availableSlotsForDate !== null ? (
+                        availableSlotsForDate.length === 0 ? (
+                          <span style={{ padding: "8px 12px", color: "#9ca3af", fontSize: 13 }}>Bu tarihte müsait saat yok</span>
+                        ) : availableSlotsForDate.map(time => (
                           <button key={time} type="button"
                             className={meetingForm.time === time ? "strip-btn active" : "strip-btn"}
                             onClick={() => setMeetingForm(p => ({ ...p, time }))}>
                             {time}
                           </button>
-                        ));
-                      })()}
+                        ))
+                      ) : (meetingFormBusiness.meetingTimes || []).map(time => (
+                        <button key={time} type="button"
+                          className={meetingForm.time === time ? "strip-btn active" : "strip-btn"}
+                          onClick={() => setMeetingForm(p => ({ ...p, time }))}>
+                          {time}
+                        </button>
+                      ))}
                     </div>
                     <button type="button" className="strip-arrow" onClick={() => meetingTimeRef.current?.scrollBy({ left: 160, behavior: "smooth" })}>›</button>
                   </div>
@@ -4418,6 +4496,15 @@ function App() {
           <div className="popup-box">
             <h2>Rezervasyon Detayları</h2>
 
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", margin: "12px 0 18px" }}>
+              <span style={{ background: "rgba(109,40,217,0.1)", color: "#6d28d9", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.95rem" }}>
+                📅 {formatDate(selectedReservation.date)}
+              </span>
+              <span style={{ background: "rgba(109,40,217,0.1)", color: "#6d28d9", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.95rem" }}>
+                🕐 {selectedReservation.time}
+              </span>
+            </div>
+
             <div className="card-row">
               <span>İsim</span>
               <strong>{selectedReservation.fullName}</strong>
@@ -4436,16 +4523,6 @@ function App() {
             <div className="card-row">
               <span>İşletme</span>
               <strong>{selectedReservation.business}</strong>
-            </div>
-
-            <div className="card-row">
-              <span>Tarih</span>
-              <strong>{formatDate(selectedReservation.date)}</strong>
-            </div>
-
-            <div className="card-row">
-              <span>Saat</span>
-              <strong>{selectedReservation.time}</strong>
             </div>
 
             <div className="card-row">
