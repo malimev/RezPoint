@@ -223,6 +223,7 @@ function App() {
   const [searchDate, setSearchDate] = useState("");
   const [searchTime, setSearchTime] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
+  const [authConfirmMsg, setAuthConfirmMsg] = useState("");
   const [emailPending, setEmailPending] = useState(false);
 
   const [bizLoginAttempts, setBizLoginAttempts] = useState(0);
@@ -452,6 +453,21 @@ function App() {
       if (event === "SIGNED_OUT") {
         setLoggedCustomer(null);
         setEmailVerified(false);
+      }
+      if (event === "SIGNED_IN") {
+        const hash = window.location.hash;
+        if (hash.includes("type=signup")) {
+          window.location.hash = "";
+          setAuthConfirmMsg("E-postanız onaylandı! Şimdi giriş yapabilirsiniz.");
+          setEmailPending(false);
+          setCustomerMode("login");
+          setPage("customerAuth");
+        } else if (hash.includes("type=email_change")) {
+          window.location.hash = "";
+          setAuthConfirmMsg("E-posta adresiniz başarıyla güncellendi.");
+          setCustomerMode("login");
+          setPage("customerAuth");
+        }
       }
     });
     return () => subscription?.unsubscribe();
@@ -1634,6 +1650,12 @@ function App() {
               </div>
             ) : (
               <>
+            {authConfirmMsg && (
+              <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 12, padding: "12px 16px", marginBottom: 16, color: "#15803d", fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                ✅ {authConfirmMsg}
+              </div>
+            )}
+
             <h1>
               {customerMode === "login" ? "Müşteri Girişi" : "Hesap Oluştur"}
             </h1>
@@ -1717,6 +1739,7 @@ function App() {
                       await supabase.auth.signUp({
                         email: customerForm.email,
                         password: customerForm.password,
+                        options: { emailRedirectTo: "https://getrezpoint.com" },
                       });
 
                     if (authError) {
@@ -2162,7 +2185,7 @@ function App() {
                         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return setAccountMsg({ text: "Geçerli bir e-posta adresi girin.", type: "error" });
 
                         setAccountLoading("email");
-                        const { error } = await supabase.auth.updateUser({ email: newEmail });
+                        const { error } = await supabase.auth.updateUser({ email: newEmail }, { emailRedirectTo: "https://getrezpoint.com" });
                         setAccountLoading("");
 
                         if (error) {
