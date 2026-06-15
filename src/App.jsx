@@ -64,14 +64,85 @@ const CUSTOMER_PAGES = ["customerDashboard"];
 const BUSINESS_PAGES = ["businessPanel"];
 const NO_RESTORE = ["reservation","summary","success","adminPanel"];
 
+// React efektleri çalışmadan önce bir kere okunur.
+// useEffect([page]) hemen "home" yazarken bu değer korunur.
+const INITIAL_SAVED_PAGE = localStorage.getItem("rp_page") || "home";
+
 function getSavedPage() {
-  const p = localStorage.getItem("rp_page");
-  if (!p || NO_RESTORE.includes(p)) return "home";
-  return p;
+  if (!INITIAL_SAVED_PAGE || NO_RESTORE.includes(INITIAL_SAVED_PAGE) || BUSINESS_PAGES.includes(INITIAL_SAVED_PAGE) || CUSTOMER_PAGES.includes(INITIAL_SAVED_PAGE)) return "home";
+  return INITIAL_SAVED_PAGE;
+}
+
+function formatRez(rez) {
+  return {
+    id: rez.id,
+    business: rez.business,
+    businessId: rez.business_id,
+    fullName: rez.full_name,
+    email: rez.email,
+    phone: rez.phone,
+    date: rez.date,
+    time: rez.time,
+    guests: rez.guests,
+    note: rez.note,
+    safeScore: rez.safe_score,
+    code: rez.code,
+    status: rez.status,
+    businessMessage: rez.business_message || "",
+    attendanceStatus: rez.attendance_status || "pending",
+    createdAt: rez.created_at || null,
+    businessNote: rez.business_note || "",
+    customerProfile: {
+      gender: rez.gender,
+      birthDate: rez.birth_date,
+      job: rez.job,
+      smoking: rez.smoking,
+    },
+  };
+}
+
+function parseMenuText(raw) {
+  if (!raw) return { description: "", menu: "", phone: "", terms: "" };
+  try {
+    const p = JSON.parse(raw);
+    if (p && typeof p === "object")
+      return { description: p.description || "", menu: p.menu || "", phone: p.phone || "", terms: p.terms || "" };
+  } catch {}
+  return { description: "", menu: raw, phone: "", terms: "" };
+}
+
+function formatBusiness(b) {
+  const parsed = parseMenuText(b.menu_text);
+  return {
+    id: b.id,
+    name: b.name,
+    email: b.email,
+    reservationActive: b.reservation_enabled,
+    aiMenuActive: b.ai_menu_enabled,
+    menuText: b.menu_text || "",
+    description: parsed.description,
+    menu: parsed.menu,
+    phone: parsed.phone,
+    terms: parsed.terms,
+    type: b.type || "Business",
+    location: b.location || "",
+    icon: b.icon || "🏢",
+    logoUrl: b.logo_url || null,
+    meetingEnabled: b.meeting_enabled ?? false,
+    availabilityMode: b.availability_mode === "everyday" ? "specific" : (b.availability_mode || "weekly"),
+    availableDays: b.available_days ? b.available_days.split(",") : ["Friday", "Saturday"],
+    specificDates: b.specific_dates ? b.specific_dates.split(",") : [],
+    availableTimes: b.available_times ? b.available_times.split(",") : ["18:00", "19:00", "20:30"],
+    closingPin: b.closing_pin || "",
+    meetingTimes: b.meeting_times ? b.meeting_times.split(",") : [],
+    meetingDates: b.meeting_dates ? b.meeting_dates.split(",") : [],
+    rating: b.rating || 0,
+  };
 }
 
 function App() {
   const [page, setPage] = useState(getSavedPage);
+  const [appReady, setAppReady] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [error, setError] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -85,7 +156,8 @@ function App() {
     "20:30",
   ]);
   const [availableDays, setAvailableDays] = useState(["Friday", "Saturday"]);
-  const [availabilityMode, setAvailabilityMode] = useState("selected");
+  const [availabilityMode, setAvailabilityMode] = useState("weekly");
+  const [specificDates, setSpecificDates] = useState([]);
   const [savedMessage, setSavedMessage] = useState("");
 
   const [selectedAcceptedDate, setSelectedAcceptedDate] = useState("");
@@ -102,6 +174,8 @@ function App() {
   const [loggedCustomer, setLoggedCustomer] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
+  const [navScrolled, setNavScrolled] = useState(false);
+  const [adminEditingBiz, setAdminEditingBiz] = useState(null);
   const [loggedBusiness, setLoggedBusiness] = useState(null);
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -109,6 +183,25 @@ function App() {
   const [businessSearch, setBusinessSearch] = useState("");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const dateStripRef = useRef(null);
+  const timeStripRef = useRef(null);
+
+  // ── Meeting system ──
+  const [meetings, setMeetings] = useState([]);
+  const [bizMode, setBizMode] = useState("reservations"); // "reservations" | "meetings"
+  const [meetingPanelTab, setMeetingPanelTab] = useState("incoming");
+  const [meetingForm, setMeetingForm] = useState({ fullName: "", email: "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
+  const [meetingTermsChecked, setMeetingTermsChecked] = useState({ biz: false, rp: false });
+  const [meetingFormBusiness, setMeetingFormBusiness] = useState(null);
+  const [meetingFormError, setMeetingFormError] = useState("");
+  const [isSendingMeeting, setIsSendingMeeting] = useState(false);
+  const [meetingDetailPopup, setMeetingDetailPopup] = useState(null);
+  const [selectedMeetingDate, setSelectedMeetingDate] = useState("");
+  const [meetingAvailableTimes, setMeetingAvailableTimes] = useState([]);
+  const [meetingAvailableDays, setMeetingAvailableDays] = useState([]);
+  const [meetingTimeSaved, setMeetingTimeSaved] = useState("");
+  const meetingDateRef = useRef(null);
+  const meetingTimeRef = useRef(null);
 
   const [businessProfileForm, setBusinessProfileForm] = useState({
     name: "",
@@ -116,14 +209,33 @@ function App() {
     phone: "",
     description: "",
     menu: "",
+    terms: "",
   });
   const [businessProfileSaved, setBusinessProfileSaved] = useState("");
+  const [termsChecked, setTermsChecked] = useState({ biz: false, rp: false });
+  const [termsModal, setTermsModal] = useState(null);
+  const [legalModal, setLegalModal] = useState(null);
+  const [rpTerms, setRpTerms] = useState("");
+  const [rpTermsEdit, setRpTermsEdit] = useState("");
   const [selectedBusinessInfo, setSelectedBusinessInfo] = useState(null);
 
   const [searchLocation, setSearchLocation] = useState("Hepsi");
   const [searchDate, setSearchDate] = useState("");
   const [searchTime, setSearchTime] = useState("");
-  const [emailVerified, setEmailVerified] = useState(true);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailPending, setEmailPending] = useState(false);
+
+  const [bizLoginAttempts, setBizLoginAttempts] = useState(0);
+  const [bizLoginLocked, setBizLoginLocked] = useState(false);
+  const [adminLoginAttempts, setAdminLoginAttempts] = useState(0);
+  const [adminLoginLocked, setAdminLoginLocked] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  const [accountNewEmail, setAccountNewEmail] = useState("");
+  const [accountNewPassword, setAccountNewPassword] = useState("");
+  const [accountNewPassword2, setAccountNewPassword2] = useState("");
+  const [accountMsg, setAccountMsg] = useState({ text: "", type: "" });
+  const [accountLoading, setAccountLoading] = useState("");
 
   const [safescoreHistory, setSafescoreHistory] = useState([]);
   const [loyaltyPoints, setLoyaltyPoints] = useState([]);
@@ -183,15 +295,6 @@ function App() {
   // ---------------------------------------------------------------------
   useEffect(() => {
     const loadInitialData = async () => {
-      const parseMenuText = (raw) => {
-        if (!raw) return { description: "", menu: "", phone: "" };
-        try {
-          const p = JSON.parse(raw);
-          if (p && typeof p === "object") return { description: p.description || "", menu: p.menu || "", phone: p.phone || "" };
-        } catch {}
-        return { description: "", menu: raw, phone: "" };
-      };
-
       // 1. Restore Supabase Auth customer session
       let sessionCustomer = null;
       const { data: { session } } = await supabase.auth.getSession();
@@ -219,6 +322,9 @@ function App() {
           setCustomerForm({ name: custData.name, email: custData.email, password: "" });
           setEmailVerified(true);
           loadCustomerExtras(custData.id);
+          // Email doğrulama linkinden dönen kullanıcıyı dashboard'a yönlendir
+          const savedPage = localStorage.getItem("rp_page") || "home";
+          if (savedPage === "customerAuth") setPage("customerDashboard");
         }
       }
 
@@ -230,32 +336,7 @@ function App() {
 
       let formattedBusinesses = [];
       if (businessData) {
-        formattedBusinesses = businessData.map((business) => {
-          const parsed = parseMenuText(business.menu_text);
-          return {
-            id: business.id,
-            name: business.name,
-            email: business.email,
-            password: business.password,
-            reservationActive: business.reservation_enabled,
-            aiMenuActive: business.ai_menu_enabled,
-            menuText: business.menu_text || "",
-            description: parsed.description,
-            menu: parsed.menu,
-            phone: parsed.phone,
-            type: business.type || "Business",
-            location: business.location || "",
-            icon: business.icon || "🏢",
-            availabilityMode: business.availability_mode || "selected",
-            availableDays: business.available_days
-              ? business.available_days.split(",")
-              : ["Friday", "Saturday"],
-            availableTimes: business.available_times
-              ? business.available_times.split(",")
-              : ["18:00", "19:00", "20:30"],
-            closingPin: business.closing_pin || "0000",
-          };
-        });
+        formattedBusinesses = businessData.map(formatBusiness);
         setAdminBusinesses(formattedBusinesses);
       }
 
@@ -266,15 +347,19 @@ function App() {
         restoredBusiness = formattedBusinesses.find(b => String(b.id) === String(savedBizId));
         if (restoredBusiness) {
           setLoggedBusiness(restoredBusiness);
-          setAvailabilityMode(restoredBusiness.availabilityMode || "selected");
+          setAvailabilityMode(restoredBusiness.availabilityMode || "weekly");
           setAvailableDays(restoredBusiness.availableDays || []);
+          setSpecificDates(restoredBusiness.specificDates || []);
           setAvailableTimes(restoredBusiness.availableTimes || []);
+          setMeetingAvailableTimes(restoredBusiness.meetingTimes || []);
+          setMeetingAvailableDays(restoredBusiness.meetingDates || []);
           setBusinessProfileForm({
             name: restoredBusiness.name || "",
             location: restoredBusiness.location || "",
             phone: restoredBusiness.phone || "",
             description: restoredBusiness.description || "",
             menu: restoredBusiness.menu || "",
+            terms: restoredBusiness.terms || "",
           });
         }
       }
@@ -285,31 +370,7 @@ function App() {
       if (reservationError) console.log("Reservations fetch error:", reservationError);
 
       if (reservationData) {
-        setReservations(reservationData.map((rez) => ({
-          id: rez.id,
-          business: rez.business,
-          businessId: rez.business_id,
-          fullName: rez.full_name,
-          email: rez.email,
-          phone: rez.phone,
-          date: rez.date,
-          time: rez.time,
-          guests: rez.guests,
-          note: rez.note,
-          safeScore: rez.safe_score,
-          code: rez.code,
-          status: rez.status,
-          businessMessage: rez.business_message || "",
-          attendanceStatus: rez.attendance_status || "pending",
-          createdAt: rez.created_at || "",
-          businessNote: rez.business_note || "",
-          customerProfile: {
-            gender: rez.gender,
-            birthDate: rez.birth_date,
-            job: rez.job,
-            smoking: rez.smoking,
-          },
-        })));
+        setReservations(reservationData.map(formatRez));
       }
 
       // 5. Load customers
@@ -323,7 +384,6 @@ function App() {
           id: customer.id,
           name: customer.name,
           email: customer.email,
-          password: customer.password,
           safeScore: customer.safe_score ?? 100,
           profile: {
             phone: customer.phone || "",
@@ -335,19 +395,42 @@ function App() {
         })));
       }
 
-      // 6. Validate page — if required session is missing, fall back to home
-      const currentPage = localStorage.getItem("rp_page") || "home";
+      // 6. Navigate to protected pages only after confirming session is valid.
+      // getSavedPage() returns "home" for BUSINESS_PAGES and CUSTOMER_PAGES, so
+      // we must explicitly setPage() here after session validation.
+      // IMPORTANT: use INITIAL_SAVED_PAGE (module-level), NOT localStorage.getItem()
+      // because the useEffect([page]) already overwrote localStorage with "home".
+      const currentPage = INITIAL_SAVED_PAGE;
       const savedSelBizId = localStorage.getItem("rp_sel_biz_id");
-      if (BUSINESS_PAGES.includes(currentPage) && !restoredBusiness) {
-        setPage("home");
-      } else if (CUSTOMER_PAGES.includes(currentPage) && !sessionCustomer) {
-        setPage("home");
+      if (BUSINESS_PAGES.includes(currentPage)) {
+        if (restoredBusiness) setPage("businessPanel");
+        // else: already "home" from getSavedPage()
+      } else if (CUSTOMER_PAGES.includes(currentPage)) {
+        if (sessionCustomer) setPage("customerDashboard");
+        // else: already "home" from getSavedPage()
       } else if (currentPage === "businessProfile" && savedSelBizId) {
         const selBiz = formattedBusinesses.find(b => String(b.id) === String(savedSelBizId));
         if (selBiz) setSelectedBusiness(selBiz);
         else setPage("businesses");
       }
-      // All other pages: already set correctly via getSavedPage() initializer
+
+      // 6b. Load meetings
+      const { data: meetingData } = await supabase.from("meetings").select("*");
+      if (meetingData) {
+        setMeetings(meetingData.map(m => ({
+          id: m.id, businessId: m.business_id, businessName: m.business_name,
+          fullName: m.full_name, email: m.email, phone: m.phone,
+          company: m.company_name || "", reason: m.reason,
+          date: m.date, time: m.time, note: m.note || "",
+          status: m.status, code: m.code, createdAt: m.created_at || "",
+        })));
+      }
+
+      // 7. Load RezPoint terms
+      const { data: rpTermsData } = await supabase.from("site_settings").select("value").eq("key", "rezpoint_terms").single();
+      if (rpTermsData?.value) { setRpTerms(rpTermsData.value); setRpTermsEdit(rpTermsData.value); }
+
+      setAppReady(true);
     };
 
     loadInitialData();
@@ -375,32 +458,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const formatRez = (rez) => ({
-      id: rez.id,
-      business: rez.business,
-      businessId: rez.business_id,
-      fullName: rez.full_name,
-      email: rez.email,
-      phone: rez.phone,
-      date: rez.date,
-      time: rez.time,
-      guests: rez.guests,
-      note: rez.note,
-      safeScore: rez.safe_score,
-      code: rez.code,
-      status: rez.status,
-      businessMessage: rez.business_message || "",
-      attendanceStatus: rez.attendance_status || "pending",
-      createdAt: rez.created_at || "",
-      businessNote: rez.business_note || "",
-      customerProfile: {
-        gender: rez.gender,
-        birthDate: rez.birth_date,
-        job: rez.job,
-        smoking: rez.smoking,
-      },
-    });
-
     const channel = supabase
       .channel("reservations-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "reservations" }, (payload) => {
@@ -417,16 +474,17 @@ function App() {
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "reservations" }, (payload) => {
         const updated = payload.new;
-        setReservations(prev => prev.map(r => r.id === updated.id ? {
-          ...r,
-          status: updated.status,
-          businessMessage: updated.business_message || "",
-          attendanceStatus: updated.attendance_status || "pending",
-        } : r));
+        setReservations(prev => prev.map(r => r.id === updated.id ? formatRez(updated) : r));
       })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setNavScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => { localStorage.setItem("rp_page", page); }, [page]);
@@ -469,7 +527,8 @@ function App() {
     });
   }
 
-  function getAvailableDates() {
+  function getAvailableDates(forBusiness) {
+    const biz = forBusiness || selectedBusiness;
     const dates = [];
 
     for (let i = 0; i < 30; i++) {
@@ -477,17 +536,17 @@ function App() {
       date.setHours(0, 0, 0, 0);
       date.setDate(date.getDate() + i);
 
+      const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
       const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
-      const businessAvailabilityMode = selectedBusiness?.availabilityMode || availabilityMode;
-      const businessAvailableDays = selectedBusiness?.availableDays?.length
-        ? selectedBusiness.availableDays
-        : availableDays;
+      const businessAvailabilityMode = biz?.availabilityMode || availabilityMode;
+      const businessAvailableDays = biz?.availableDays?.length ? biz.availableDays : availableDays;
+      const businessSpecificDates = biz?.specificDates || specificDates;
       const shouldInclude =
-        businessAvailabilityMode === "everyday" ||
-        businessAvailableDays.includes(dayName);
+        businessAvailabilityMode === "specific"
+          ? businessSpecificDates.includes(fullDate)
+          : businessAvailableDays.includes(dayName);
 
       if (shouldInclude) {
-        const fullDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
         dates.push({
           fullDate,
           display: date.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", weekday: "long" }),
@@ -509,7 +568,11 @@ function App() {
 
     return reservations.filter(
       (rez) =>
-        String(rez.businessId) === String(loggedBusiness.id) && rez.status === "accepted",
+        String(rez.businessId) === String(loggedBusiness.id) &&
+        (
+          (rez.status === "completed" && rez.attendanceStatus === "attended") ||
+          rez.status === "accepted"
+        ),
     );
   }
   function getBusinessReservationCount(status) {
@@ -656,6 +719,7 @@ function App() {
 
     setSelectedBusiness(business);
     setReservation({ phone: "", date: "", time: "", guests: "", note: "" });
+    setTermsChecked({ biz: false, rp: false });
     setDatePickerOpen(false);
     setTimePickerOpen(false);
     setError("");
@@ -702,64 +766,96 @@ function App() {
     setPage("summary");
   }
 
-  function handleBusinessLogin() {
-    const business = adminBusinesses.find(
-      (item) =>
-        item.email === businessLogin.email &&
-        item.password === businessLogin.password,
-    );
+  async function handleBusinessLogin() {
+    if (bizLoginLocked) return;
 
-    if (business) {
-      setLoggedBusiness(business);
+    const email = businessLogin.email.trim().toLowerCase();
+    const password = businessLogin.password;
 
-      setAvailabilityMode(
-        business.availabilityMode || business.availability_mode || "selected",
-      );
-
-      setAvailableDays(
-        business.availableDays ||
-          (business.available_days ? business.available_days.split(",") : []),
-      );
-
-      setAvailableTimes(
-        business.availableTimes ||
-          (business.available_times ? business.available_times.split(",") : []),
-      );
-
-      setBusinessProfileForm({
-        name: business.name || "",
-        location: business.location || "",
-        phone: business.phone || "",
-        description: business.description || "",
-        menu: business.menu || "",
-      });
-
-      localStorage.setItem("rp_biz_id", business.id);
-      setLoginError("");
-      setPanelTab("incoming");
-      setPage("businessPanel");
-    } else {
-      setLoginError("Hatalı e-posta veya şifre.");
+    if (!email || !password) {
+      setLoginError("E-posta ve şifre alanlarını doldurun.");
+      return;
     }
+
+    setLoginLoading(true);
+    const { data, error } = await supabase.rpc("login_business", {
+      p_email: email,
+      p_password: password,
+    });
+    setLoginLoading(false);
+
+    if (error || !data || data.length === 0) {
+      const attempts = bizLoginAttempts + 1;
+      setBizLoginAttempts(attempts);
+      if (attempts >= 5) {
+        setBizLoginLocked(true);
+        setLoginError("Çok fazla hatalı deneme. Sayfayı yenileyin ve tekrar deneyin.");
+      } else {
+        setLoginError(`Hatalı e-posta veya şifre. (${attempts}/5)`);
+      }
+      return;
+    }
+
+    const business = formatBusiness(data[0]);
+    setLoggedBusiness(business);
+    setAvailabilityMode(business.availabilityMode || "weekly");
+    setAvailableDays(business.availableDays || []);
+    setSpecificDates(business.specificDates || []);
+    setAvailableTimes(business.availableTimes || []);
+    setMeetingAvailableTimes(business.meetingTimes || []);
+    setMeetingAvailableDays(business.meetingDates || []);
+    setBusinessProfileForm({
+      name: business.name || "",
+      location: business.location || "",
+      phone: business.phone || "",
+      description: business.description || "",
+      menu: business.menu || "",
+      terms: business.terms || "",
+    });
+
+    localStorage.setItem("rp_biz_id", business.id);
+    setLoginError("");
+    setBizLoginAttempts(0);
+    setPanelTab("incoming");
+    setPage("businessPanel");
   }
 
-  function handleAdminLogin() {
-    // SECURITY NOTE: This check runs entirely in the browser, so the
-    // credentials below are visible to anyone who opens devtools / the
-    // bundled JS. For real protection this must be enforced server-side
-    // (e.g. Supabase Auth + Row Level Security policies), not here.
-    if (
-      adminLogin.email === "admin@rezpoint.com" &&
-      adminLogin.password === "0000"
-    ) {
-      setAdminError("");
-      setPage("adminPanel");
-      supabase.from("business_types").select("*").order("name").then(({ data }) => {
-        if (data) setAdminBizTypes(data);
-      });
-    } else {
-      setAdminError("Hatalı yönetici e-postası veya şifre.");
+  async function handleAdminLogin() {
+    if (adminLoginLocked) return;
+
+    const email = adminLogin.email.trim().toLowerCase();
+    const password = adminLogin.password;
+
+    if (!email || !password) {
+      setAdminError("E-posta ve şifre alanlarını doldurun.");
+      return;
     }
+
+    setLoginLoading(true);
+    const { data, error } = await supabase.rpc("verify_admin", {
+      p_email: email,
+      p_password: password,
+    });
+    setLoginLoading(false);
+
+    if (error || !data) {
+      const attempts = adminLoginAttempts + 1;
+      setAdminLoginAttempts(attempts);
+      if (attempts >= 5) {
+        setAdminLoginLocked(true);
+        setAdminError("Çok fazla hatalı deneme. Sayfayı yenileyin ve tekrar deneyin.");
+      } else {
+        setAdminError(`Hatalı yönetici e-postası veya şifre. (${attempts}/5)`);
+      }
+      return;
+    }
+
+    setAdminError("");
+    setAdminLoginAttempts(0);
+    setPage("adminPanel");
+    supabase.from("business_types").select("*").order("name").then(({ data: bt }) => {
+      if (bt) setAdminBizTypes(bt);
+    });
   }
 
   async function closeDayReservations() {
@@ -829,9 +925,17 @@ function App() {
     setSavedMessage(`${formatDate(selectedAcceptedDate)} günü başarıyla kapatıldı.`);
     setTimeout(() => setSavedMessage(""), 3000);
   }
+  if (!appReady) {
+    return (
+      <div className="app-loading">
+        <div className="app-loading-spinner" />
+      </div>
+    );
+  }
+
   return (
     <div className="page">
-      <nav className="navbar">
+      <nav className={`navbar${navScrolled ? " navbar--scrolled" : ""}`}>
         <div
           className="logo"
           onClick={() => {
@@ -1057,7 +1161,9 @@ function App() {
                 if (searchLocation !== "Hepsi" && business.location !== searchLocation) return false;
                 if (searchDate) {
                   const dayName = new Date(searchDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
-                  const dayOk = business.availabilityMode === "everyday" || business.availableDays.includes(dayName);
+                  const dayOk = business.availabilityMode === "specific"
+                    ? (business.specificDates || []).includes(searchDate)
+                    : (business.availableDays || []).includes(dayName);
                   if (!dayOk) return false;
                 }
                 if (searchDate && searchTime) {
@@ -1070,11 +1176,15 @@ function App() {
                 <div
                   className="business-card"
                   key={business.id}
-                  style={{ animationDelay: `${index * 0.07}s` }}
+                  style={{ animationDelay: `${index * 0.07}s`, cursor: "pointer" }}
+                  onClick={() => { setSelectedBusiness(business); setPage("businessProfile"); }}
                 >
                   <div className="bc-glow" />
                   <div className="bc-icon-wrap">
-                    <span className="bc-icon">{business.icon}</span>
+                    {business.logoUrl
+                      ? <img src={business.logoUrl} alt={business.name} className="bc-logo-img" />
+                      : <span className="bc-icon">{business.icon}</span>
+                    }
                   </div>
                   <div className="bc-body">
                     <h3 className="bc-name">{business.name}</h3>
@@ -1086,16 +1196,26 @@ function App() {
                   <div className="bc-actions">
                     <button
                       className="bc-select-btn"
-                      onClick={() => openReservationForm(business)}
+                      onClick={(e) => { e.stopPropagation(); openReservationForm(business); }}
                     >
                       Rezervasyon Yap <span className="bc-arrow">→</span>
                     </button>
-                    <button
-                      className="bc-info-btn"
-                      onClick={(e) => { e.stopPropagation(); setSelectedBusiness(business); setPage("businessProfile"); }}
-                    >
-                      ℹ Profili Gör
-                    </button>
+                    {business.meetingEnabled && business.meetingDates?.length > 0 && (
+                      <button
+                        className="bc-info-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!loggedCustomer) { setPage("customerAuth"); return; }
+                          setMeetingFormBusiness(business);
+                          setMeetingForm({ fullName: loggedCustomer.name || "", email: loggedCustomer.email || "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
+                          setMeetingTermsChecked({ biz: false, rp: false });
+                          setMeetingFormError("");
+                          setPage("meetingRequest");
+                        }}
+                      >
+                        📅 Randevu İste
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1106,7 +1226,10 @@ function App() {
               if (searchLocation !== "Hepsi" && b.location !== searchLocation) return false;
               if (searchDate) {
                 const dayName = new Date(searchDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
-                if (b.availabilityMode !== "everyday" && !b.availableDays.includes(dayName)) return false;
+                const dayOk2 = b.availabilityMode === "specific"
+                  ? (b.specificDates || []).includes(searchDate)
+                  : (b.availableDays || []).includes(dayName);
+                if (!dayOk2) return false;
               }
               if (searchDate && searchTime && !b.availableTimes.includes(searchTime)) return false;
               return true;
@@ -1168,37 +1291,45 @@ function App() {
               <div className="date-time-row">
                 <div className="strip-section">
                   <div className="strip-label">📅 Tarih</div>
-                  <div className="date-strip">
-                    {getAvailableDates().map((date) => (
-                      <button
-                        key={date.fullDate}
-                        type="button"
-                        className={reservation.date === date.fullDate ? "strip-btn active" : "strip-btn"}
-                        onClick={() => setReservation({ ...reservation, date: date.fullDate, time: "" })}
-                      >
-                        <span className="strip-day">{date.dayShort}</span>
-                        <span className="strip-date">{date.dateShort}</span>
-                      </button>
-                    ))}
+                  <div className="strip-scroll-wrap">
+                    <button type="button" className="strip-arrow" onClick={() => dateStripRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
+                    <div className="date-strip" ref={dateStripRef}>
+                      {getAvailableDates().map((date) => (
+                        <button
+                          key={date.fullDate}
+                          type="button"
+                          className={reservation.date === date.fullDate ? "strip-btn active" : "strip-btn"}
+                          onClick={() => setReservation({ ...reservation, date: date.fullDate, time: "" })}
+                        >
+                          <span className="strip-day">{date.dayShort}</span>
+                          <span className="strip-date">{date.dateShort}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <button type="button" className="strip-arrow" onClick={() => dateStripRef.current?.scrollBy({ left: 160, behavior: "smooth" })}>›</button>
                   </div>
                 </div>
 
                 <div className="strip-section">
                   <div className="strip-label">🕐 Saat</div>
-                  <div className="time-strip">
-                    {(selectedBusiness?.availableTimes?.length
-                      ? selectedBusiness.availableTimes
-                      : availableTimes
-                    ).map((time) => (
-                      <button
-                        key={time}
-                        type="button"
-                        className={reservation.time === time ? "strip-btn active" : "strip-btn"}
-                        onClick={() => setReservation({ ...reservation, time })}
-                      >
-                        {time}
-                      </button>
-                    ))}
+                  <div className="strip-scroll-wrap">
+                    <button type="button" className="strip-arrow" onClick={() => timeStripRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
+                    <div className="time-strip" ref={timeStripRef}>
+                      {(selectedBusiness?.availableTimes?.length
+                        ? selectedBusiness.availableTimes
+                        : availableTimes
+                      ).map((time) => (
+                        <button
+                          key={time}
+                          type="button"
+                          className={reservation.time === time ? "strip-btn active" : "strip-btn"}
+                          onClick={() => setReservation({ ...reservation, time })}
+                        >
+                          {time}
+                        </button>
+                      ))}
+                    </div>
+                    <button type="button" className="strip-arrow" onClick={() => timeStripRef.current?.scrollBy({ left: 160, behavior: "smooth" })}>›</button>
                   </div>
                 </div>
               </div>
@@ -1233,18 +1364,65 @@ function App() {
 
               {error && <p className="error-message">{error}</p>}
 
+              <div className="rez-terms-checks">
+                <label className="rez-terms-label">
+                  <input
+                    type="checkbox"
+                    checked={termsChecked.biz}
+                    onChange={e => setTermsChecked(p => ({ ...p, biz: e.target.checked }))}
+                  />
+                  <span className="rez-check-box">{termsChecked.biz ? "✓" : ""}</span>
+                  <span>
+                    <button type="button" className="terms-link" onClick={() => setTermsModal("biz")}>
+                      İşletme Koşulları
+                    </button>
+                    'nı okudum ve kabul ediyorum
+                  </span>
+                </label>
+                <label className="rez-terms-label">
+                  <input
+                    type="checkbox"
+                    checked={termsChecked.rp}
+                    onChange={e => setTermsChecked(p => ({ ...p, rp: e.target.checked }))}
+                  />
+                  <span className="rez-check-box">{termsChecked.rp ? "✓" : ""}</span>
+                  <span>
+                    <button type="button" className="terms-link" onClick={() => setTermsModal("rp")}>
+                      RezPoint Koşulları
+                    </button>
+                    'nı okudum ve kabul ediyorum
+                  </span>
+                </label>
+              </div>
+
               <button
                 type="button"
-                disabled={!emailVerified || !reservation.date || !reservation.time || !reservation.guests || !reservation.phone}
+                disabled={!emailVerified || !reservation.date || !reservation.time || !reservation.guests || !reservation.phone || !termsChecked.biz || !termsChecked.rp}
                 onClick={sendReservation}
-                style={{ opacity: (!emailVerified || !reservation.date || !reservation.time || !reservation.guests || !reservation.phone) ? 0.5 : 1 }}
+                style={{ opacity: (!emailVerified || !reservation.date || !reservation.time || !reservation.guests || !reservation.phone || !termsChecked.biz || !termsChecked.rp) ? 0.5 : 1 }}
               >
                 Rezervasyon İsteği Gönder →
               </button>
 
-              <p className="rez-terms">
-                Rezervasyon oluşturarak RezPoint kullanım koşullarını kabul etmiş olursunuz.
-              </p>
+              {termsModal && (
+                <div className="terms-modal-overlay" onClick={() => setTermsModal(null)}>
+                  <div className="terms-modal" onClick={e => e.stopPropagation()}>
+                    <h3>
+                      {termsModal === "biz"
+                        ? `${selectedBusiness?.name} — Koşullar`
+                        : "RezPoint Kullanım Koşulları"}
+                    </h3>
+                    <div className="terms-modal-body">
+                      {termsModal === "biz"
+                        ? (selectedBusiness?.terms || "Bu işletme henüz koşul belirlememiş.")
+                        : (rpTerms || "Henüz koşul eklenmemiş.")}
+                    </div>
+                    <button type="button" className="primary-btn" style={{ marginTop: 16 }} onClick={() => setTermsModal(null)}>
+                      Kapat
+                    </button>
+                  </div>
+                </div>
+              )}
             </form>
           </div>
         </section>
@@ -1420,6 +1598,42 @@ function App() {
       {page === "customerAuth" && (
         <section className="reservation-section">
           <div className="reservation-box">
+
+            {emailPending ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <div style={{ fontSize: 56, marginBottom: 16 }}>📧</div>
+                <h2>E-posta Doğrulama Linki Gönderildi</h2>
+                <p className="description" style={{ marginBottom: 24 }}>
+                  <strong>{customerForm.email}</strong> adresine bir doğrulama linki gönderdik.
+                  Lütfen mail kutunuzu kontrol edin ve linke tıklayın.
+                </p>
+                <p className="description" style={{ fontSize: 13, marginBottom: 24 }}>
+                  Spam/Junk klasörünü de kontrol etmeyi unutmayın.
+                </p>
+                <button
+                  className="secondary-btn"
+                  style={{ marginBottom: 10 }}
+                  onClick={async () => {
+                    const { error } = await supabase.auth.resend({
+                      type: "signup",
+                      email: customerForm.email,
+                    });
+                    if (!error) alert("Doğrulama maili tekrar gönderildi.");
+                    else alert("Gönderilemedi, lütfen tekrar deneyin.");
+                  }}
+                >
+                  Tekrar Gönder
+                </button>
+                <br />
+                <button
+                  className="secondary-btn"
+                  onClick={() => { setEmailPending(false); setCustomerMode("login"); }}
+                >
+                  Giriş Sayfasına Dön
+                </button>
+              </div>
+            ) : (
+              <>
             <h1>
               {customerMode === "login" ? "Müşteri Girişi" : "Hesap Oluştur"}
             </h1>
@@ -1547,18 +1761,8 @@ function App() {
                       safeScore = 100;
                     }
 
-                    const newCustomer = {
-                      id: custId,
-                      name: customerForm.name,
-                      email: customerForm.email,
-                      safeScore,
-                    };
                     setCustomerAuthError("");
-                    setLoggedCustomer(newCustomer);
-                    setCustomerProfile({ phone: "", gender: "", birthDate: "", job: "", smoking: "" });
-                    setEmailVerified(true);
-                    setCustomerTab("reservations");
-                    setPage("customerDashboard");
+                    setEmailPending(true);
                   } else {
                     const { data: authData, error: authError } =
                       await supabase.auth.signInWithPassword({
@@ -1567,7 +1771,11 @@ function App() {
                       });
 
                     if (authError) {
-                      setCustomerAuthError("Hatalı e-posta veya şifre.");
+                      if (authError.message.toLowerCase().includes("email not confirmed")) {
+                        setCustomerAuthError("E-posta adresinizi henüz doğrulamadınız. Mail kutunuzu kontrol edin.");
+                      } else {
+                        setCustomerAuthError("Hatalı e-posta veya şifre.");
+                      }
                       return;
                     }
 
@@ -1608,6 +1816,8 @@ function App() {
                 {customerMode === "login" ? "Giriş Yap" : "Hesap Oluştur"}
               </button>
             </form>
+              </>
+            )}
           </div>
         </section>
       )}
@@ -1636,13 +1846,15 @@ function App() {
                   <button className={customerTab === "notifications" ? "active-tab" : ""} onClick={() => setCustomerTab("notifications")}>
                     Bildirimler{customerNotifications.filter(n => !n.is_read).length > 0 && <span className="notif-count">{customerNotifications.filter(n => !n.is_read).length}</span>}
                   </button>
+                  <button className={customerTab === "meetings" ? "active-tab" : ""} onClick={() => setCustomerTab("meetings")}>📅 Randevularım</button>
+                  <button className={customerTab === "account" ? "active-tab" : ""} onClick={() => { setCustomerTab("account"); setAccountMsg({ text: "", type: "" }); setAccountNewEmail(""); setAccountNewPassword(""); setAccountNewPassword2(""); }}>⚙ Hesap Ayarları</button>
                 </div>
 
                 {/* ── Rezervasyonlarım ── */}
                 {customerTab === "reservations" && (() => {
                   const now = new Date();
                   const myRezs = reservations.filter(r => r.email === loggedCustomer.email);
-                  const byDate = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
+                  const byDate = (a, b) => (new Date(b.createdAt).getTime() || 0) - (new Date(a.createdAt).getTime() || 0);
                   const active = myRezs
                     .filter(r => r.status === "pending" || r.status === "accepted")
                     .sort(byDate);
@@ -1895,27 +2107,173 @@ function App() {
                   </div>
                 )}
 
-                <button
-                  className="primary-btn"
-                  style={{ marginTop: "20px" }}
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    localStorage.setItem("rp_page", "home");
-                    setLoggedCustomer(null);
-                    setEmailVerified(false);
-                    setCustomerForm({ name: "", email: "", password: "" });
-                    setCustomerProfile({
-                      phone: "",
-                      gender: "",
-                      birthDate: "",
-                      job: "",
-                      smoking: "",
-                    });
-                    setPage("home");
-                  }}
-                >
-                  Çıkış
-                </button>
+                {/* ── Randevularım ── */}
+                {customerTab === "meetings" && (() => {
+                  const REASON_LABELS = { is_gorusmesi: "İş Görüşmesi", urun_tanitimi: "Ürün Tanıtımı", urun_teslimi: "Ürün Teslimi", diger: "Diğer" };
+                  const myMeetings = meetings.filter(m => m.email === loggedCustomer.email).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                  return (
+                    <div style={{ marginTop: 16 }}>
+                      {myMeetings.length > 0 ? myMeetings.map(m => (
+                        <div key={m.id} className="rez-list-item">
+                          <div className="rez-item-main">
+                            <div className="rez-item-name">{m.businessName}</div>
+                            <div className="rez-item-meta">{REASON_LABELS[m.reason] || m.reason} · {formatDate(m.date)} {m.time}{m.company ? ` · ${m.company}` : ""}</div>
+                          </div>
+                          <div className="rez-item-right">
+                            <span className={`status-badge ${m.status}`}>
+                              {m.status === "accepted" ? "Kabul Edildi" : m.status === "rejected" ? "Reddedildi" : "Bekliyor"}
+                            </span>
+                          </div>
+                        </div>
+                      )) : <p className="description">Henüz randevu talebiniz yok.</p>}
+                    </div>
+                  );
+                })()}
+
+                {/* ── Hesap Ayarları ── */}
+                {customerTab === "account" && (
+                  <div style={{ marginTop: 16, maxWidth: 480 }}>
+
+                    {accountMsg.text && (
+                      <div className={accountMsg.type === "success" ? "success-message" : "error-message"} style={{ marginBottom: 20 }}>
+                        {accountMsg.text}
+                      </div>
+                    )}
+
+                    {/* Mevcut bilgiler */}
+                    <div className="profile-card" style={{ marginBottom: 24 }}>
+                      <div className="profile-field-row">
+                        <span className="profile-field-label">Mevcut E-posta</span>
+                        <span className="profile-field-value">{loggedCustomer.email}</span>
+                      </div>
+                    </div>
+
+                    {/* E-posta değiştir */}
+                    <div className="reservation-box" style={{ marginBottom: 20 }}>
+                      <h3 style={{ marginBottom: 12, fontSize: 15 }}>✉️ E-posta Değiştir</h3>
+                      <p className="description" style={{ fontSize: 13, marginBottom: 14 }}>
+                        Yeni e-postanıza bir doğrulama linki gönderilir. Linke tıkladıktan sonra değişiklik geçerli olur.
+                      </p>
+                      <form className="reservation-form" onSubmit={async (e) => {
+                        e.preventDefault();
+                        const newEmail = accountNewEmail.trim().toLowerCase();
+                        if (!newEmail) return setAccountMsg({ text: "Yeni e-posta adresini girin.", type: "error" });
+                        if (newEmail === loggedCustomer.email) return setAccountMsg({ text: "Bu zaten mevcut e-posta adresiniz.", type: "error" });
+                        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return setAccountMsg({ text: "Geçerli bir e-posta adresi girin.", type: "error" });
+
+                        setAccountLoading("email");
+                        const { error } = await supabase.auth.updateUser({ email: newEmail });
+                        setAccountLoading("");
+
+                        if (error) {
+                          setAccountMsg({ text: "E-posta değiştirilemedi: " + error.message, type: "error" });
+                        } else {
+                          setAccountNewEmail("");
+                          setAccountMsg({ text: `${newEmail} adresine doğrulama linki gönderildi. Linke tıkladıktan sonra e-postanız güncellenir.`, type: "success" });
+                        }
+                      }}>
+                        <input
+                          type="email"
+                          placeholder="Yeni e-posta adresi"
+                          value={accountNewEmail}
+                          onChange={e => setAccountNewEmail(e.target.value)}
+                          autoComplete="email"
+                          disabled={accountLoading === "email"}
+                        />
+                        <button type="submit" className="save-changes-btn" disabled={accountLoading === "email"}>
+                          {accountLoading === "email" ? <Spinner /> : "Doğrulama Linki Gönder"}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Şifre değiştir */}
+                    <div className="reservation-box" style={{ marginBottom: 20 }}>
+                      <h3 style={{ marginBottom: 12, fontSize: 15 }}>🔒 Şifre Değiştir</h3>
+                      <form className="reservation-form" onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!accountNewPassword) return setAccountMsg({ text: "Yeni şifre girin.", type: "error" });
+                        if (accountNewPassword.length < 6) return setAccountMsg({ text: "Şifre en az 6 karakter olmalıdır.", type: "error" });
+                        if (accountNewPassword !== accountNewPassword2) return setAccountMsg({ text: "Şifreler eşleşmiyor.", type: "error" });
+
+                        setAccountLoading("password");
+                        const { error } = await supabase.auth.updateUser({ password: accountNewPassword });
+                        setAccountLoading("");
+
+                        if (error) {
+                          setAccountMsg({ text: "Şifre değiştirilemedi: " + error.message, type: "error" });
+                        } else {
+                          setAccountNewPassword("");
+                          setAccountNewPassword2("");
+                          setAccountMsg({ text: "Şifreniz başarıyla güncellendi.", type: "success" });
+                        }
+                      }}>
+                        <input
+                          type="password"
+                          placeholder="Yeni şifre (en az 6 karakter)"
+                          value={accountNewPassword}
+                          onChange={e => setAccountNewPassword(e.target.value)}
+                          autoComplete="new-password"
+                          disabled={accountLoading === "password"}
+                        />
+                        <input
+                          type="password"
+                          placeholder="Yeni şifre (tekrar)"
+                          value={accountNewPassword2}
+                          onChange={e => setAccountNewPassword2(e.target.value)}
+                          autoComplete="new-password"
+                          disabled={accountLoading === "password"}
+                        />
+                        <button type="submit" className="save-changes-btn" disabled={accountLoading === "password"}>
+                          {accountLoading === "password" ? <Spinner /> : "Şifreyi Güncelle"}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Şifremi unuttum */}
+                    <div className="reservation-box">
+                      <h3 style={{ marginBottom: 8, fontSize: 15 }}>🔑 Şifremi Unuttum</h3>
+                      <p className="description" style={{ fontSize: 13, marginBottom: 14 }}>
+                        Mevcut şifrenizi bilmiyorsanız e-postanıza sıfırlama linki gönderebilirsiniz.
+                      </p>
+                      <button
+                        className="secondary-btn"
+                        disabled={accountLoading === "reset"}
+                        onClick={async () => {
+                          setAccountLoading("reset");
+                          const { error } = await supabase.auth.resetPasswordForEmail(loggedCustomer.email, {
+                            redirectTo: window.location.origin,
+                          });
+                          setAccountLoading("");
+                          if (error) {
+                            setAccountMsg({ text: "Gönderilemedi: " + error.message, type: "error" });
+                          } else {
+                            setAccountMsg({ text: `${loggedCustomer.email} adresine şifre sıfırlama linki gönderildi.`, type: "success" });
+                          }
+                        }}
+                      >
+                        {accountLoading === "reset" ? <Spinner /> : "Sıfırlama Linki Gönder"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {customerTab === "account" && (
+                  <button
+                    className="primary-btn"
+                    style={{ marginTop: 16, maxWidth: 480 }}
+                    onClick={async () => {
+                      await supabase.auth.signOut();
+                      localStorage.setItem("rp_page", "home");
+                      setLoggedCustomer(null);
+                      setEmailVerified(false);
+                      setCustomerForm({ name: "", email: "", password: "" });
+                      setCustomerProfile({ phone: "", gender: "", birthDate: "", job: "", smoking: "" });
+                      setPage("home");
+                    }}
+                  >
+                    Çıkış Yap
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -1940,32 +2298,29 @@ function App() {
             <h1>İşletme Girişi</h1>
             <p className="description">Rezervasyonları yönetmek için giriş yapın.</p>
 
-            <form className="reservation-form">
+            <form className="reservation-form" onSubmit={e => { e.preventDefault(); handleBusinessLogin(); }}>
               <input
                 type="email"
                 placeholder="İşletme E-postası"
+                autoComplete="username"
+                disabled={bizLoginLocked || loginLoading}
                 value={businessLogin.email}
-                onChange={(e) =>
-                  setBusinessLogin({ ...businessLogin, email: e.target.value })
-                }
+                onChange={(e) => setBusinessLogin({ ...businessLogin, email: e.target.value })}
               />
 
               <input
                 type="password"
                 placeholder="Şifre"
+                autoComplete="current-password"
+                disabled={bizLoginLocked || loginLoading}
                 value={businessLogin.password}
-                onChange={(e) =>
-                  setBusinessLogin({
-                    ...businessLogin,
-                    password: e.target.value,
-                  })
-                }
+                onChange={(e) => setBusinessLogin({ ...businessLogin, password: e.target.value })}
               />
 
               {loginError && <p className="error-message">{loginError}</p>}
 
-              <button type="button" onClick={handleBusinessLogin}>
-                Giriş Yap
+              <button type="submit" disabled={bizLoginLocked || loginLoading}>
+                {loginLoading ? <Spinner /> : "Giriş Yap"}
               </button>
             </form>
           </div>
@@ -1977,29 +2332,29 @@ function App() {
             <h1>Yönetici Girişi</h1>
             <p className="description">RezPoint yönetim paneli.</p>
 
-            <form className="reservation-form">
+            <form className="reservation-form" onSubmit={e => { e.preventDefault(); handleAdminLogin(); }}>
               <input
                 type="email"
                 placeholder="Yönetici E-postası"
+                autoComplete="username"
+                disabled={adminLoginLocked || loginLoading}
                 value={adminLogin.email}
-                onChange={(e) =>
-                  setAdminLogin({ ...adminLogin, email: e.target.value })
-                }
+                onChange={(e) => setAdminLogin({ ...adminLogin, email: e.target.value })}
               />
 
               <input
                 type="password"
                 placeholder="Şifre"
+                autoComplete="current-password"
+                disabled={adminLoginLocked || loginLoading}
                 value={adminLogin.password}
-                onChange={(e) =>
-                  setAdminLogin({ ...adminLogin, password: e.target.value })
-                }
+                onChange={(e) => setAdminLogin({ ...adminLogin, password: e.target.value })}
               />
 
               {adminError && <p className="error-message">{adminError}</p>}
 
-              <button type="button" onClick={handleAdminLogin}>
-                Giriş Yap
+              <button type="submit" disabled={adminLoginLocked || loginLoading}>
+                {loginLoading ? <Spinner /> : "Giriş Yap"}
               </button>
             </form>
           </div>
@@ -2066,6 +2421,30 @@ function App() {
               <span>AI Menu Aktif</span>
               <strong><AnimatedNumber value={adminBusinesses.filter(b => b.aiMenuActive).length} /></strong>
             </div>
+          </div>
+
+          <div className="reservation-box" style={{ marginTop: "24px" }}>
+            <h2>📄 RezPoint Kullanım Koşulları</h2>
+            <p className="description">Müşterilerin rezervasyon öncesi onaylaması gereken platform koşulları.</p>
+            <form className="reservation-form">
+              <textarea
+                placeholder="RezPoint kullanım koşullarını buraya yazın..."
+                value={rpTermsEdit}
+                onChange={e => setRpTermsEdit(e.target.value)}
+                rows={8}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  const { error } = await supabase.from("site_settings").upsert({ key: "rezpoint_terms", value: rpTermsEdit });
+                  if (error) { alert("Kaydedilemedi: " + error.message); return; }
+                  setRpTerms(rpTermsEdit);
+                  alert("Koşullar kaydedildi ✅");
+                }}
+              >
+                Koşulları Kaydet
+              </button>
+            </form>
           </div>
 
           <div className="reservation-box" style={{ marginTop: "24px" }}>
@@ -2175,6 +2554,9 @@ function App() {
                           name: newBusinessForm.name,
                           email: newBusinessForm.email,
                           password: newBusinessForm.password,
+                          type: newBusinessForm.type || "Business",
+                          location: newBusinessForm.location || "",
+                          icon: newBusinessForm.icon || "🏢",
                           reservation_enabled: true,
                           ai_menu_enabled: false,
                         },
@@ -2193,19 +2575,24 @@ function App() {
                       id: addedBusiness.id,
                       name: addedBusiness.name,
                       email: addedBusiness.email,
-                      password: addedBusiness.password,
                       reservationActive: addedBusiness.reservation_enabled,
                       aiMenuActive: addedBusiness.ai_menu_enabled,
                       menuText: "",
                       description: "",
                       menu: "",
                       phone: "",
+                      terms: "",
                       type: newBusinessForm.type || "Business",
                       location: newBusinessForm.location || "",
                       icon: newBusinessForm.icon || "🏢",
-                      availabilityMode: "selected",
+                      availabilityMode: "weekly",
                       availableDays: ["Friday", "Saturday"],
                       availableTimes: ["18:00", "19:00", "20:30"],
+                      specificDates: [],
+                      meetingTimes: [],
+                      meetingDates: [],
+                      closingPin: "",
+                      rating: 0,
                     };
 
                     setAdminBusinesses([...adminBusinesses, formattedBusiness]);
@@ -2234,22 +2621,99 @@ function App() {
                   <th>İşletme</th>
                   <th>Tür / Konum</th>
                   <th>Rezervasyon</th>
-                  <th>AI Menu</th>
+                  <th>Randevu</th>
+                  <th>AI Menü</th>
                   <th>İşlemler</th>
                 </tr>
               </thead>
               <tbody>
                 {adminBusinesses.map((business) => (
                   <tr key={business.id}>
+                    {/* ── Logo + İsim ── */}
                     <td>
-                      <span style={{ fontSize: 20, marginRight: 8 }}>{business.icon}</span>
-                      <strong>{business.name}</strong>
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{business.email}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        {business.logoUrl
+                          ? <img src={business.logoUrl} alt="" style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover", flexShrink: 0, border: "1px solid #e5e7eb" }} />
+                          : <span style={{ fontSize: 22, flexShrink: 0 }}>{business.icon}</span>
+                        }
+                        <div>
+                          <strong>{business.name}</strong>
+                          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{business.email}</div>
+                          <label style={{ fontSize: 11, color: "var(--purple)", cursor: "pointer", marginTop: 3, display: "block", fontWeight: 600 }}>
+                            {business.logoUrl ? "🔄 Logo değiştir" : "📷 Logo yükle"}
+                            <input type="file" accept="image/*" style={{ display: "none" }} onChange={async (e) => {
+                              const file = e.target.files[0];
+                              if (!file) return;
+                              const compressedBlob = await new Promise((resolve) => {
+                                const img = new Image();
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  img.onload = () => {
+                                    const MAX = 800;
+                                    let { width, height } = img;
+                                    if (width > MAX || height > MAX) {
+                                      if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+                                      else { width = Math.round(width * MAX / height); height = MAX; }
+                                    }
+                                    const canvas = document.createElement("canvas");
+                                    canvas.width = width; canvas.height = height;
+                                    canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+                                    canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.82);
+                                  };
+                                  img.src = ev.target.result;
+                                };
+                                reader.readAsDataURL(file);
+                              });
+                              const path = `${business.id}/logo.jpg`;
+                              const { error: upErr } = await supabase.storage.from("business-logos").upload(path, compressedBlob, { upsert: true, contentType: "image/jpeg" });
+                              if (upErr) { alert("Yükleme hatası: " + upErr.message); return; }
+                              const { data: urlData } = supabase.storage.from("business-logos").getPublicUrl(path);
+                              const logoUrl = urlData.publicUrl + "?t=" + Date.now();
+                              const { error: dbErr } = await supabase.from("businesses").update({ logo_url: urlData.publicUrl }).eq("id", business.id);
+                              if (dbErr) { alert("Kaydedilemedi: " + dbErr.message); return; }
+                              setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, logoUrl } : item));
+                            }} />
+                          </label>
+                        </div>
+                      </div>
                     </td>
-                    <td style={{ color: "var(--text-muted)" }}>
-                      {business.type}<br />
-                      <span style={{ fontSize: 11 }}>{business.location}</span>
+
+                    {/* ── Tür / Konum (inline düzenleme) ── */}
+                    <td>
+                      {adminEditingBiz?.id === business.id ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <input
+                            value={adminEditingBiz.type}
+                            onChange={e => setAdminEditingBiz({ ...adminEditingBiz, type: e.target.value })}
+                            placeholder="Tür"
+                            style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--purple)", width: 110 }}
+                          />
+                          <input
+                            value={adminEditingBiz.location}
+                            onChange={e => setAdminEditingBiz({ ...adminEditingBiz, location: e.target.value })}
+                            placeholder="Konum"
+                            style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid #e2e8f0", width: 110 }}
+                          />
+                          <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
+                            <button className="primary-btn" style={{ fontSize: 11, padding: "3px 10px" }} onClick={async () => {
+                              const { error } = await supabase.from("businesses").update({ type: adminEditingBiz.type, location: adminEditingBiz.location }).eq("id", business.id);
+                              if (error) { alert("Kaydedilemedi."); return; }
+                              setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, type: adminEditingBiz.type, location: adminEditingBiz.location } : item));
+                              setAdminEditingBiz(null);
+                            }}>✓ Kaydet</button>
+                            <button className="time-btn" style={{ fontSize: 11, padding: "3px 8px" }} onClick={() => setAdminEditingBiz(null)}>✕</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ cursor: "pointer" }} onClick={() => setAdminEditingBiz({ id: business.id, type: business.type, location: business.location })}>
+                          <span style={{ color: "var(--text-muted)", fontSize: 13 }}>{business.type}</span><br />
+                          <span style={{ fontSize: 11, color: "#94a3b8" }}>{business.location || "—"}</span>
+                          <div style={{ fontSize: 10, color: "var(--purple)", marginTop: 2, fontWeight: 600 }}>✏ Düzenle</div>
+                        </div>
+                      )}
                     </td>
+
+                    {/* ── Rezervasyon toggle ── */}
                     <td>
                       <button
                         className={business.reservationActive ? "selected-time" : "time-btn"}
@@ -2261,9 +2725,27 @@ function App() {
                           setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, reservationActive: newValue } : item));
                         }}
                       >
-                        {business.reservationActive ? "✓ Aktif" : "✕ Kapalı"}
+                        {business.reservationActive ? "✓ Açık" : "✕ Kapalı"}
                       </button>
                     </td>
+
+                    {/* ── Randevu toggle ── */}
+                    <td>
+                      <button
+                        className={business.meetingEnabled ? "selected-time" : "time-btn"}
+                        style={{ fontSize: 12, padding: "6px 12px" }}
+                        onClick={async () => {
+                          const newValue = !business.meetingEnabled;
+                          const { error } = await supabase.from("businesses").update({ meeting_enabled: newValue }).eq("id", business.id);
+                          if (error) { alert("Güncellenemedi."); return; }
+                          setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, meetingEnabled: newValue } : item));
+                        }}
+                      >
+                        {business.meetingEnabled ? "✓ Açık" : "✕ Kapalı"}
+                      </button>
+                    </td>
+
+                    {/* ── AI Menü toggle ── */}
                     <td>
                       <button
                         className={business.aiMenuActive ? "selected-time" : "time-btn"}
@@ -2278,21 +2760,40 @@ function App() {
                         {business.aiMenuActive ? "✓ Aktif" : "✕ Kapalı"}
                       </button>
                     </td>
+
+                    {/* ── İşlemler: Sıfırla + Sil ── */}
                     <td>
-                      <button
-                        className="reject-btn"
-                        style={{ fontSize: 12, padding: "6px 12px" }}
-                        onClick={async () => {
-                          if (!window.confirm(`${business.name} silinsin mi? Rezervasyonlar da silinecek.`)) return;
-                          const { error } = await supabase.from("businesses").delete().eq("id", business.id);
-                          if (error) { alert("Silinemedi."); return; }
-                          setAdminBusinesses(adminBusinesses.filter(item => item.id !== business.id));
-                          setReservations(reservations.filter(rez => rez.businessId !== business.id));
-                          if (loggedBusiness?.id === business.id) { setLoggedBusiness(null); setPage("home"); }
-                        }}
-                      >
-                        Sil
-                      </button>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <button
+                          className="time-btn"
+                          style={{ fontSize: 12, padding: "6px 12px", color: "#f59e0b", borderColor: "#f59e0b" }}
+                          onClick={async () => {
+                            if (!window.confirm(`${business.name} istatistikleri sıfırlansın mı?`)) return;
+                            const { error } = await supabase.from("businesses").update({ rating: 0 }).eq("id", business.id);
+                            if (error) { alert("Sıfırlanamadı."); return; }
+                            await supabase.from("reservations").update({ safe_score_delta: 0 }).eq("business_id", business.id);
+                            setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, rating: 0 } : item));
+                            alert("İstatistikler sıfırlandı.");
+                          }}
+                        >
+                          ↺ Sıfırla
+                        </button>
+                        <button
+                          className="reject-btn"
+                          style={{ fontSize: 12, padding: "6px 12px" }}
+                          onClick={async () => {
+                            if (!window.confirm(`${business.name} silinsin mi? Rezervasyonlar da silinecek.`)) return;
+                            const { error } = await supabase.from("businesses").delete().eq("id", business.id);
+                            if (error) { alert("Silinemedi."); return; }
+                            if (business.logoUrl) supabase.storage.from("business-logos").remove([`${business.id}/logo.jpg`]);
+                            setAdminBusinesses(adminBusinesses.filter(item => item.id !== business.id));
+                            setReservations(reservations.filter(rez => rez.businessId !== business.id));
+                            if (loggedBusiness?.id === business.id) { setLoggedBusiness(null); setPage("home"); }
+                          }}
+                        >
+                          Sil
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -2393,10 +2894,117 @@ function App() {
             </a>
           </div>
 
+          <div className="contact-legal-row">
+            <button className="contact-legal-btn" onClick={() => setLegalModal("privacy")}>
+              🔒 Gizlilik Politikası
+            </button>
+            <button className="contact-legal-btn" onClick={() => setLegalModal("terms")}>
+              📄 Kullanım Koşulları
+            </button>
+          </div>
+
           <button className="back-btn" onClick={() => setPage("home")} style={{ marginTop: 32 }}>
             ← Ana Sayfa
           </button>
         </section>
+      )}
+
+      {legalModal && (
+        <div className="terms-modal-overlay" onClick={() => setLegalModal(null)}>
+          <div className="terms-modal legal-modal" onClick={e => e.stopPropagation()}>
+            <div className="terms-modal-header">
+              <h2>{legalModal === "privacy" ? "🔒 Gizlilik Politikası" : "📄 Kullanım Koşulları"}</h2>
+              <button className="terms-modal-close" onClick={() => setLegalModal(null)}>✕</button>
+            </div>
+            <div className="terms-modal-body legal-modal-body">
+              {legalModal === "privacy" ? (
+                <div className="legal-content">
+                  <p className="legal-date"><strong>Son güncelleme:</strong> 14 Haziran 2026</p>
+
+                  <p>RezPoint ("RezPoint", "Platform", "biz") olarak gizliliğinize önem veriyoruz. Bu Gizlilik Politikası, Platformu kullandığınızda hangi kişisel verileri, nasıl ve neden işlediğimizi; bu veriler üzerindeki haklarınızı açıklar.</p>
+                  <p>Platformu kullanarak bu Politikada açıklanan veri işleme uygulamalarını kabul etmiş olursunuz.</p>
+
+                  <h3>1. Veri Sorumlusu</h3>
+                  <p>Kişisel verileriniz, veri sorumlusu sıfatıyla RezPoint tarafından işlenir.<br/>İletişim: <a href="mailto:rezpointsupport@gmail.com">rezpointsupport@gmail.com</a></p>
+
+                  <h3>2. Topladığımız Veriler</h3>
+                  <h4>2.1 Sizin Sağladığınız Veriler</h4>
+                  <ul>
+                    <li><strong>Hesap bilgileri:</strong> ad, soyad, e-posta adresi, telefon numarası.</li>
+                    <li><strong>Profil tercihleri (opsiyonel):</strong> cinsiyet, sigara tercihi, müzik zevki gibi rezervasyon deneyimini iyileştirmeye yönelik bilgiler.</li>
+                    <li><strong>Rezervasyon bilgileri:</strong> seçtiğiniz işletme, tarih, saat, kişi sayısı, varsa eklediğiniz notlar.</li>
+                  </ul>
+                  <h4>2.2 Otomatik Olarak Toplanan Veriler</h4>
+                  <ul>
+                    <li><strong>Kullanım verileri:</strong> rezervasyon geçmişi, katılım durumu, SafeScore ve sadakat puanı hesaplamaları.</li>
+                    <li><strong>Teknik veriler:</strong> giriş zamanları, cihaz/tarayıcı türü (hizmetin güvenliği ve iyileştirilmesi için).</li>
+                  </ul>
+                  <h4>2.3 Şifreler Hakkında</h4>
+                  <p>Şifreniz <strong>güvenli (hash'lenmiş) biçimde</strong> saklanır. RezPoint çalışanları, yöneticileri ve sistem yöneticileri dahil hiç kimse şifrenizi düz metin olarak göremez. Kimlik doğrulama, güvenli altyapı (Supabase Auth) üzerinden yürütülür. Şifrenizi unutmanız halinde yalnızca sıfırlanması mümkündür.</p>
+
+                  <h3>3. Verileri İşleme Amaçlarımız</h3>
+                  <ul>
+                    <li>Hesabınızı oluşturmak ve yönetmek.</li>
+                    <li>Rezervasyonlarınızı oluşturmak ve ilgili işletmeye iletmek.</li>
+                    <li>SafeScore ve sadakat puanı sistemlerini işletmek.</li>
+                    <li>Size bildirim göndermek (rezervasyon kabul/red, hatırlatma vb.).</li>
+                    <li>Platformun güvenliğini sağlamak ve kötüye kullanımı önlemek.</li>
+                    <li>Hizmetlerimizi analiz etmek ve geliştirmek.</li>
+                    <li>Yasal yükümlülüklerimizi yerine getirmek.</li>
+                  </ul>
+
+                  <h3>4. Verilerin İşletmelerle Paylaşılması</h3>
+                  <p>Bir rezervasyon oluşturduğunuzda, rezervasyonun gerçekleştirilebilmesi için gerekli bilgileriniz (ad, iletişim, kişi sayısı, varsa tercihleriniz ve notunuz) ilgili <strong>işletme</strong> ile paylaşılır.</p>
+                  <p>İşletmeler bu verileri yalnızca rezervasyon ve hizmet sunumu amacıyla kullanmakla yükümlüdür. RezPoint, işletmelerin kendi sorumlulukları altında yaptıkları veri kullanımından sorumlu değildir.</p>
+
+                  <h3>5. Üçüncü Taraflarla Paylaşım</h3>
+                  <p>Verilerinizi şu durumlar dışında üçüncü taraflarla paylaşmayız:</p>
+                  <ul>
+                    <li><strong>Hizmet sağlayıcılar:</strong> Platformun çalışması için kullandığımız altyapı sağlayıcıları (Supabase — sunucu/veritabanı ve e-posta hizmeti). Bu sağlayıcılar verileri yalnızca bizim adımıza işler.</li>
+                    <li><strong>Yasal zorunluluk:</strong> Yürürlükteki mevzuat veya yetkili merci talebi gerektirdiğinde.</li>
+                  </ul>
+                  <p>Verilerinizi <strong>hiçbir şekilde reklam amacıyla satmayız.</strong></p>
+
+                  <h3>6. Verilerin Saklanma Süresi</h3>
+                  <p>Verilerinizi hesabınız aktif olduğu sürece saklarız. Hesabınızı kapatmanız halinde, yasal saklama yükümlülükleri saklı kalmak kaydıyla, kişisel verileriniz makul süre içinde silinir veya anonimleştirilir. İstatistiksel amaçlarla tutulan veriler kimliğinizi belirlemeyecek şekilde anonim tutulabilir.</p>
+
+                  <h3>7. Veri Güvenliği</h3>
+                  <p>Verilerinizi yetkisiz erişime karşı korumak için şifrelerin hash'lenmesi, güvenli kimlik doğrulama ve erişim yetkilendirmesi gibi sektör standardı önlemler uygularız. Hiçbir sistem %100 güvenli olmamakla birlikte, verilerinizi korumak için gerekli tüm önlemleri alırız.</p>
+
+                  <h3>8. Haklarınız</h3>
+                  <p>Yürürlükteki kişisel veri mevzuatı kapsamında şu haklara sahipsiniz:</p>
+                  <ul>
+                    <li>Kişisel verilerinizin işlenip işlenmediğini öğrenme.</li>
+                    <li>İşlenen verilerinize erişme ve kopyasını talep etme.</li>
+                    <li>Yanlış veya eksik verilerin düzeltilmesini isteme.</li>
+                    <li>Verilerinizin silinmesini veya yok edilmesini talep etme.</li>
+                    <li>Verilerinizin işlenmesine itiraz etme.</li>
+                  </ul>
+                  <p>Bu haklarınızı kullanmak için <a href="mailto:rezpointsupport@gmail.com">rezpointsupport@gmail.com</a> adresinden bize ulaşabilirsiniz.</p>
+
+                  <h3>9. Çerezler</h3>
+                  <p>Platform, oturum yönetimi ve temel işlevsellik için yalnızca zorunlu çerezleri ve tarayıcı yerel depolama alanını (localStorage) kullanır. Reklam veya izleme amacıyla çerez kullanılmaz.</p>
+
+                  <h3>10. Çocukların Gizliliği</h3>
+                  <p>Platform 18 yaşından küçükler için tasarlanmamıştır. Bilerek 18 yaş altı kullanıcılardan veri toplamayız; böyle bir durumun farkına varırsak ilgili verileri sileriz.</p>
+
+                  <h3>11. Politikada Değişiklik</h3>
+                  <p>Bu Gizlilik Politikasını zaman zaman güncelleyebiliriz. Önemli değişiklikler Platform üzerinden duyurulur. Güncel tarih sayfanın üst kısmında belirtilir.</p>
+
+                  <h3>12. İletişim</h3>
+                  <p>Gizlilikle ilgili sorularınız için: <a href="mailto:rezpointsupport@gmail.com">rezpointsupport@gmail.com</a></p>
+                </div>
+              ) : (
+                <div className="legal-content">
+                  {rpTerms
+                    ? rpTerms.split("\n").map((line, i) => <p key={i}>{line || <br />}</p>)
+                    : <p className="description">Kullanım koşulları henüz yönetici tarafından eklenmemiştir.</p>
+                  }
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {page === "businessPanel" && (
@@ -2425,7 +3033,190 @@ function App() {
             </button>
           </div>
 
-          <div className="panel-tabs">
+          <div className="biz-mode-toggle">
+            <button className={bizMode === "reservations" ? "biz-mode-btn active" : "biz-mode-btn"} onClick={() => setBizMode("reservations")}>🍽 Rezervasyonlar</button>
+            <button className={bizMode === "meetings" ? "biz-mode-btn active" : "biz-mode-btn"} onClick={() => setBizMode("meetings")}>📅 Randevular</button>
+          </div>
+
+          {bizMode === "meetings" && (() => {
+            const REASON_LABELS = { is_gorusmesi: "İş Görüşmesi", urun_tanitimi: "Ürün Tanıtımı", urun_teslimi: "Ürün Teslimi", diger: "Diğer" };
+            const myMeetings = meetings.filter(m => String(m.businessId) === String(loggedBusiness?.id));
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const isPast = m => { const d = new Date(m.date + "T00:00:00"); return d < today; };
+            const incomingMeetings = myMeetings.filter(m => m.status === "pending" && !isPast(m));
+            const acceptedMeetings = myMeetings.filter(m => m.status === "accepted");
+            const rejectedMeetings = myMeetings.filter(m => m.status === "rejected");
+            const pastMeetings = myMeetings.filter(m => m.status === "accepted" && isPast(m));
+            const activeMeetingDates = [...new Set(acceptedMeetings.filter(m => !isPast(m)).map(m => m.date))].sort();
+            const meetingTitle = m => `${REASON_LABELS[m.reason] || m.reason} — ${m.company || m.fullName} — ${m.time} — ${formatDate(m.date)}`;
+            return (
+              <div>
+                <div className="panel-tabs">
+                  <button className={meetingPanelTab === "incoming" ? "active-tab" : ""} onClick={() => setMeetingPanelTab("incoming")}>Gelen İstekler ({incomingMeetings.length})</button>
+                  <button className={meetingPanelTab === "accepted" ? "active-tab" : ""} onClick={() => setMeetingPanelTab("accepted")}>Kabul Edilenler ({acceptedMeetings.filter(m => !isPast(m)).length})</button>
+                  <button className={meetingPanelTab === "rejected" ? "active-tab" : ""} onClick={() => setMeetingPanelTab("rejected")}>Reddedilenler ({rejectedMeetings.length})</button>
+                  <button className={meetingPanelTab === "past" ? "active-tab" : ""} onClick={() => setMeetingPanelTab("past")}>Geçmiş ({pastMeetings.length})</button>
+                  <button className={meetingPanelTab === "settings" ? "active-tab" : ""} onClick={() => setMeetingPanelTab("settings")}>Müsaitlik</button>
+                </div>
+
+                {meetingPanelTab === "incoming" && (
+                  <div className="reservation-box">
+                    <h2>Gelen Randevu İstekleri</h2>
+                    {incomingMeetings.length > 0 ? incomingMeetings.map(m => (
+                      <div key={m.id} className="incoming-req-item" style={{ cursor: "pointer" }} onClick={() => setMeetingDetailPopup(m)}>
+                        <div className="incoming-req-info">
+                          <div className="incoming-req-name">{meetingTitle(m)}</div>
+                          <div className="incoming-req-meta">{m.email}</div>
+                        </div>
+                        <div className="incoming-req-actions" onClick={e => e.stopPropagation()}>
+                          <button className="req-accept-btn" disabled={loadingReservationId === m.id} onClick={async () => {
+                            setLoadingReservationId(m.id);
+                            await supabase.from("meetings").update({ status: "accepted" }).eq("id", m.id);
+                            setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "accepted" } : x));
+                            setLoadingReservationId(null);
+                          }}>{loadingReservationId === m.id ? <Spinner /> : "✓"}</button>
+                          <button className="req-reject-btn" disabled={loadingReservationId === m.id} onClick={async () => {
+                            setLoadingReservationId(m.id);
+                            await supabase.from("meetings").update({ status: "rejected" }).eq("id", m.id);
+                            setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "rejected" } : x));
+                            setLoadingReservationId(null);
+                          }}>{loadingReservationId === m.id ? <Spinner /> : "✗"}</button>
+                        </div>
+                      </div>
+                    )) : <p className="description" style={{ padding: "20px 0" }}>📭 Bekleyen randevu isteği yok.</p>}
+                  </div>
+                )}
+
+                {meetingPanelTab === "accepted" && (
+                  <div className="reservation-box">
+                    <h2>Kabul Edilen Randevular</h2>
+                    <div className="time-slots">
+                      {activeMeetingDates.map(d => {
+                        const parsed = new Date(d + "T00:00:00");
+                        return (
+                          <button key={d} className={selectedMeetingDate === d ? "selected-time" : "time-btn"} onClick={() => setSelectedMeetingDate(d)}>
+                            {parsed.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", weekday: "long" })}<br />
+                            <small>{acceptedMeetings.filter(m => m.date === d && !isPast(m)).length} randevu</small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedMeetingDate && acceptedMeetings.filter(m => m.date === selectedMeetingDate && !isPast(m)).sort((a, b) => a.time.localeCompare(b.time)).map(m => (
+                      <div key={m.id} className="accepted-list-item" style={{ cursor: "pointer" }} onClick={() => setMeetingDetailPopup(m)}>
+                        <div className="accepted-list-info">
+                          <strong>{m.time} — {REASON_LABELS[m.reason] || m.reason}</strong>
+                          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{m.company || m.fullName} · {m.phone}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {meetingPanelTab === "rejected" && (
+                  <div className="reservation-box">
+                    <h2>Reddedilen Randevular</h2>
+                    {rejectedMeetings.length > 0 ? rejectedMeetings.map(m => (
+                      <div key={m.id} className="incoming-req-item" style={{ cursor: "pointer" }} onClick={() => setMeetingDetailPopup(m)}>
+                        <div className="incoming-req-info">
+                          <div className="incoming-req-name">{meetingTitle(m)}</div>
+                          <div className="incoming-req-meta">{m.email}</div>
+                        </div>
+                        <span className="status-badge rejected">Reddedildi</span>
+                      </div>
+                    )) : <p className="description" style={{ padding: "20px 0" }}>Reddedilen randevu yok.</p>}
+                  </div>
+                )}
+
+                {meetingPanelTab === "past" && (
+                  <div className="reservation-box">
+                    <h2>Geçmiş Randevular</h2>
+                    {pastMeetings.length > 0 ? pastMeetings.sort((a, b) => b.date.localeCompare(a.date)).map(m => (
+                      <div key={m.id} className="incoming-req-item" style={{ cursor: "pointer" }} onClick={() => setMeetingDetailPopup(m)}>
+                        <div className="incoming-req-info">
+                          <div className="incoming-req-name">{meetingTitle(m)}</div>
+                          <div className="incoming-req-meta">{m.email}</div>
+                        </div>
+                        <span className="status-badge completed">Tamamlandı</span>
+                      </div>
+                    )) : <p className="description" style={{ padding: "20px 0" }}>Geçmiş randevu yok.</p>}
+                  </div>
+                )}
+
+                {meetingPanelTab === "settings" && (() => {
+                  const next15 = [];
+                  for (let i = 0; i < 15; i++) {
+                    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+                    const fullDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                    next15.push({ fullDate, display: d.toLocaleDateString("tr-TR", { day:"2-digit", month:"short", weekday:"short" }) });
+                  }
+                  return (
+                    <div className="reservation-box">
+                      <h2>Randevu Müsaitlik Ayarları</h2>
+
+                      <p className="description" style={{ marginBottom: 10 }}>📅 Müsait günler</p>
+                      <div className="time-slots" style={{ flexWrap: "wrap", marginBottom: 20 }}>
+                        {next15.map(day => (
+                          <button key={day.fullDate} type="button"
+                            className={meetingAvailableDays.includes(day.fullDate) ? "selected-time" : "time-btn"}
+                            onClick={() => setMeetingAvailableDays(prev => prev.includes(day.fullDate) ? prev.filter(d => d !== day.fullDate) : [...prev, day.fullDate].sort())}>
+                            {day.display}
+                          </button>
+                        ))}
+                      </div>
+
+                      <p className="description" style={{ marginBottom: 10 }}>🕐 Müsait saatler</p>
+                      <div className="time-slots-grid" style={{ maxHeight: "none", marginBottom: 16 }}>
+                        {ALL_TIME_SLOTS.map(slot => (
+                          <button key={slot} type="button"
+                            className={meetingAvailableTimes.includes(slot) ? "time-btn selected-time" : "time-btn"}
+                            onClick={() => setMeetingAvailableTimes(prev => prev.includes(slot) ? prev.filter(t => t !== slot) : [...prev, slot].sort())}>
+                            {slot}
+                          </button>
+                        ))}
+                      </div>
+
+                      {meetingTimeSaved && <p style={{ color: "#16a34a", fontWeight: 700, marginBottom: 8 }}>{meetingTimeSaved}</p>}
+                      <button type="button" className="primary-btn" onClick={async () => {
+                        const { error } = await supabase.from("businesses").update({
+                          meeting_times: meetingAvailableTimes.join(","),
+                          meeting_dates: meetingAvailableDays.join(","),
+                        }).eq("id", loggedBusiness.id);
+                        if (error) { alert("Kaydedilemedi: " + error.message); return; }
+                        setLoggedBusiness(prev => ({ ...prev, meetingTimes: meetingAvailableTimes, meetingDates: meetingAvailableDays }));
+                        setAdminBusinesses(prev => prev.map(b => b.id === loggedBusiness.id ? { ...b, meetingTimes: meetingAvailableTimes, meetingDates: meetingAvailableDays } : b));
+                        setMeetingTimeSaved("Müsaitlik kaydedildi ✅");
+                        setTimeout(() => setMeetingTimeSaved(""), 4000);
+                      }}>Kaydet</button>
+                    </div>
+                  );
+                })()}
+
+                {meetingDetailPopup && (
+                  <div className="popup-overlay" onClick={() => setMeetingDetailPopup(null)}>
+                    <div className="popup-box" onClick={e => e.stopPropagation()}>
+                      <h2>Randevu Detayları</h2>
+                      {[
+                        ["İsim Soyisim", meetingDetailPopup.fullName],
+                        ["E-posta", meetingDetailPopup.email],
+                        ["Telefon", meetingDetailPopup.phone],
+                        ["Şirket", meetingDetailPopup.company || "—"],
+                        ["Görüşme Sebebi", REASON_LABELS[meetingDetailPopup.reason] || meetingDetailPopup.reason],
+                        ["Tarih", formatDate(meetingDetailPopup.date)],
+                        ["Saat", meetingDetailPopup.time],
+                        ["Not", meetingDetailPopup.note || "—"],
+                        ["Durum", meetingDetailPopup.status === "accepted" ? "Kabul Edildi" : meetingDetailPopup.status === "rejected" ? "Reddedildi" : "Bekliyor"],
+                      ].map(([k, v]) => (
+                        <div className="card-row" key={k}><span>{k}</span><strong>{v}</strong></div>
+                      ))}
+                      <button className="primary-btn" style={{ marginTop: 16, width: "100%" }} onClick={() => setMeetingDetailPopup(null)}>Kapat</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {bizMode === "reservations" && <div className="panel-tabs">
             <button
               className={panelTab === "incoming" ? "active-tab" : ""}
               onClick={() => setPanelTab("incoming")}
@@ -2481,9 +3272,9 @@ function App() {
             >
               Müşterini Tanı
             </button>
-          </div>
+          </div>}
 
-          <div className="panel-content">
+          {bizMode === "reservations" && <div className="panel-content">
             {panelTab === "incoming" && (
               <div className="reservation-box">
                 <h2>Gelen Rezervasyon İstekleri</h2>
@@ -2868,32 +3659,45 @@ function App() {
 
                 <div className="time-slots">
                   <button
-                    className={
-                      availabilityMode === "everyday"
-                        ? "selected-time"
-                        : "time-btn"
-                    }
-                    onClick={() => setAvailabilityMode("everyday")}
+                    className={availabilityMode === "specific" ? "selected-time" : "time-btn"}
+                    onClick={() => setAvailabilityMode("specific")}
                   >
-                    Her Gün
+                    Belirli Günler
                   </button>
-
                   <button
-                    className={
-                      availabilityMode === "selected"
-                        ? "selected-time"
-                        : "time-btn"
-                    }
-                    onClick={() => setAvailabilityMode("selected")}
+                    className={availabilityMode === "weekly" ? "selected-time" : "time-btn"}
+                    onClick={() => setAvailabilityMode("weekly")}
                   >
-                    Seçili Günler
+                    Haftalık Gün
                   </button>
                 </div>
 
-                {availabilityMode === "selected" && (
+                {availabilityMode === "specific" && (
+                  <>
+                    <h3 style={{ marginTop: "24px" }}>Müsait Günler (Önümüzdeki 15 Gün)</h3>
+                    <div className="time-slots" style={{ flexWrap: "wrap" }}>
+                      {(() => {
+                        const next15 = [];
+                        for (let i = 0; i < 15; i++) {
+                          const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+                          const fd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                          next15.push({ fullDate: fd, display: d.toLocaleDateString("tr-TR", { day:"2-digit", month:"short", weekday:"short" }) });
+                        }
+                        return next15.map(day => (
+                          <button key={day.fullDate}
+                            className={specificDates.includes(day.fullDate) ? "selected-time" : "time-btn"}
+                            onClick={() => setSpecificDates(prev => prev.includes(day.fullDate) ? prev.filter(d => d !== day.fullDate) : [...prev, day.fullDate].sort())}>
+                            {day.display}
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  </>
+                )}
+
+                {availabilityMode === "weekly" && (
                   <>
                     <h3 style={{ marginTop: "24px" }}>Müsait Günler</h3>
-
                     <div className="time-slots">
                       {[
                         { value: "Monday", label: "Pazartesi" },
@@ -2904,23 +3708,9 @@ function App() {
                         { value: "Saturday", label: "Cumartesi" },
                         { value: "Sunday", label: "Pazar" },
                       ].map(({ value, label }) => (
-                        <button
-                          key={value}
-                          className={
-                            availableDays.includes(value)
-                              ? "selected-time"
-                              : "time-btn"
-                          }
-                          onClick={() => {
-                            if (availableDays.includes(value)) {
-                              setAvailableDays(
-                                availableDays.filter((d) => d !== value),
-                              );
-                            } else {
-                              setAvailableDays([...availableDays, value]);
-                            }
-                          }}
-                        >
+                        <button key={value}
+                          className={availableDays.includes(value) ? "selected-time" : "time-btn"}
+                          onClick={() => setAvailableDays(prev => prev.includes(value) ? prev.filter(d => d !== value) : [...prev, value])}>
                           {label}
                         </button>
                       ))}
@@ -2975,6 +3765,7 @@ function App() {
                         availability_mode: availabilityMode,
                         available_days: availableDays.join(","),
                         available_times: availableTimes.join(","),
+                        specific_dates: specificDates.join(","),
                       })
                       .eq("id", loggedBusiness.id);
 
@@ -2992,6 +3783,7 @@ function App() {
                       availabilityMode,
                       availableDays,
                       availableTimes,
+                      specificDates,
                     };
 
                     setLoggedBusiness(updatedBusiness);
@@ -3050,6 +3842,12 @@ function App() {
                     onChange={(e) => setBusinessProfileForm({ ...businessProfileForm, menu: e.target.value })}
                     rows={4}
                   />
+                  <textarea
+                    placeholder="İşletme Koşulları (rezervasyon öncesi müşterilere gösterilir — boş bırakılabilir)"
+                    value={businessProfileForm.terms}
+                    onChange={(e) => setBusinessProfileForm({ ...businessProfileForm, terms: e.target.value })}
+                    rows={5}
+                  />
                   {businessProfileSaved && (
                     <p style={{ color: "#86efac", fontWeight: "bold", marginTop: 8 }}>{businessProfileSaved}</p>
                   )}
@@ -3078,6 +3876,7 @@ function App() {
                         description: businessProfileForm.description,
                         menu: businessProfileForm.menu,
                         phone: businessProfileForm.phone,
+                        terms: businessProfileForm.terms,
                       });
                       const { error: menuError } = await supabase
                         .from("businesses")
@@ -3091,11 +3890,13 @@ function App() {
                         phone: businessProfileForm.phone,
                         description: businessProfileForm.description,
                         menu: businessProfileForm.menu,
+                        terms: businessProfileForm.terms,
                         menuText: menuError ? loggedBusiness.menuText : menuData,
+                        logoUrl: loggedBusiness.logoUrl,
                       };
                       setLoggedBusiness(updatedBusiness);
                       setAdminBusinesses((prev) =>
-                        prev.map((b) => b.id === loggedBusiness.id ? updatedBusiness : b)
+                        prev.map((b) => b.id === loggedBusiness.id ? { ...updatedBusiness, logoUrl: b.logoUrl || updatedBusiness.logoUrl } : b)
                       );
 
                       if (menuError) {
@@ -3118,11 +3919,11 @@ function App() {
                   <div>
                     <h2>Müşterini Tanı</h2>
                     <p className="description" style={{ marginBottom: 0 }}>
-                      Kabul edilen rezervasyonlardan elde edilen müşteri analizleri.
+                      Katılan müşterilere ait analizler.
                     </p>
                   </div>
                   <div className="insight-total-badge">
-                    <AnimatedNumber value={getBusinessAcceptedReservations().length} /> kabul
+                    <AnimatedNumber value={getBusinessAcceptedReservations().length} /> katılımcı
                   </div>
                 </div>
 
@@ -3295,7 +4096,7 @@ function App() {
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </section>
       )}
 
@@ -3305,13 +4106,32 @@ function App() {
 
           <div className="biz-profile-header">
             <div className="biz-profile-icon-wrap">
-              <span className="biz-profile-icon">{selectedBusiness.icon}</span>
+              {selectedBusiness.logoUrl
+                ? <img src={selectedBusiness.logoUrl} alt={selectedBusiness.name} className="biz-profile-logo-img" />
+                : <span className="biz-profile-icon">{selectedBusiness.icon}</span>
+              }
             </div>
             <div className="biz-profile-meta">
               <h1 className="biz-profile-name">{selectedBusiness.name}</h1>
               <span className="biz-profile-type">{selectedBusiness.type}</span>
               {selectedBusiness.location && <span className="biz-profile-loc">📍 {selectedBusiness.location}</span>}
-              {selectedBusiness.phone && <span className="biz-profile-phone">📞 {selectedBusiness.phone}</span>}
+              {selectedBusiness.phone && (
+                <span className="biz-profile-phone">📞 {selectedBusiness.phone}</span>
+              )}
+              {selectedBusiness.meetingEnabled && selectedBusiness.meetingDates?.length > 0 && (
+                <div className="biz-profile-phone-row">
+                  <button className="meeting-request-btn" onClick={() => {
+                    if (!loggedCustomer) { setPage("customerAuth"); return; }
+                    setMeetingFormBusiness(selectedBusiness);
+                    setMeetingForm({ fullName: loggedCustomer.name || "", email: loggedCustomer.email || "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
+                    setMeetingTermsChecked({ biz: false, rp: false });
+                    setMeetingFormError("");
+                    setPage("meetingRequest");
+                  }}>
+                    📅 Randevu İste
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -3359,6 +4179,146 @@ function App() {
             {loggedCustomer
               ? <button className="primary-btn" onClick={() => openReservationForm(selectedBusiness)}>Rezervasyon Yap →</button>
               : <button className="primary-btn" onClick={() => setPage("customerAuth")}>Giriş Yaparak Rezervasyon Yap →</button>}
+          </div>
+        </section>
+      )}
+
+      {page === "meetingRequest" && meetingFormBusiness && (
+        <section className="reservation-section">
+          <div className="reservation-box">
+            <button className="back-btn" style={{ marginBottom: 12 }} onClick={() => { setPage("businessProfile"); }}>← Geri</button>
+            <h1>Randevu İste</h1>
+            <p className="description">{meetingFormBusiness.name} — Yetkili ile görüşme talebi oluşturun.</p>
+
+            <form className="reservation-form">
+              <input type="text" placeholder="İsim Soyisim *" value={meetingForm.fullName} onChange={e => setMeetingForm(p => ({ ...p, fullName: e.target.value }))} />
+              <input type="email" placeholder="E-posta *" value={meetingForm.email} onChange={e => setMeetingForm(p => ({ ...p, email: e.target.value }))} />
+              <input type="tel" placeholder="📞 Telefon *" value={meetingForm.phone} onChange={e => setMeetingForm(p => ({ ...p, phone: e.target.value }))} />
+              <input type="text" placeholder="Şirket Adı (opsiyonel)" value={meetingForm.company} onChange={e => setMeetingForm(p => ({ ...p, company: e.target.value }))} />
+              <select value={meetingForm.reason} onChange={e => setMeetingForm(p => ({ ...p, reason: e.target.value }))}>
+                <option value="is_gorusmesi">💼 İş Görüşmesi</option>
+                <option value="urun_tanitimi">📦 Ürün Tanıtımı</option>
+                <option value="urun_teslimi">🚚 Ürün Teslimi</option>
+                <option value="diger">💬 Diğer</option>
+              </select>
+
+              <div className="date-time-row">
+                <div className="strip-section">
+                  <div className="strip-label">📅 Tarih</div>
+                  <div className="strip-scroll-wrap">
+                    <button type="button" className="strip-arrow" onClick={() => meetingDateRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
+                    <div className="date-strip" ref={meetingDateRef}>
+                      {(() => {
+                        const todayMs = new Date().setHours(0,0,0,0);
+                        return (meetingFormBusiness.meetingDates || [])
+                          .filter(d => new Date(d + "T00:00:00").getTime() >= todayMs)
+                          .sort()
+                          .map(d => {
+                            const parsed = new Date(d + "T00:00:00");
+                            return (
+                              <button key={d} type="button"
+                                className={meetingForm.date === d ? "strip-btn active" : "strip-btn"}
+                                onClick={() => setMeetingForm(p => ({ ...p, date: d, time: "" }))}>
+                                <span className="strip-day">{parsed.toLocaleDateString("tr-TR", { weekday: "short" })}</span>
+                                <span className="strip-date">{parsed.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}</span>
+                              </button>
+                            );
+                          });
+                      })()}
+                    </div>
+                    <button type="button" className="strip-arrow" onClick={() => meetingDateRef.current?.scrollBy({ left: 160, behavior: "smooth" })}>›</button>
+                  </div>
+                </div>
+
+                <div className="strip-section">
+                  <div className="strip-label">🕐 Saat</div>
+                  <div className="strip-scroll-wrap">
+                    <button type="button" className="strip-arrow" onClick={() => meetingTimeRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
+                    <div className="time-strip" ref={meetingTimeRef}>
+                      {(() => {
+                        const bookedTimes = meetings.filter(m => String(m.businessId) === String(meetingFormBusiness.id) && m.date === meetingForm.date && m.status !== "rejected").map(m => m.time);
+                        return (meetingFormBusiness.meetingTimes || []).filter(t => !bookedTimes.includes(t)).map(time => (
+                          <button key={time} type="button"
+                            className={meetingForm.time === time ? "strip-btn active" : "strip-btn"}
+                            onClick={() => setMeetingForm(p => ({ ...p, time }))}>
+                            {time}
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                    <button type="button" className="strip-arrow" onClick={() => meetingTimeRef.current?.scrollBy({ left: 160, behavior: "smooth" })}>›</button>
+                  </div>
+                </div>
+              </div>
+
+              <textarea placeholder="📝 Not (opsiyonel)" value={meetingForm.note} onChange={e => setMeetingForm(p => ({ ...p, note: e.target.value }))} />
+
+              {meetingFormError && <p className="error-message">{meetingFormError}</p>}
+
+              <div className="rez-terms-checks">
+                <label className="rez-terms-label">
+                  <input type="checkbox" checked={meetingTermsChecked.biz} onChange={e => setMeetingTermsChecked(p => ({ ...p, biz: e.target.checked }))} />
+                  <span className="rez-check-box">{meetingTermsChecked.biz ? "✓" : ""}</span>
+                  <span><button type="button" className="terms-link" onClick={() => setTermsModal("biz")}>İşletme Koşulları</button>'nı okudum ve kabul ediyorum</span>
+                </label>
+                <label className="rez-terms-label">
+                  <input type="checkbox" checked={meetingTermsChecked.rp} onChange={e => setMeetingTermsChecked(p => ({ ...p, rp: e.target.checked }))} />
+                  <span className="rez-check-box">{meetingTermsChecked.rp ? "✓" : ""}</span>
+                  <span><button type="button" className="terms-link" onClick={() => setTermsModal("rp")}>RezPoint Koşulları</button>'nı okudum ve kabul ediyorum</span>
+                </label>
+              </div>
+
+              <button type="button"
+                disabled={isSendingMeeting || !meetingForm.fullName || !meetingForm.email || !meetingForm.phone || !meetingForm.date || !meetingForm.time || !meetingTermsChecked.biz || !meetingTermsChecked.rp}
+                style={{ opacity: (isSendingMeeting || !meetingForm.fullName || !meetingForm.email || !meetingForm.phone || !meetingForm.date || !meetingForm.time || !meetingTermsChecked.biz || !meetingTermsChecked.rp) ? 0.5 : 1 }}
+                onClick={async () => {
+                  setIsSendingMeeting(true);
+                  setMeetingFormError("");
+                  const code = "MT-" + Math.floor(10000 + Math.random() * 90000);
+                  const { data: inserted, error } = await supabase.from("meetings").insert([{
+                    business_id: meetingFormBusiness.id,
+                    business_name: meetingFormBusiness.name,
+                    full_name: meetingForm.fullName,
+                    email: meetingForm.email,
+                    phone: meetingForm.phone,
+                    company_name: meetingForm.company || null,
+                    reason: meetingForm.reason,
+                    date: meetingForm.date,
+                    time: meetingForm.time,
+                    note: meetingForm.note || null,
+                    status: "pending",
+                    code,
+                  }]).select().single();
+                  if (error) { setMeetingFormError("Randevu gönderilemedi: " + error.message); setIsSendingMeeting(false); return; }
+                  setMeetings(prev => [...prev, { id: inserted.id, businessId: meetingFormBusiness.id, businessName: meetingFormBusiness.name, fullName: meetingForm.fullName, email: meetingForm.email, phone: meetingForm.phone, company: meetingForm.company || "", reason: meetingForm.reason, date: meetingForm.date, time: meetingForm.time, note: meetingForm.note || "", status: "pending", code, createdAt: inserted.created_at || new Date().toISOString() }]);
+                  setIsSendingMeeting(false);
+                  setPage("meetingSuccess");
+                }}
+              >
+                {isSendingMeeting ? "Gönderiliyor..." : "Randevu Talebi Gönder →"}
+              </button>
+
+              {termsModal && (
+                <div className="terms-modal-overlay" onClick={() => setTermsModal(null)}>
+                  <div className="terms-modal" onClick={e => e.stopPropagation()}>
+                    <h3>{termsModal === "biz" ? `${meetingFormBusiness?.name} — Koşullar` : "RezPoint Kullanım Koşulları"}</h3>
+                    <div className="terms-modal-body">{termsModal === "biz" ? (meetingFormBusiness?.terms || "Bu işletme henüz koşul belirlememiş.") : (rpTerms || "Henüz koşul eklenmemiş.")}</div>
+                    <button type="button" className="primary-btn" style={{ marginTop: 16 }} onClick={() => setTermsModal(null)}>Kapat</button>
+                  </div>
+                </div>
+              )}
+            </form>
+          </div>
+        </section>
+      )}
+
+      {page === "meetingSuccess" && (
+        <section className="reservation-section">
+          <div className="reservation-box" style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>📅</div>
+            <h1>Randevu Talebiniz Alındı!</h1>
+            <p className="description">İşletme talebinizi inceleyecek ve onaylayacaktır. Sonucu bildirimlerinizde görebilirsiniz.</p>
+            <button className="primary-btn" style={{ marginTop: 20 }} onClick={() => { setPage("customerDashboard"); setCustomerTab("meetings"); }}>Randevularıma Git</button>
           </div>
         </section>
       )}
@@ -3441,7 +4401,7 @@ function App() {
             </div>
 
             <div className="card-row">
-              <span>Sigara</span>
+              <span>Sigara ve Türevleri</span>
               <strong>
                 {selectedReservation.customerProfile?.smoking || "Belirtilmedi"}
               </strong>
