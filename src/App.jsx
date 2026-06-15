@@ -231,6 +231,7 @@ function App() {
   const [adminLoginAttempts, setAdminLoginAttempts] = useState(0);
   const [adminLoginLocked, setAdminLoginLocked] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
+  const [bizSessionToken, setBizSessionToken] = useState(localStorage.getItem("rp_biz_token") || "");
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [accountNewEmail, setAccountNewEmail] = useState("");
@@ -375,27 +376,7 @@ function App() {
         setReservations(reservationData.map(formatRez));
       }
 
-      // 5. Load customers
-      const { data: customerData, error: customerError } = await supabase
-        .from("customers")
-        .select("*");
-      if (customerError) console.log("Customers fetch error:", customerError);
-
-      if (customerData) {
-        setRegisteredCustomers(customerData.map((customer) => ({
-          id: customer.id,
-          name: customer.name,
-          email: customer.email,
-          safeScore: customer.safe_score ?? 100,
-          profile: {
-            phone: customer.phone || "",
-            gender: customer.gender || "",
-            birthDate: customer.birth_date || "",
-            job: customer.job || "",
-            smoking: customer.smoking || "",
-          },
-        })));
-      }
+      // 5. Customers loaded after admin login via admin_get_customers RPC
 
       // 6. Navigate to protected pages only after confirming session is valid.
       // getSavedPage() returns "home" for BUSINESS_PAGES and CUSTOMER_PAGES, so
@@ -813,6 +794,10 @@ function App() {
       return;
     }
 
+    const token = data[0].session_token || "";
+    setBizSessionToken(token);
+    localStorage.setItem("rp_biz_token", token);
+
     const business = formatBusiness(data[0]);
     setLoggedBusiness(business);
     setAvailabilityMode(business.availabilityMode || "weekly");
@@ -830,7 +815,7 @@ function App() {
       terms: business.terms || "",
     });
 
-    localStorage.setItem("rp_biz_id", business.id);
+    localStorage.setItem("rp_biz_id", String(business.id));
     setLoginError("");
     setBizLoginAttempts(0);
     setPanelTab("incoming");
@@ -874,6 +859,14 @@ function App() {
     supabase.from("business_types").select("*").order("name").then(({ data: bt }) => {
       if (bt) setAdminBizTypes(bt);
     });
+    supabase.rpc("admin_get_customers", { p_password: adminLogin.password }).then(({ data: custData }) => {
+      if (custData) {
+        setRegisteredCustomers(custData.map((c) => ({
+          id: c.id, name: c.name, email: c.email, safeScore: c.safe_score ?? 100,
+          profile: { phone: c.phone || "", gender: c.gender || "", birthDate: c.birth_date || "", job: c.job || "", smoking: c.smoking || "" },
+        })));
+      }
+    });
   }
 
   async function closeDayReservations() {
@@ -888,41 +881,18 @@ function App() {
 
     setActionLoading(true);
 
-    for (const rez of targetReservations) {
-      if (rez.attendanceStatus === "pending") {
-        // Tiklenmeyen → katılmadı
-        const { error } = await supabase.from("reservations")
-          .update({ attendance_status: "no_show", status: "completed" })
-          .eq("id", rez.id);
-        if (error) { console.log("no_show error:", error); continue; }
+    const { error } = await supabase.rpc("business_close_day", {
+      p_token: bizSessionToken,
+      p_business_id: loggedBusiness.id,
+      p_date: selectedAcceptedDate,
+    });
 
-        const { data: cust } = await supabase.from("customers")
-          .select("id, safe_score").eq("email", rez.email).single();
-        if (cust) {
-          const newScore = Math.max(0, (cust.safe_score ?? 100) - 8);
-          await supabase.from("customers").update({ safe_score: newScore }).eq("id", cust.id);
-          await supabase.from("safescore_history").insert([{
-            customer_id: cust.id, reservation_id: rez.id, delta: -8, reason: "no_show",
-          }]);
-          await supabase.from("notifications").insert([{
-            customer_id: cust.id,
-            title: "Rezervasyona katılmadınız",
-            message: `${rez.business} — ${formatDate(rez.date)} ${rez.time} rezervasyonuna katılmadınız. SafeScore'unuz 8 puan azaldı.`,
-            is_read: false,
-          }]);
-          if (loggedCustomer?.email === rez.email) {
-            setLoggedCustomer(prev => prev ? { ...prev, safeScore: newScore } : prev);
-          }
-        }
-      } else if (rez.attendanceStatus === "attended") {
-        // Tiklenmiş → tamamlandı olarak işaretle (safescore zaten verildi)
-        await supabase.from("reservations")
-          .update({ status: "completed" })
-          .eq("id", rez.id);
-      }
+    if (error) {
+      alert("Gün kapatılamadı: " + error.message);
+      setActionLoading(false);
+      return;
     }
 
-    // Listeyi temizle: tüm o gün kayıtları local state'de completed yap
     setReservations(prev => prev.map(rez => {
       if (
         String(rez.businessId) === String(loggedBusiness.id) &&
@@ -1749,41 +1719,15 @@ function App() {
                       return;
                     }
 
-                    // Check if a customer record already exists for this email
-                    // (migration case: user registered before Supabase Auth).
-                    const { data: existingCust } = await supabase
-                      .from("customers")
-                      .select("id, safe_score")
-                      .eq("email", customerForm.email)
-                      .single();
+                    const { error: regError } = await supabase.rpc("register_or_link_customer", {
+                      p_name: customerForm.name,
+                      p_email: customerForm.email,
+                      p_auth_user_id: authData.user.id,
+                    });
 
-                    let custId, safeScore;
-                    if (existingCust) {
-                      // Link existing record to the new Auth user
-                      await supabase
-                        .from("customers")
-                        .update({ auth_user_id: authData.user.id })
-                        .eq("id", existingCust.id);
-                      custId = existingCust.id;
-                      safeScore = existingCust.safe_score || 100;
-                    } else {
-                      const { data: inserted, error: insertError } = await supabase
-                        .from("customers")
-                        .insert([{
-                          name: customerForm.name,
-                          email: customerForm.email,
-                          auth_user_id: authData.user.id,
-                          safe_score: 100,
-                        }])
-                        .select("id")
-                        .single();
-
-                      if (insertError) {
-                        setCustomerAuthError("Hesap oluşturulamadı. Tekrar deneyin.");
-                        return;
-                      }
-                      custId = inserted.id;
-                      safeScore = 100;
+                    if (regError) {
+                      setCustomerAuthError("Hesap oluşturulamadı. Tekrar deneyin.");
+                      return;
                     }
 
                     setCustomerAuthError("");
@@ -1913,7 +1857,7 @@ function App() {
                                 <button className="cancel-small-btn" onClick={async e => {
                                   e.stopPropagation();
                                   if (!window.confirm("Rezervasyonu iptal etmek istiyor musunuz?")) return;
-                                  const { error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", rez.id);
+                                  const { error } = await supabase.rpc("customer_cancel_reservation", { p_rez_id: rez.id });
                                   if (!error) setReservations(prev => prev.map(r => r.id === rez.id ? { ...r, status: "cancelled" } : r));
                                 }}>İptal</button>
                               )}
@@ -2094,13 +2038,13 @@ function App() {
                         ))}
                       </div>
                       <button type="button" onClick={async () => {
-                        const { error } = await supabase.from("customers").update({
-                          phone: customerProfile.phone,
-                          gender: customerProfile.gender,
-                          birth_date: customerProfile.birthDate,
-                          job: customerProfile.job,
-                          smoking: customerProfile.smoking,
-                        }).eq("id", loggedCustomer.id);
+                        const { error } = await supabase.rpc("customer_update_profile", {
+                          p_phone: customerProfile.phone,
+                          p_gender: customerProfile.gender,
+                          p_birth_date: customerProfile.birthDate,
+                          p_job: customerProfile.job,
+                          p_smoking: customerProfile.smoking,
+                        });
                         if (error) { alert("Profil kaydedilemedi."); return; }
                         alert("Profil başarıyla kaydedildi.");
                       }}>Profili Kaydet</button>
@@ -2688,7 +2632,7 @@ function App() {
                               if (upErr) { alert("Yükleme hatası: " + upErr.message); return; }
                               const { data: urlData } = supabase.storage.from("business-logos").getPublicUrl(path);
                               const logoUrl = urlData.publicUrl + "?t=" + Date.now();
-                              const { error: dbErr } = await supabase.from("businesses").update({ logo_url: urlData.publicUrl }).eq("id", business.id);
+                              const { error: dbErr } = await supabase.rpc("admin_update_business", { p_password: adminPassword, p_business_id: business.id, p_logo_url: urlData.publicUrl });
                               if (dbErr) { alert("Kaydedilemedi: " + dbErr.message); return; }
                               setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, logoUrl } : item));
                             }} />
@@ -2715,7 +2659,7 @@ function App() {
                           />
                           <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
                             <button className="primary-btn" style={{ fontSize: 11, padding: "3px 10px" }} onClick={async () => {
-                              const { error } = await supabase.from("businesses").update({ type: adminEditingBiz.type, location: adminEditingBiz.location }).eq("id", business.id);
+                              const { error } = await supabase.rpc("admin_update_business", { p_password: adminPassword, p_business_id: business.id, p_type: adminEditingBiz.type, p_location: adminEditingBiz.location });
                               if (error) { alert("Kaydedilemedi."); return; }
                               setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, type: adminEditingBiz.type, location: adminEditingBiz.location } : item));
                               setAdminEditingBiz(null);
@@ -2739,7 +2683,7 @@ function App() {
                         style={{ fontSize: 12, padding: "6px 12px" }}
                         onClick={async () => {
                           const newValue = !business.reservationActive;
-                          const { error } = await supabase.from("businesses").update({ reservation_enabled: newValue }).eq("id", business.id);
+                          const { error } = await supabase.rpc("admin_update_business", { p_password: adminPassword, p_business_id: business.id, p_reservation_enabled: newValue });
                           if (error) { alert("Güncellenemedi."); return; }
                           setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, reservationActive: newValue } : item));
                         }}
@@ -2755,7 +2699,7 @@ function App() {
                         style={{ fontSize: 12, padding: "6px 12px" }}
                         onClick={async () => {
                           const newValue = !business.meetingEnabled;
-                          const { error } = await supabase.from("businesses").update({ meeting_enabled: newValue }).eq("id", business.id);
+                          const { error } = await supabase.rpc("admin_update_business", { p_password: adminPassword, p_business_id: business.id, p_meeting_enabled: newValue });
                           if (error) { alert("Güncellenemedi."); return; }
                           setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, meetingEnabled: newValue } : item));
                         }}
@@ -2771,7 +2715,7 @@ function App() {
                         style={{ fontSize: 12, padding: "6px 12px" }}
                         onClick={async () => {
                           const newValue = !business.aiMenuActive;
-                          const { error } = await supabase.from("businesses").update({ ai_menu_enabled: newValue }).eq("id", business.id);
+                          const { error } = await supabase.rpc("admin_update_business", { p_password: adminPassword, p_business_id: business.id, p_ai_menu_enabled: newValue });
                           if (error) { alert("Güncellenemedi."); return; }
                           setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, aiMenuActive: newValue } : item));
                         }}
@@ -2788,9 +2732,8 @@ function App() {
                           style={{ fontSize: 12, padding: "6px 12px", color: "#f59e0b", borderColor: "#f59e0b" }}
                           onClick={async () => {
                             if (!window.confirm(`${business.name} istatistikleri sıfırlansın mı?`)) return;
-                            const { error } = await supabase.from("businesses").update({ rating: 0 }).eq("id", business.id);
+                            const { error } = await supabase.rpc("admin_update_business", { p_password: adminPassword, p_business_id: business.id, p_rating: 0 });
                             if (error) { alert("Sıfırlanamadı."); return; }
-                            await supabase.from("reservations").update({ safe_score_delta: 0 }).eq("business_id", business.id);
                             setAdminBusinesses(adminBusinesses.map(item => item.id === business.id ? { ...item, rating: 0 } : item));
                             alert("İstatistikler sıfırlandı.");
                           }}
@@ -3042,6 +2985,8 @@ function App() {
               className="nav-button"
               onClick={() => {
                 localStorage.removeItem("rp_biz_id");
+                localStorage.removeItem("rp_biz_token");
+                setBizSessionToken("");
                 localStorage.setItem("rp_page", "home");
                 setLoggedBusiness(null);
                 setBusinessLogin({ email: "", password: "" });
@@ -3090,14 +3035,14 @@ function App() {
                         <div className="incoming-req-actions" onClick={e => e.stopPropagation()}>
                           <button className="req-accept-btn" disabled={loadingReservationId === m.id} onClick={async () => {
                             setLoadingReservationId(m.id);
-                            await supabase.from("meetings").update({ status: "accepted" }).eq("id", m.id);
-                            setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "accepted" } : x));
+                            const { error } = await supabase.rpc("business_update_meeting_status", { p_token: bizSessionToken, p_meeting_id: m.id, p_status: "accepted" });
+                            if (!error) setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "accepted" } : x));
                             setLoadingReservationId(null);
                           }}>{loadingReservationId === m.id ? <Spinner /> : "✓"}</button>
                           <button className="req-reject-btn" disabled={loadingReservationId === m.id} onClick={async () => {
                             setLoadingReservationId(m.id);
-                            await supabase.from("meetings").update({ status: "rejected" }).eq("id", m.id);
-                            setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "rejected" } : x));
+                            const { error } = await supabase.rpc("business_update_meeting_status", { p_token: bizSessionToken, p_meeting_id: m.id, p_status: "rejected" });
+                            if (!error) setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "rejected" } : x));
                             setLoadingReservationId(null);
                           }}>{loadingReservationId === m.id ? <Spinner /> : "✗"}</button>
                         </div>
@@ -3196,10 +3141,12 @@ function App() {
 
                       {meetingTimeSaved && <p style={{ color: "#16a34a", fontWeight: 700, marginBottom: 8 }}>{meetingTimeSaved}</p>}
                       <button type="button" className="primary-btn" onClick={async () => {
-                        const { error } = await supabase.from("businesses").update({
-                          meeting_times: meetingAvailableTimes.join(","),
-                          meeting_dates: meetingAvailableDays.join(","),
-                        }).eq("id", loggedBusiness.id);
+                        const { error } = await supabase.rpc("business_save_meeting_availability", {
+                          p_token: bizSessionToken,
+                          p_business_id: loggedBusiness.id,
+                          p_meeting_times: meetingAvailableTimes.join(","),
+                          p_meeting_dates: meetingAvailableDays.join(","),
+                        });
                         if (error) { alert("Kaydedilemedi: " + error.message); return; }
                         setLoggedBusiness(prev => ({ ...prev, meetingTimes: meetingAvailableTimes, meetingDates: meetingAvailableDays }));
                         setAdminBusinesses(prev => prev.map(b => b.id === loggedBusiness.id ? { ...b, meetingTimes: meetingAvailableTimes, meetingDates: meetingAvailableDays } : b));
@@ -3342,25 +3289,15 @@ function App() {
                               e.stopPropagation();
                               setLoadingReservationId(rez.id);
 
-                              const { error } = await supabase
-                                .from("reservations")
-                                .update({ status: "accepted", business_message: "Rezervasyonunuz oluşturuldu. Sizi bekliyoruz ❤️" })
-                                .eq("id", rez.id);
+                              const { error } = await supabase.rpc("business_accept_reservation", {
+                                p_token: bizSessionToken,
+                                p_rez_id: rez.id,
+                              });
 
                               if (error) {
                                 alert(`Rezervasyon kabul edilemedi: ${error.message}`);
                                 setLoadingReservationId(null);
                                 return;
-                              }
-
-                              const { data: custAccept } = await supabase.from("customers").select("id").eq("email", rez.email).single();
-                              if (custAccept) {
-                                await supabase.from("notifications").insert([{
-                                  customer_id: custAccept.id,
-                                  title: "Rezervasyonunuz kabul edildi",
-                                  message: `${loggedBusiness.name} — ${formatDate(rez.date)} ${rez.time} rezervasyonunuz kabul edildi. Sizi bekliyoruz ❤️`,
-                                  is_read: false,
-                                }]);
                               }
 
                               setReservations((prev) =>
@@ -3384,25 +3321,15 @@ function App() {
                               e.stopPropagation();
                               setLoadingReservationId(rez.id);
 
-                              const { error } = await supabase
-                                .from("reservations")
-                                .update({ status: "rejected", business_message: "İşletmemizde uygun masa bulunmamaktadır, yine bekleriz ❤️" })
-                                .eq("id", rez.id);
+                              const { error } = await supabase.rpc("business_reject_reservation", {
+                                p_token: bizSessionToken,
+                                p_rez_id: rez.id,
+                              });
 
                               if (error) {
                                 alert(`Rezervasyon reddedilemedi: ${error.message}`);
                                 setLoadingReservationId(null);
                                 return;
-                              }
-
-                              const { data: custReject } = await supabase.from("customers").select("id").eq("email", rez.email).single();
-                              if (custReject) {
-                                await supabase.from("notifications").insert([{
-                                  customer_id: custReject.id,
-                                  title: "Rezervasyonunuz reddedildi",
-                                  message: `${loggedBusiness.name} — ${formatDate(rez.date)} ${rez.time} rezervasyonunuz için uygun masa bulunamadı, yine bekleriz ❤️`,
-                                  is_read: false,
-                                }]);
                               }
 
                               setReservations((prev) =>
@@ -3487,27 +3414,17 @@ function App() {
 
                               if (rez.attendanceStatus === "attended") {
                                 // Geri al — sadece durumu sıfırla, safescore değişmez
-                                const { error } = await supabase.from("reservations").update({ attendance_status: "pending" }).eq("id", rez.id);
+                                const { error } = await supabase.rpc("business_undo_attendance", { p_token: bizSessionToken, p_rez_id: rez.id });
                                 if (error) { alert("Güncellenemedi."); return; }
                                 setReservations(prev => prev.map(r => r.id === rez.id ? { ...r, attendanceStatus: "pending" } : r));
                                 return;
                               }
 
                               // Katıldı olarak işaretle
-                              const { error } = await supabase.from("reservations").update({ attendance_status: "attended" }).eq("id", rez.id);
+                              const { data: newScore, error } = await supabase.rpc("business_mark_attended", { p_token: bizSessionToken, p_rez_id: rez.id });
                               if (error) { alert("Güncellenemedi."); return; }
-                              const { data: cust } = await supabase.from("customers").select("id, safe_score").eq("email", rez.email).single();
-                              if (cust) {
-                                const newScore = Math.min(100, (cust.safe_score ?? 100) + 2);
-                                await supabase.from("customers").update({ safe_score: newScore }).eq("id", cust.id);
-                                await supabase.from("safescore_history").insert([{ customer_id: cust.id, reservation_id: rez.id, delta: 2, reason: "attended" }]);
-                                const { data: existing } = await supabase.from("loyalty_points").select("id, points").eq("customer_id", cust.id).eq("business_id", rez.businessId).single();
-                                if (existing) {
-                                  await supabase.from("loyalty_points").update({ points: existing.points + 2 }).eq("id", existing.id);
-                                } else {
-                                  await supabase.from("loyalty_points").insert([{ customer_id: cust.id, business_id: rez.businessId, points: 2 }]);
-                                }
-                                if (loggedCustomer?.email === rez.email) setLoggedCustomer(prev => prev ? { ...prev, safeScore: newScore } : prev);
+                              if (loggedCustomer?.email === rez.email && newScore != null) {
+                                setLoggedCustomer(prev => prev ? { ...prev, safeScore: Number(newScore) } : prev);
                               }
                               setReservations(prev => prev.map(r => r.id === rez.id ? { ...r, attendanceStatus: "attended" } : r));
                             }}
@@ -3778,15 +3695,14 @@ function App() {
                   onClick={async () => {
                     if (!loggedBusiness) return;
 
-                    const { error } = await supabase
-                      .from("businesses")
-                      .update({
-                        availability_mode: availabilityMode,
-                        available_days: availableDays.join(","),
-                        available_times: availableTimes.join(","),
-                        specific_dates: specificDates.join(","),
-                      })
-                      .eq("id", loggedBusiness.id);
+                    const { error } = await supabase.rpc("business_save_availability", {
+                      p_token: bizSessionToken,
+                      p_business_id: loggedBusiness.id,
+                      p_availability_mode: availabilityMode,
+                      p_available_days: availableDays.join(","),
+                      p_available_times: availableTimes.join(","),
+                      p_specific_dates: specificDates.join(","),
+                    });
 
                     if (error) {
                       console.log("Availability save error:", error);
@@ -3875,32 +3791,25 @@ function App() {
                     onClick={async () => {
                       if (!loggedBusiness) return;
 
-                      // Step 1: Save name & location (columns guaranteed to exist)
-                      const { error: basicError } = await supabase
-                        .from("businesses")
-                        .update({
-                          name: businessProfileForm.name,
-                          location: businessProfileForm.location,
-                        })
-                        .eq("id", loggedBusiness.id);
-
-                      if (basicError) {
-                        console.log("Business profile save error:", basicError);
-                        alert("Profil kaydedilemedi: " + basicError.message);
-                        return;
-                      }
-
-                      // Step 2: Try to save description/menu/phone via menu_text (optional column)
                       const menuData = JSON.stringify({
                         description: businessProfileForm.description,
                         menu: businessProfileForm.menu,
                         phone: businessProfileForm.phone,
                         terms: businessProfileForm.terms,
                       });
-                      const { error: menuError } = await supabase
-                        .from("businesses")
-                        .update({ menu_text: menuData })
-                        .eq("id", loggedBusiness.id);
+
+                      const { error: saveError } = await supabase.rpc("business_save_profile", {
+                        p_token: bizSessionToken,
+                        p_business_id: loggedBusiness.id,
+                        p_name: businessProfileForm.name,
+                        p_location: businessProfileForm.location,
+                        p_menu_text: menuData,
+                      });
+
+                      if (saveError) {
+                        alert("Profil kaydedilemedi: " + saveError.message);
+                        return;
+                      }
 
                       const updatedBusiness = {
                         ...loggedBusiness,
@@ -3910,20 +3819,15 @@ function App() {
                         description: businessProfileForm.description,
                         menu: businessProfileForm.menu,
                         terms: businessProfileForm.terms,
-                        menuText: menuError ? loggedBusiness.menuText : menuData,
+                        menuText: menuData,
                         logoUrl: loggedBusiness.logoUrl,
                       };
                       setLoggedBusiness(updatedBusiness);
                       setAdminBusinesses((prev) =>
                         prev.map((b) => b.id === loggedBusiness.id ? { ...updatedBusiness, logoUrl: b.logoUrl || updatedBusiness.logoUrl } : b)
                       );
-
-                      if (menuError) {
-                        setBusinessProfileSaved("İsim/konum kaydedildi ✅ — Açıklama/menü için Supabase'de şu SQL'i çalıştırın: ALTER TABLE businesses ADD COLUMN menu_text text;");
-                      } else {
-                        setBusinessProfileSaved("Profil başarıyla kaydedildi ✅");
-                      }
-                      setTimeout(() => setBusinessProfileSaved(""), 8000);
+                      setBusinessProfileSaved("Profil başarıyla kaydedildi ✅");
+                      setTimeout(() => setBusinessProfileSaved(""), 4000);
                     }}
                   >
                     Profili Kaydet
