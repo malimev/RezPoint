@@ -3381,28 +3381,78 @@ function App() {
 
                 {meetingDetailPopup && (
                   <div className="popup-overlay" onClick={() => setMeetingDetailPopup(null)}>
-                    <div className="popup-box" onClick={e => e.stopPropagation()}>
-                      <h2>Randevu Detayları</h2>
-                      <div style={{ display: "flex", gap: 10, justifyContent: "center", margin: "12px 0 18px" }}>
-                        <span style={{ background: "rgba(109,40,217,0.1)", color: "#6d28d9", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.95rem" }}>
+                    <div className="popup-box" onClick={e => e.stopPropagation()} style={{ padding: "28px 28px 24px" }}>
+
+                      {/* Başlık + gönderilme zamanı */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+                        <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1a1a2e" }}>Randevu</h2>
+                        {meetingDetailPopup.createdAt && (
+                          <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500, lineHeight: 1.4, textAlign: "right" }}>
+                            Gönderildi<br/>
+                            <strong style={{ color: "#6b7280" }}>
+                              {(() => { const d = new Date(meetingDetailPopup.createdAt); return `${d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} ${d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}`; })()}
+                            </strong>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* İsim + şirket + iletişim */}
+                      <div style={{ textAlign: "center", marginBottom: 18 }}>
+                        <div style={{ fontSize: "1.45rem", fontWeight: 800, color: "#1a1a2e", marginBottom: 4 }}>
+                          {meetingDetailPopup.fullName}
+                        </div>
+                        {meetingDetailPopup.company && (
+                          <div style={{ fontSize: 13, color: "#7c3aed", fontWeight: 600, marginBottom: 5 }}>{meetingDetailPopup.company}</div>
+                        )}
+                        <div style={{ fontSize: 13, color: "#6b7280", display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                          <span>{meetingDetailPopup.email}</span>
+                          <span>·</span>
+                          <span>{meetingDetailPopup.phone}</span>
+                        </div>
+                      </div>
+
+                      {/* Önemli bilgi chipler: tarih, saat, sebep */}
+                      <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 20 }}>
+                        <span style={{ background: "rgba(109,40,217,0.12)", color: "#5b21b6", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
                           📅 {formatDate(meetingDetailPopup.date)}
                         </span>
-                        <span style={{ background: "rgba(109,40,217,0.1)", color: "#6d28d9", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.95rem" }}>
+                        <span style={{ background: "rgba(109,40,217,0.12)", color: "#5b21b6", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
                           🕐 {meetingDetailPopup.time}
                         </span>
+                        <span style={{ background: "rgba(59,130,246,0.12)", color: "#1e40af", borderRadius: 12, padding: "9px 16px", fontWeight: 600, fontSize: "0.85rem" }}>
+                          {REASON_LABELS[meetingDetailPopup.reason] || meetingDetailPopup.reason}
+                        </span>
                       </div>
-                      {[
-                        ["İsim Soyisim", meetingDetailPopup.fullName],
-                        ["E-posta", meetingDetailPopup.email],
-                        ["Telefon", meetingDetailPopup.phone],
-                        ["Şirket", meetingDetailPopup.company || "—"],
-                        ["Görüşme Sebebi", REASON_LABELS[meetingDetailPopup.reason] || meetingDetailPopup.reason],
-                        ["Not", meetingDetailPopup.note || "—"],
-                        ["Durum", meetingDetailPopup.status === "accepted" ? "Kabul Edildi" : meetingDetailPopup.status === "rejected" ? "Reddedildi" : "Bekliyor"],
-                      ].map(([k, v]) => (
-                        <div className="card-row" key={k}><span>{k}</span><strong>{v}</strong></div>
-                      ))}
-                      <button className="primary-btn" style={{ marginTop: 16, width: "100%" }} onClick={() => setMeetingDetailPopup(null)}>Kapat</button>
+
+                      <hr style={{ border: "none", borderTop: "1px solid rgba(109,40,217,0.08)", margin: "0 0 16px" }} />
+
+                      {/* Durum badge */}
+                      {(() => {
+                        const s = meetingDetailPopup.status;
+                        const map = {
+                          pending: { bg: "rgba(234,179,8,0.1)", color: "#854d0e", label: "Bekliyor" },
+                          accepted: { bg: "rgba(34,197,94,0.1)", color: "#166534", label: "Kabul Edildi" },
+                          rejected: { bg: "rgba(239,68,68,0.1)", color: "#7f1d1d", label: "Reddedildi" },
+                        };
+                        const st = map[s] || map.pending;
+                        return (
+                          <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+                            <span style={{ background: st.bg, color: st.color, borderRadius: 8, padding: "5px 18px", fontWeight: 700, fontSize: "0.85rem" }}>
+                              {st.label}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Not */}
+                      {meetingDetailPopup.note && meetingDetailPopup.note !== "—" && (
+                        <div style={{ background: "rgba(109,40,217,0.04)", border: "1px solid rgba(109,40,217,0.1)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#374151" }}>
+                          <span style={{ fontWeight: 600, color: "#6d28d9" }}>Not: </span>
+                          {meetingDetailPopup.note}
+                        </div>
+                      )}
+
+                      <button className="primary-btn" style={{ marginTop: 8, width: "100%" }} onClick={() => setMeetingDetailPopup(null)}>Kapat</button>
                     </div>
                   </div>
                 )}
@@ -4492,97 +4542,106 @@ function App() {
       )}
 
       {selectedReservation && (
-        <div className="popup-overlay">
-          <div className="popup-box">
-            <h2>Rezervasyon Detayları</h2>
+        <div className="popup-overlay" onClick={() => setSelectedReservation(null)}>
+          <div className="popup-box" onClick={e => e.stopPropagation()} style={{ padding: "28px 28px 24px" }}>
 
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", margin: "12px 0 18px" }}>
-              <span style={{ background: "rgba(109,40,217,0.1)", color: "#6d28d9", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.95rem" }}>
+            {/* Başlık + gönderilme zamanı */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1a1a2e" }}>Rezervasyon</h2>
+              {selectedReservation.createdAt && (
+                <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500, lineHeight: 1.4, textAlign: "right" }}>
+                  Gönderildi<br/>
+                  <strong style={{ color: "#6b7280" }}>
+                    {(() => { const d = new Date(selectedReservation.createdAt); return `${d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} ${d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}`; })()}
+                  </strong>
+                </span>
+              )}
+            </div>
+
+            {/* İsim + iletişim */}
+            <div style={{ textAlign: "center", marginBottom: 18 }}>
+              <div style={{ fontSize: "1.45rem", fontWeight: 800, color: "#1a1a2e", marginBottom: 5 }}>
+                {selectedReservation.fullName}
+              </div>
+              <div style={{ fontSize: 13, color: "#6b7280", display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                <span>{selectedReservation.email}</span>
+                <span>·</span>
+                <span>{selectedReservation.phone}</span>
+              </div>
+            </div>
+
+            {/* Önemli bilgi chipler: tarih, saat, kişi sayısı */}
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 20 }}>
+              <span style={{ background: "rgba(109,40,217,0.12)", color: "#5b21b6", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
                 📅 {formatDate(selectedReservation.date)}
               </span>
-              <span style={{ background: "rgba(109,40,217,0.1)", color: "#6d28d9", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.95rem" }}>
+              <span style={{ background: "rgba(109,40,217,0.12)", color: "#5b21b6", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
                 🕐 {selectedReservation.time}
+              </span>
+              <span style={{ background: "rgba(34,197,94,0.12)", color: "#166534", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
+                👥 {selectedReservation.guests} kişi
               </span>
             </div>
 
-            <div className="card-row">
-              <span>İsim</span>
-              <strong>{selectedReservation.fullName}</strong>
+            <hr style={{ border: "none", borderTop: "1px solid rgba(109,40,217,0.08)", margin: "0 0 16px" }} />
+
+            {/* Durum badge */}
+            {(() => {
+              const s = selectedReservation.status;
+              const map = {
+                pending: { bg: "rgba(234,179,8,0.1)", color: "#854d0e", label: "Bekliyor" },
+                accepted: { bg: "rgba(34,197,94,0.1)", color: "#166534", label: "Kabul Edildi" },
+                rejected: { bg: "rgba(239,68,68,0.1)", color: "#7f1d1d", label: "Reddedildi" },
+                completed: { bg: "rgba(109,40,217,0.1)", color: "#4c1d95", label: "Tamamlandı" },
+              };
+              const st = map[s] || map.pending;
+              return (
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+                  <span style={{ background: st.bg, color: st.color, borderRadius: 8, padding: "5px 18px", fontWeight: 700, fontSize: "0.85rem" }}>
+                    {st.label}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Güven puanı + kod */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <div style={{ flex: 1, background: "rgba(0,0,0,0.03)", borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>Güven Puanı</div>
+                <div style={{ fontWeight: 700, color: "#1a1a2e" }}>{selectedReservation.safeScore ?? 100}/100</div>
+              </div>
+              <div style={{ flex: 1, background: "rgba(0,0,0,0.03)", borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>Rezervasyon Kodu</div>
+                <div style={{ fontWeight: 700, color: "#7c3aed" }}>{selectedReservation.code}</div>
+              </div>
             </div>
 
-            <div className="card-row">
-              <span>E-posta</span>
-              <strong>{selectedReservation.email}</strong>
+            {/* Profil bilgileri */}
+            <div style={{ background: "rgba(0,0,0,0.025)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px" }}>
+                {[
+                  ["Cinsiyet", selectedReservation.customerProfile?.gender],
+                  ["Doğum Tarihi", selectedReservation.customerProfile?.birthDate],
+                  ["Meslek", selectedReservation.customerProfile?.job],
+                  ["Sigara", selectedReservation.customerProfile?.smoking],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 1 }}>{k}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#374151" }}>{v || "Belirtilmedi"}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="card-row">
-              <span>Telefon</span>
-              <strong>{selectedReservation.phone}</strong>
-            </div>
+            {/* Not */}
+            {selectedReservation.note && (
+              <div style={{ background: "rgba(109,40,217,0.04)", border: "1px solid rgba(109,40,217,0.1)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#374151" }}>
+                <span style={{ fontWeight: 600, color: "#6d28d9" }}>Not: </span>
+                {selectedReservation.note}
+              </div>
+            )}
 
-            <div className="card-row">
-              <span>İşletme</span>
-              <strong>{selectedReservation.business}</strong>
-            </div>
-
-            <div className="card-row">
-              <span>Misafir</span>
-              <strong>{selectedReservation.guests}</strong>
-            </div>
-
-            <div className="card-row">
-              <span>Durum</span>
-              <strong>{selectedReservation.status}</strong>
-            </div>
-            <div className="card-row">
-              <span>Güven Puanı</span>
-              <strong>{selectedReservation.safeScore ?? 100}/100</strong>
-            </div>
-            <div className="card-row">
-              <span>Rezervasyon Kodu</span>
-              <strong style={{ color: "#a855f7" }}>
-                {selectedReservation.code}
-              </strong>
-            </div>
-
-            <div className="card-row">
-              <span>Cinsiyet</span>
-              <strong>
-                {selectedReservation.customerProfile?.gender || "Belirtilmedi"}
-              </strong>
-            </div>
-
-            <div className="card-row">
-              <span>Doğum Tarihi</span>
-              <strong>
-                {selectedReservation.customerProfile?.birthDate ||
-                  "Belirtilmedi"}
-              </strong>
-            </div>
-
-            <div className="card-row">
-              <span>Meslek</span>
-              <strong>
-                {selectedReservation.customerProfile?.job || "Belirtilmedi"}
-              </strong>
-            </div>
-
-            <div className="card-row">
-              <span>Sigara ve Türevleri</span>
-              <strong>
-                {selectedReservation.customerProfile?.smoking || "Belirtilmedi"}
-              </strong>
-            </div>
-            <div className="card-row">
-              <span>Not</span>
-              <strong>{selectedReservation.note || "Not yok"}</strong>
-            </div>
-
-            <button
-              className="primary-btn"
-              style={{ marginTop: "20px" }}
-              onClick={() => setSelectedReservation(null)}
-            >
+            <button className="primary-btn" style={{ marginTop: 8, width: "100%" }} onClick={() => setSelectedReservation(null)}>
               Kapat
             </button>
           </div>
