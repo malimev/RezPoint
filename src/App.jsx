@@ -230,6 +230,7 @@ function App() {
   const [bizLoginLocked, setBizLoginLocked] = useState(false);
   const [adminLoginAttempts, setAdminLoginAttempts] = useState(0);
   const [adminLoginLocked, setAdminLoginLocked] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [accountNewEmail, setAccountNewEmail] = useState("");
@@ -868,6 +869,7 @@ function App() {
 
     setAdminError("");
     setAdminLoginAttempts(0);
+    setAdminPassword(adminLogin.password);
     setPage("adminPanel");
     supabase.from("business_types").select("*").order("name").then(({ data: bt }) => {
       if (bt) setAdminBizTypes(bt);
@@ -2570,36 +2572,30 @@ function App() {
                       return;
                     }
 
-                    const { data, error } = await supabase
-                      .from("businesses")
-                      .insert([
-                        {
-                          name: newBusinessForm.name,
-                          email: newBusinessForm.email,
-                          password: newBusinessForm.password,
-                          type: newBusinessForm.type || "Business",
-                          location: newBusinessForm.location || "",
-                          icon: newBusinessForm.icon || "🏢",
-                          reservation_enabled: true,
-                          ai_menu_enabled: false,
-                        },
-                      ])
-                      .select();
+                    const { data: newId, error } = await supabase.rpc("admin_add_business", {
+                      p_admin_password: adminPassword,
+                      p_name: newBusinessForm.name,
+                      p_email: newBusinessForm.email,
+                      p_password: newBusinessForm.password,
+                      p_type: newBusinessForm.type || "Business",
+                      p_location: newBusinessForm.location || "",
+                      p_icon: newBusinessForm.icon || "🏢",
+                    });
 
-                    if (error) {
+                    if (error || !newId) {
                       console.log("Add business error:", error);
-                      alert("Business eklenirken hata oldu.");
+                      alert("Business eklenirken hata oldu: " + (error?.message || "Bilinmeyen hata"));
                       return;
                     }
 
-                    const addedBusiness = data[0];
+                    const addedBusiness = { id: newId };
 
                     const formattedBusiness = {
-                      id: addedBusiness.id,
-                      name: addedBusiness.name,
-                      email: addedBusiness.email,
-                      reservationActive: addedBusiness.reservation_enabled,
-                      aiMenuActive: addedBusiness.ai_menu_enabled,
+                      id: newId,
+                      name: newBusinessForm.name,
+                      email: newBusinessForm.email,
+                      reservationActive: true,
+                      aiMenuActive: false,
                       menuText: "",
                       description: "",
                       menu: "",
@@ -2806,8 +2802,8 @@ function App() {
                           style={{ fontSize: 12, padding: "6px 12px" }}
                           onClick={async () => {
                             if (!window.confirm(`${business.name} silinsin mi? Rezervasyonlar da silinecek.`)) return;
-                            const { error } = await supabase.from("businesses").delete().eq("id", business.id);
-                            if (error) { alert("Silinemedi."); return; }
+                            const { error } = await supabase.rpc("admin_delete_business", { p_admin_password: adminPassword, p_business_id: business.id });
+                            if (error) { alert("Silinemedi: " + error.message); return; }
                             if (business.logoUrl) supabase.storage.from("business-logos").remove([`${business.id}/logo.jpg`]);
                             setAdminBusinesses(adminBusinesses.filter(item => item.id !== business.id));
                             setReservations(reservations.filter(rez => rez.businessId !== business.id));
