@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import "./App.css";
 import logo from "./assets/logo.png";
 import { supabase } from "./supabaseClient";
+import translations from "./i18n";
 
 function Spinner() {
   return <span className="spinner" />;
@@ -166,6 +167,8 @@ function App() {
   const [availableSlotsForDate, setAvailableSlotsForDate] = useState(null);
   const [savedMessage, setSavedMessage] = useState("");
   const [afterLoginReturnPage, setAfterLoginReturnPage] = useState(null);
+  const [lang, setLang] = useState(() => localStorage.getItem("rp_lang") || "tr");
+  const t = translations[lang];
 
   const [selectedAcceptedDate, setSelectedAcceptedDate] = useState("");
   const [selectedReservation, setSelectedReservation] = useState(null);
@@ -990,7 +993,7 @@ function App() {
               setMobileMenuOpen(false);
             }}
           >
-            Rezervasyon Oluştur
+            {t.nav.makeReservation}
           </button>
 
           <button
@@ -1001,11 +1004,10 @@ function App() {
               } else {
                 setPage("customerAuth");
               }
-
               setMobileMenuOpen(false);
             }}
           >
-            {loggedCustomer ? "Hesabım" : "Müşteri Girişi"}
+            {loggedCustomer ? t.nav.myAccount : t.nav.customerLogin}
           </button>
 
           <button
@@ -1015,7 +1017,7 @@ function App() {
               setMobileMenuOpen(false);
             }}
           >
-            İşletme Girişi
+            {t.nav.businessLogin}
           </button>
 
           <button
@@ -1025,7 +1027,19 @@ function App() {
               setMobileMenuOpen(false);
             }}
           >
-            İletişim
+            {t.nav.contact}
+          </button>
+
+          <button
+            className="nav-button lang-toggle"
+            onClick={() => {
+              const next = lang === "tr" ? "en" : "tr";
+              setLang(next);
+              localStorage.setItem("rp_lang", next);
+              setMobileMenuOpen(false);
+            }}
+          >
+            {lang === "tr" ? "🇬🇧 EN" : "🇹🇷 TR"}
           </button>
         </div>
       </nav>
@@ -1041,26 +1055,22 @@ function App() {
         <>
         <section className="hero">
           <div className="hero-text">
-            <h1>Modern işletmeler için akıllı rezervasyon ve randevu.</h1>
-            <p className="description">
-              Konum ve zaman seç, müsait işletmeleri gör — saniyeler içinde rezervasyon oluştur.
-            </p>
+            <h1>{t.hero.headline}</h1>
+            <p className="description">{t.hero.subheadline}</p>
 
             <div className="search-panel">
-              {/* Konum — her zaman görünür */}
               <div className="search-field search-loc-row">
-                <label className="search-label">📍 Konum</label>
+                <label className="search-label">📍 {t.hero.location}</label>
                 <select className="search-select" value={searchLocation} onChange={(e) => setSearchLocation(e.target.value)}>
-                  <option value="Hepsi">Hepsi</option>
+                  <option value="Hepsi">{t.hero.locationAll}</option>
                   <option value="İskele">İskele</option>
                   <option value="Mağusa">Mağusa</option>
                 </select>
               </div>
 
-              {/* Masaüstü: date input + time select */}
               <div className="search-fields search-desktop-only">
                 <div className="search-field">
-                  <label className="search-label">📅 Tarih</label>
+                  <label className="search-label">📅 {t.hero.date}</label>
                   <input type="date" className="search-input" value={searchDate}
                     onChange={(e) => setSearchDate(e.target.value)}
                     min={new Date().toISOString().split("T")[0]}
@@ -1068,173 +1078,152 @@ function App() {
                   />
                 </div>
                 <div className="search-field">
-                  <label className="search-label">🕐 Saat</label>
+                  <label className="search-label">🕐 {t.hero.time}</label>
                   <select className="search-select" value={searchTime} onChange={(e) => setSearchTime(e.target.value)}>
-                    <option value="">Fark etmez</option>
-                    {ALL_TIME_SLOTS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    <option value="">{t.hero.timeAny}</option>
+                    {ALL_TIME_SLOTS.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
                   </select>
                 </div>
               </div>
 
-              {/* Mobil: yatay kaydırılabilir gün + saat stripları */}
               <div className="search-mobile-only">
-                <label className="search-label" style={{ display: "block", marginBottom: 8 }}>📅 Tarih</label>
+                <label className="search-label" style={{ display: "block", marginBottom: 8 }}>📅 {t.hero.date}</label>
                 <div className="home-date-strip">
                   <button
                     className={!searchDate ? "home-strip-btn active" : "home-strip-btn"}
                     onClick={() => setSearchDate("")}>
-                    <span className="strip-day">Hep</span>
-                    <span className="strip-date">si</span>
+                    <span className="strip-day">{t.hero.dayAll[0]}</span>
+                    <span className="strip-date">{t.hero.dayAll[1]}</span>
                   </button>
                   {Array.from({ length: 30 }, (_, i) => {
                     const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
                     const fullDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                    const locale = lang === "en" ? "en-GB" : "tr-TR";
                     return (
                       <button key={fullDate}
                         className={searchDate === fullDate ? "home-strip-btn active" : "home-strip-btn"}
                         onClick={() => setSearchDate(fullDate)}>
-                        <span className="strip-day">{d.toLocaleDateString("tr-TR",{weekday:"short"})}</span>
-                        <span className="strip-date">{d.toLocaleDateString("tr-TR",{day:"2-digit",month:"short"})}</span>
+                        <span className="strip-day">{d.toLocaleDateString(locale,{weekday:"short"})}</span>
+                        <span className="strip-date">{d.toLocaleDateString(locale,{day:"2-digit",month:"short"})}</span>
                       </button>
                     );
                   })}
                 </div>
-                <label className="search-label" style={{ display: "block", margin: "14px 0 8px" }}>🕐 Saat</label>
+                <label className="search-label" style={{ display: "block", margin: "14px 0 8px" }}>🕐 {t.hero.time}</label>
                 <div className="home-time-strip">
-                  <button className={!searchTime ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => setSearchTime("")}>Hepsi</button>
-                  {ALL_TIME_SLOTS.map(t => (
-                    <button key={t} className={searchTime === t ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => setSearchTime(t)}>{t}</button>
+                  <button className={!searchTime ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => setSearchTime("")}>{t.hero.timeAll}</button>
+                  {ALL_TIME_SLOTS.map(slot => (
+                    <button key={slot} className={searchTime === slot ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => setSearchTime(slot)}>{slot}</button>
                   ))}
                 </div>
               </div>
 
               <button className="search-btn" onClick={() => setPage("businesses")}>
-                {searchDate
-                  ? `${formatDate(searchDate)}${searchTime ? ` saat ${searchTime}` : ""} için müsait işletmeleri gör`
-                  : "Tüm işletmeleri gör"}
+                {t.hero.searchBtn(searchDate, searchTime, formatDate)}
               </button>
             </div>
           </div>
 
           <div className="hero-card">
-            <h3>Nasıl çalışır?</h3>
-            <div className="card-row">
-              <span>1</span>
-              <strong>Giriş yap veya hesap oluştur</strong>
-            </div>
-            <div className="card-row">
-              <span>2</span>
-              <strong>İşletme seç</strong>
-            </div>
-            <div className="card-row">
-              <span>3</span>
-              <strong>İstek gönder</strong>
-            </div>
+            <h3>{t.hero.howItWorks}</h3>
+            <div className="card-row"><span>1</span><strong>{t.hero.step1}</strong></div>
+            <div className="card-row"><span>2</span><strong>{t.hero.step2}</strong></div>
+            <div className="card-row"><span>3</span><strong>{t.hero.step3}</strong></div>
           </div>
         </section>
 
-        {/* ── Nasıl Çalışır? ── */}
         <section className="lp-section">
           <div className="lp-section-header lp-animate">
-            <h2>Üç adımda rezervasyon</h2>
-            <p>Hesap oluştur, işletme seç, yerinizi anında ayırt.</p>
+            <h2>{t.landing.stepsTitle}</h2>
+            <p>{t.landing.stepsSub}</p>
           </div>
           <div className="lp-steps-grid">
             <div className="lp-step lp-animate" style={{ transitionDelay: "0.05s" }}>
               <div className="lp-step-num">1</div>
               <div className="lp-step-icon">🔍</div>
-              <h3>İşletme Seç</h3>
-              <p>Konumuna ve saatine göre müsait işletmeleri filtrele, beğendiğini seç.</p>
+              <h3>{t.landing.step1Title}</h3>
+              <p>{t.landing.step1Desc}</p>
             </div>
             <div className="lp-step lp-animate" style={{ transitionDelay: "0.15s" }}>
               <div className="lp-step-num">2</div>
               <div className="lp-step-icon">📋</div>
-              <h3>İstek Gönder</h3>
-              <p>Tarih, saat ve kişi sayısını gir. Rezervasyon talebini saniyeler içinde gönder.</p>
+              <h3>{t.landing.step2Title}</h3>
+              <p>{t.landing.step2Desc}</p>
             </div>
             <div className="lp-step lp-animate" style={{ transitionDelay: "0.25s" }}>
               <div className="lp-step-num">3</div>
               <div className="lp-step-icon">✅</div>
-              <h3>Onay Al</h3>
-              <p>İşletme talebini kabul ettiğinde anında bildirim alırsın. Hepsi bu kadar.</p>
+              <h3>{t.landing.step3Title}</h3>
+              <p>{t.landing.step3Desc}</p>
             </div>
           </div>
         </section>
 
-        {/* ── Neden RezPoint? ── */}
         <section className="lp-section">
           <div className="lp-section-header lp-animate">
-            <h2>Neden RezPoint?</h2>
-            <p>Sadece rezervasyon değil, tam bir deneyim.</p>
+            <h2>{t.landing.whyTitle}</h2>
+            <p>{t.landing.whySub}</p>
           </div>
           <div className="lp-features-grid">
             <div className="lp-feature lp-animate" style={{ transitionDelay: "0.05s" }}>
               <div className="lp-feature-icon">🛡️</div>
-              <h3>SafeScore</h3>
-              <p>Rezervasyon geçmişine göre güven puanı. İşletmeler güvenilir müşterileri önceliklendirir.</p>
+              <h3>{t.landing.feat1Title}</h3>
+              <p>{t.landing.feat1Desc}</p>
             </div>
             <div className="lp-feature lp-animate" style={{ transitionDelay: "0.12s" }}>
               <div className="lp-feature-icon">⚡</div>
-              <h3>Anlık Onay</h3>
-              <p>Beklemek yok. İşletmeler talebini gerçek zamanlı kabul eder, sen anında haberdar olursun.</p>
+              <h3>{t.landing.feat2Title}</h3>
+              <p>{t.landing.feat2Desc}</p>
             </div>
             <div className="lp-feature lp-animate" style={{ transitionDelay: "0.19s" }}>
               <div className="lp-feature-icon">💎</div>
-              <h3>Sadakat Puanı</h3>
-              <p>Her onaylı rezervasyona puan kazan. Düzenli müşteriler özel avantajlardan faydalanır.</p>
+              <h3>{t.landing.feat3Title}</h3>
+              <p>{t.landing.feat3Desc}</p>
             </div>
           </div>
         </section>
 
-        {/* ── Değer önerileri ── */}
         <section className="lp-section">
           <div className="lp-props-grid">
             <div className="lp-prop lp-animate" style={{ transitionDelay: "0.05s" }}>
               <div className="lp-prop-icon">⏱️</div>
-              <div className="lp-prop-title">Sıfır Bekleme</div>
-              <div className="lp-prop-desc">Telefon bekleme, e-posta gönderme yok. Anında rezervasyon.</div>
+              <div className="lp-prop-title">{t.landing.prop1Title}</div>
+              <div className="lp-prop-desc">{t.landing.prop1Desc}</div>
             </div>
             <div className="lp-prop lp-animate" style={{ transitionDelay: "0.15s" }}>
               <div className="lp-prop-icon">📱</div>
-              <div className="lp-prop-title">%100 Dijital</div>
-              <div className="lp-prop-desc">Kağıt, kalem, telefon yok. Her şey tek ekranda, her cihazdan.</div>
+              <div className="lp-prop-title">{t.landing.prop2Title}</div>
+              <div className="lp-prop-desc">{t.landing.prop2Desc}</div>
             </div>
             <div className="lp-prop lp-animate" style={{ transitionDelay: "0.25s" }}>
               <div className="lp-prop-icon">🔒</div>
-              <div className="lp-prop-title">Güvenli Altyapı</div>
-              <div className="lp-prop-desc">Verilerın şifreli, hesabın korumalı. Gizliliğine saygı duyuyoruz.</div>
+              <div className="lp-prop-title">{t.landing.prop3Title}</div>
+              <div className="lp-prop-desc">{t.landing.prop3Desc}</div>
             </div>
           </div>
         </section>
 
-        {/* ── Final CTA ── */}
         <section className="lp-cta-section lp-animate">
-          <h2>Rezervasyonunuzu şimdi oluşturun</h2>
-          <p>Saniyeler içinde kaydol, müsait işletmeleri gör, yerinizi ayırtın.</p>
-          <button className="lp-cta-btn" onClick={() => setPage("businesses")}>
-            Hemen Başla →
-          </button>
+          <h2>{t.landing.ctaTitle}</h2>
+          <p>{t.landing.ctaSub}</p>
+          <button className="lp-cta-btn" onClick={() => setPage("businesses")}>{t.landing.ctaBtn}</button>
         </section>
         </>
       )}
 
       {page === "businesses" && (
         <section className="business-section">
-          <button className="back-btn" onClick={() => setPage("home")}>
-            ← Geri
-          </button>
+          <button className="back-btn" onClick={() => setPage("home")}>{t.businesses.back}</button>
 
-          <h1>İşletme Seç</h1>
-          <p className="description">
-            Rezervasyon oluşturmak istediğin işletmeyi seç.
-          </p>
+          <h1>{t.businesses.title}</h1>
+          <p className="description">{t.businesses.subtitle}</p>
 
           <div className="business-search-wrapper">
             <span className="business-search-icon">🔍</span>
             <input
               className="business-search-input"
               type="text"
-              placeholder="İşletme ara..."
+              placeholder={t.businesses.searchPlaceholder}
               value={businessSearch}
               onChange={(e) => setBusinessSearch(e.target.value)}
             />
@@ -1252,7 +1241,7 @@ function App() {
                 className="search-chip-clear"
                 onClick={() => { setSearchLocation("Hepsi"); setSearchDate(""); setSearchTime(""); }}
               >
-                ✕ Filtreyi Temizle
+                {t.businesses.clearFilter}
               </button>
             </div>
           )}
@@ -1303,7 +1292,7 @@ function App() {
                         className="bc-select-btn"
                         onClick={(e) => { e.stopPropagation(); openReservationForm(business); }}
                       >
-                        Rezervasyon Yap <span className="bc-arrow">→</span>
+                        {t.businesses.reserveBtn} <span className="bc-arrow">→</span>
                       </button>
                     )}
                     {business.meetingEnabled && business.meetingDates?.length > 0 && (
@@ -1318,7 +1307,7 @@ function App() {
                           setPage("meetingRequest");
                         }}
                       >
-                        📅 Randevu İste
+                        {t.businesses.meetingBtn}
                       </button>
                     )}
                   </div>
@@ -1339,7 +1328,7 @@ function App() {
               return true;
             }).length === 0 && (
               <p className="description" style={{ gridColumn: "1/-1" }}>
-                {businessSearch ? `"${businessSearch}" için` : "Seçili filtrelerle eşleşen"} işletme bulunamadı.
+                {t.businesses.noResults(businessSearch)}{t.businesses.noResultsSuffix}
               </p>
             )}
           </div>
@@ -1348,9 +1337,7 @@ function App() {
 
       {page === "reservation" && selectedBusiness && (
         <section className="reservation-section">
-          <button className="back-btn" onClick={() => setPage("businesses")}>
-            ← Geri
-          </button>
+          <button className="back-btn" onClick={() => setPage("businesses")}>{t.reservation.back}</button>
 
           <div className="reservation-box">
             <h1>{selectedBusiness.name}</h1>
@@ -1362,8 +1349,8 @@ function App() {
               <div className="email-verify-warning">
                 <span>⚠️</span>
                 <div>
-                  <strong>E-postanız doğrulanmamış</strong>
-                  <p>Rezervasyon oluşturmak için e-posta adresinizi doğrulayın.</p>
+                  <strong>{t.reservation.emailNotVerified}</strong>
+                  <p>{t.reservation.emailNotVerifiedDesc}</p>
                 </div>
                 <button
                   type="button"
@@ -1373,34 +1360,32 @@ function App() {
                     alert("Doğrulama maili gönderildi!");
                   }}
                 >
-                  📧 Tekrar Gönder
+                  {t.reservation.resendEmail}
                 </button>
               </div>
             )}
 
             <form className="reservation-form">
-              {/* Ad & E-posta: giriş yapıldıysa otomatik, yapılmadıysa hint */}
               {loggedCustomer ? (
                 <div className="rez-info-row">
                   <div className="rez-info-item">
-                    <span className="rez-info-label">İsim</span>
+                    <span className="rez-info-label">{t.reservation.nameLabel}</span>
                     <span className="rez-info-value">{loggedCustomer.name}</span>
                   </div>
                   <div className="rez-info-item">
-                    <span className="rez-info-label">E-posta</span>
+                    <span className="rez-info-label">{t.reservation.emailLabel}</span>
                     <span className="rez-info-value">{loggedCustomer.email}</span>
                   </div>
                 </div>
               ) : (
                 <div style={{ background: "rgba(109,40,217,0.05)", border: "1px dashed rgba(109,40,217,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 4, fontSize: 13, color: "#6b7280" }}>
-                  İsim ve e-posta bilgileriniz gönderirken giriş yapmanız istenenecek
+                  {t.reservation.loginHint}
                 </div>
               )}
 
-              {/* Tarih + Saat yan yana strip */}
               <div className="date-time-row">
                 <div className="strip-section">
-                  <div className="strip-label">📅 Tarih</div>
+                  <div className="strip-label">{t.reservation.dateLabel}</div>
                   <div className="strip-scroll-wrap">
                     <button type="button" className="strip-arrow" onClick={() => dateStripRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
                     <div className="date-strip" ref={dateStripRef}>
@@ -1421,7 +1406,7 @@ function App() {
                 </div>
 
                 <div className="strip-section">
-                  <div className="strip-label">🕐 Saat</div>
+                  <div className="strip-label">{t.reservation.timeLabel}</div>
                   <div className="strip-scroll-wrap">
                     <button type="button" className="strip-arrow" onClick={() => timeStripRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
                     <div className="time-strip" ref={timeStripRef}>
@@ -1438,63 +1423,27 @@ function App() {
                 </div>
               </div>
 
-              {/* Kişi sayısı */}
-              <input
-                name="guests"
-                value={reservation.guests}
-                onChange={handleChange}
-                type="number"
-                placeholder="👥 Kişi sayısı (1-20)"
-                min="1"
-                max="20"
-              />
-
-              {/* Telefon */}
-              <input
-                name="phone"
-                value={reservation.phone}
-                onChange={handleChange}
-                type="tel"
-                placeholder="📞 Telefon numarası"
-              />
-
-              {/* Not */}
-              <textarea
-                name="note"
-                value={reservation.note}
-                onChange={handleChange}
-                placeholder="📝 Not, masa tercihi veya özel istek (opsiyonel)"
-              />
+              <input name="guests" value={reservation.guests} onChange={handleChange} type="number" placeholder={t.reservation.guestsPlaceholder} min="1" max="20" />
+              <input name="phone" value={reservation.phone} onChange={handleChange} type="tel" placeholder={t.reservation.phonePlaceholder} />
+              <textarea name="note" value={reservation.note} onChange={handleChange} placeholder={t.reservation.notePlaceholder} />
 
               {error && <p className="error-message">{error}</p>}
 
               <div className="rez-terms-checks">
                 <label className="rez-terms-label">
-                  <input
-                    type="checkbox"
-                    checked={termsChecked.biz}
-                    onChange={e => setTermsChecked(p => ({ ...p, biz: e.target.checked }))}
-                  />
+                  <input type="checkbox" checked={termsChecked.biz} onChange={e => setTermsChecked(p => ({ ...p, biz: e.target.checked }))} />
                   <span className="rez-check-box">{termsChecked.biz ? "✓" : ""}</span>
                   <span>
-                    <button type="button" className="terms-link" onClick={() => setTermsModal("biz")}>
-                      İşletme Koşulları
-                    </button>
-                    'nı okudum ve kabul ediyorum
+                    <button type="button" className="terms-link" onClick={() => setTermsModal("biz")}>{t.reservation.bizTerms}</button>
+                    {t.reservation.termsAccept}
                   </span>
                 </label>
                 <label className="rez-terms-label">
-                  <input
-                    type="checkbox"
-                    checked={termsChecked.rp}
-                    onChange={e => setTermsChecked(p => ({ ...p, rp: e.target.checked }))}
-                  />
+                  <input type="checkbox" checked={termsChecked.rp} onChange={e => setTermsChecked(p => ({ ...p, rp: e.target.checked }))} />
                   <span className="rez-check-box">{termsChecked.rp ? "✓" : ""}</span>
                   <span>
-                    <button type="button" className="terms-link" onClick={() => setTermsModal("rp")}>
-                      RezPoint Koşulları
-                    </button>
-                    'nı okudum ve kabul ediyorum
+                    <button type="button" className="terms-link" onClick={() => setTermsModal("rp")}>{t.reservation.rpTerms}</button>
+                    {t.reservation.termsAccept}
                   </span>
                 </label>
               </div>
@@ -1505,22 +1454,14 @@ function App() {
                   const disabled = !emailVerified || formIncomplete;
                   return (
                     <button type="button" disabled={disabled} onClick={sendReservation} style={{ opacity: disabled ? 0.5 : 1 }}>
-                      Rezervasyon İsteği Gönder →
+                      {t.reservation.submitBtn}
                     </button>
                   );
                 }
                 return (
-                  <button
-                    type="button"
-                    disabled={formIncomplete}
-                    style={{ opacity: formIncomplete ? 0.5 : 1 }}
-                    onClick={() => {
-                      setAfterLoginReturnPage("reservation");
-                      setCustomerMode("login");
-                      setPage("customerAuth");
-                    }}
-                  >
-                    Giriş Yap ve Gönder →
+                  <button type="button" disabled={formIncomplete} style={{ opacity: formIncomplete ? 0.5 : 1 }}
+                    onClick={() => { setAfterLoginReturnPage("reservation"); setCustomerMode("login"); setPage("customerAuth"); }}>
+                    {t.reservation.loginAndSend}
                   </button>
                 );
               })()}
@@ -1539,7 +1480,7 @@ function App() {
                         : (rpTerms || "Henüz koşul eklenmemiş.")}
                     </div>
                     <button type="button" className="primary-btn" style={{ marginTop: 16 }} onClick={() => setTermsModal(null)}>
-                      Kapat
+                      {t.common.close}
                     </button>
                   </div>
                 </div>
@@ -1552,40 +1493,40 @@ function App() {
       {page === "summary" && selectedBusiness && loggedCustomer && (
         <section className="reservation-section">
           <div className="reservation-box">
-            <h1>Rezervasyon Özeti</h1>
-            <p className="description">İsteğiniz oluşturuldu.</p>
+            <h1>{t.reservation.summaryTitle}</h1>
+            <p className="description">{t.reservation.summaryDesc}</p>
 
             <div className="card-row">
-              <span>İşletme</span>
+              <span>{t.reservation.fieldBusiness}</span>
               <strong>{selectedBusiness.name}</strong>
             </div>
             <div className="card-row">
-              <span>İsim</span>
+              <span>{t.reservation.fieldName}</span>
               <strong>{loggedCustomer.name}</strong>
             </div>
             <div className="card-row">
-              <span>E-posta</span>
+              <span>{t.reservation.fieldEmail}</span>
               <strong>{loggedCustomer.email}</strong>
             </div>
             <div className="card-row">
-              <span>Telefon</span>
+              <span>{t.reservation.fieldPhone}</span>
               <strong>{reservation.phone}</strong>
             </div>
             <div className="card-row">
-              <span>Tarih</span>
+              <span>{t.reservation.fieldDate}</span>
               <strong>{formatDate(reservation.date)}</strong>
             </div>
             <div className="card-row">
-              <span>Saat</span>
+              <span>{t.reservation.fieldTime}</span>
               <strong>{reservation.time}</strong>
             </div>
             <div className="card-row">
-              <span>Misafir</span>
+              <span>{t.reservation.fieldGuests}</span>
               <strong>{reservation.guests}</strong>
             </div>
             <div className="card-row">
-              <span>Not</span>
-              <strong>{reservation.note || "Not yok"}</strong>
+              <span>{t.reservation.fieldNote}</span>
+              <strong>{reservation.note || t.reservation.noNote}</strong>
             </div>
 
             <button
@@ -1668,9 +1609,7 @@ function App() {
                 setPage("success");
               }}
             >
-              {isCreatingReservation
-                ? "Oluşturuluyor..."
-                : "Onayla ve Gönder"}
+              {isCreatingReservation ? t.reservation.confirming : t.reservation.confirmBtn}
             </button>
           </div>
         </section>
@@ -1679,21 +1618,14 @@ function App() {
       {page === "success" && selectedBusiness && loggedCustomer && (
         <section className="reservation-section">
           <div className="reservation-box">
-            <h1>Rezervasyon Gönderildi ✅</h1>
+            <h1>{t.reservation.successTitle}</h1>
 
-            <p className="description">
-              Rezervasyon isteğiniz {selectedBusiness.name} işletmesine gönderildi.
-              İşletme isteğinizi inceleyecek.
-            </p>
+            <p className="description">{t.reservation.successDesc}</p>
 
             <div className="card-row">
-              <span>Rezervasyon Kodu</span>
+              <span>{t.popup.fieldCode}</span>
               <strong>{reservationCode}</strong>
             </div>
-
-            <p className="description">
-              Rezervasyon kodu şuraya gönderildi: <strong>{loggedCustomer.email}</strong>
-            </p>
 
             <button
               className="primary-btn"
@@ -1710,7 +1642,7 @@ function App() {
                 setPage("customerDashboard");
               }}
             >
-              Rezervasyonlarıma Git
+              {t.reservation.goToReservations}
             </button>
           </div>
         </section>
@@ -1762,42 +1694,26 @@ function App() {
             )}
 
             <h1>
-              {customerMode === "login" ? "Müşteri Girişi" : "Hesap Oluştur"}
+              {customerMode === "login" ? t.nav.customerLogin : t.auth.registerBtn}
             </h1>
 
-            <p className="description">
-              Rezervasyonlarınızı yönetmek için giriş yapın veya hesap oluşturun.
-            </p>
+            <p className="description">{t.auth.subtitle}</p>
 
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-              <button
-                className={
-                  customerMode === "login" ? "selected-time" : "time-btn"
-                }
-                type="button"
-                onClick={() => setCustomerMode("login")}
-              >
-                Giriş
+              <button className={customerMode === "login" ? "selected-time" : "time-btn"} type="button" onClick={() => setCustomerMode("login")}>
+                {t.auth.loginTab}
               </button>
-
-              <button
-                className={
-                  customerMode === "register" ? "selected-time" : "time-btn"
-                }
-                type="button"
-                onClick={() => setCustomerMode("register")}
-              >
-                Kayıt
+              <button className={customerMode === "register" ? "selected-time" : "time-btn"} type="button" onClick={() => setCustomerMode("register")}>
+                {t.auth.registerTab}
               </button>
             </div>
 
             <form className="reservation-form">
               {isPasswordRecovery ? (
                 <>
-                  <p className="description" style={{ marginBottom: 8 }}>Hesabınız için yeni şifrenizi girin.</p>
                   <input
                     type="password"
-                    placeholder="Yeni Şifre (en az 6 karakter)"
+                    placeholder={t.auth.newPasswordPlaceholder}
                     value={customerForm.password}
                     onChange={(e) => setCustomerForm({ ...customerForm, password: e.target.value })}
                   />
@@ -1807,23 +1723,13 @@ function App() {
                   {customerMode === "register" && (
                     <input
                       type="text"
-                      placeholder="Ad Soyad"
+                      placeholder={t.auth.namePlaceholder}
                       value={customerForm.name}
                       onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
                     />
                   )}
-                  <input
-                    type="email"
-                    placeholder="E-posta Adresi"
-                    value={customerForm.email}
-                    onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
-                  />
-                  <input
-                    type="password"
-                    placeholder="Şifre"
-                    value={customerForm.password}
-                    onChange={(e) => setCustomerForm({ ...customerForm, password: e.target.value })}
-                  />
+                  <input type="email" placeholder={t.auth.emailPlaceholder} value={customerForm.email} onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })} />
+                  <input type="password" placeholder={t.auth.passwordPlaceholder} value={customerForm.password} onChange={(e) => setCustomerForm({ ...customerForm, password: e.target.value })} />
                 </>
               )}
 
@@ -1943,7 +1849,7 @@ function App() {
                   }
                 }}
               >
-                  {isPasswordRecovery ? "Şifreyi Güncelle" : customerMode === "login" ? "Giriş Yap" : "Hesap Oluştur"}
+                  {isPasswordRecovery ? t.auth.updatePasswordBtn : customerMode === "login" ? t.auth.loginBtn : t.auth.registerBtn}
               </button>
               {customerMode === "login" && !isPasswordRecovery && (
                 <p style={{ textAlign: "center", marginTop: 12, fontSize: 13 }}>
@@ -1957,7 +1863,7 @@ function App() {
                       if (error) { setForgotPasswordMsg("Gönderilemedi: " + error.message); return; }
                       setForgotPasswordMsg("Şifre sıfırlama bağlantısı e-postanıza gönderildi.");
                     }}
-                  >Şifremi Unuttum</button>
+                  >{t.auth.forgotPassword}</button>
                 </p>
               )}
               {forgotPasswordMsg && (
@@ -1979,25 +1885,22 @@ function App() {
 
             {loggedCustomer ? (
               <>
-                <p className="description">Hoş geldiniz, {loggedCustomer.name} 👋</p>
-                <button
-                  className="dashboard-create-btn"
-                  onClick={goToReservationFlow}
-                >
-                  + Yeni Rezervasyon Oluştur
+                <p className="description">{t.dashboard.hello(loggedCustomer.name)} 👋</p>
+                <button className="dashboard-create-btn" onClick={goToReservationFlow}>
+                  + {t.nav.makeReservation}
                 </button>
 
                 <div className="panel-tabs">
-                  <button className={customerTab === "reservations" ? "active-tab" : ""} onClick={() => setCustomerTab("reservations")}>Rezervasyonlarım</button>
+                  <button className={customerTab === "reservations" ? "active-tab" : ""} onClick={() => setCustomerTab("reservations")}>{t.dashboard.reservationsTab}</button>
                   <button className={customerTab === "safescore" ? "active-tab" : ""} onClick={() => setCustomerTab("safescore")}>SafeScore</button>
-                  <button className={customerTab === "statistics" ? "active-tab" : ""} onClick={() => setCustomerTab("statistics")}>İstatistiklerim</button>
-                  <button className={customerTab === "loyalty" ? "active-tab" : ""} onClick={() => setCustomerTab("loyalty")}>Sadakat Puanları</button>
-                  <button className={customerTab === "profile" ? "active-tab" : ""} onClick={() => setCustomerTab("profile")}>Profil</button>
+                  <button className={customerTab === "statistics" ? "active-tab" : ""} onClick={() => setCustomerTab("statistics")}>{lang === "en" ? "My Stats" : "İstatistiklerim"}</button>
+                  <button className={customerTab === "loyalty" ? "active-tab" : ""} onClick={() => setCustomerTab("loyalty")}>{lang === "en" ? "Loyalty" : "Sadakat Puanları"}</button>
+                  <button className={customerTab === "profile" ? "active-tab" : ""} onClick={() => setCustomerTab("profile")}>{lang === "en" ? "Profile" : "Profil"}</button>
                   <button className={customerTab === "notifications" ? "active-tab" : ""} onClick={() => setCustomerTab("notifications")}>
-                    Bildirimler{customerNotifications.filter(n => !n.is_read).length > 0 && <span className="notif-count">{customerNotifications.filter(n => !n.is_read).length}</span>}
+                    {t.dashboard.notificationsTab}{customerNotifications.filter(n => !n.is_read).length > 0 && <span className="notif-count">{customerNotifications.filter(n => !n.is_read).length}</span>}
                   </button>
-                  <button className={customerTab === "meetings" ? "active-tab" : ""} onClick={() => setCustomerTab("meetings")}>📅 Randevularım</button>
-                  <button className={customerTab === "account" ? "active-tab" : ""} onClick={() => { setCustomerTab("account"); setAccountMsg({ text: "", type: "" }); setAccountNewEmail(""); setAccountNewPassword(""); setAccountNewPassword2(""); }}>⚙ Hesap Ayarları</button>
+                  <button className={customerTab === "meetings" ? "active-tab" : ""} onClick={() => setCustomerTab("meetings")}>📅 {t.dashboard.meetingsTab}</button>
+                  <button className={customerTab === "account" ? "active-tab" : ""} onClick={() => { setCustomerTab("account"); setAccountMsg({ text: "", type: "" }); setAccountNewEmail(""); setAccountNewPassword(""); setAccountNewPassword2(""); }}>⚙ {t.dashboard.accountTab}</button>
                 </div>
 
                 {/* ── Rezervasyonlarım ── */}
@@ -2065,7 +1968,7 @@ function App() {
                         ))}
                       </>}
                       {active.length === 0 && history.length === 0 && (
-                        <p className="description">Henüz rezervasyonunuz bulunmuyor.</p>
+                        <p className="description">{t.dashboard.noReservations}</p>
                       )}
                     </div>
                   );
@@ -2253,7 +2156,7 @@ function App() {
                           </div>
                         </div>
                       ))
-                      : <p className="description">Henüz bildirim yok.</p>}
+                      : <p className="description">{t.dashboard.noNotifications}</p>}
                   </div>
                 )}
 
@@ -2271,11 +2174,11 @@ function App() {
                           </div>
                           <div className="rez-item-right">
                             <span className={`status-badge ${m.status}`}>
-                              {m.status === "accepted" ? "Kabul Edildi" : m.status === "rejected" ? "Reddedildi" : "Bekliyor"}
+                              {m.status === "accepted" ? t.status.accepted : m.status === "rejected" ? t.status.rejected : t.status.pending}
                             </span>
                           </div>
                         </div>
-                      )) : <p className="description">Henüz randevu talebiniz yok.</p>}
+                      )) : <p className="description">{t.dashboard.noMeetings}</p>}
                     </div>
                   );
                 })()}
@@ -2997,10 +2900,8 @@ function App() {
         <section className="contact-page">
           <div className="contact-hero">
             <div className="contact-hero-icon">💬</div>
-            <h1>Yardıma mı İhtiyacınız Var?</h1>
-            <p className="contact-hero-desc">
-              RezPoint ile ilgili tüm soru, öneri ve destek talepleriniz için bizimle iletişime geçebilirsiniz.
-            </p>
+            <h1>{t.contact.title}</h1>
+            <p className="contact-hero-desc">{t.contact.desc}</p>
           </div>
 
           <div className="contact-cards">
@@ -3012,7 +2913,7 @@ function App() {
             >
               <div className="contact-card-icon">✉️</div>
               <div className="contact-card-body">
-                <div className="contact-card-label">E-posta</div>
+                <div className="contact-card-label">{t.contact.emailLabel}</div>
                 <div className="contact-card-value">rezpointsupport@gmail.com</div>
               </div>
               <span className="contact-card-arrow">→</span>
@@ -3035,19 +2936,15 @@ function App() {
 
           <div className="contact-business-box">
             <div className="contact-business-icon">🏢</div>
-            <h2>İşletmenizi RezPoint'e Ekleyin</h2>
-            <p>
-              İşletmenizi RezPoint ağına dahil etmek, rezervasyon süreçlerinizi dijitalleştirmek
-              ve müşterilerinizi daha yakından tanımak için bizimle iletişime geçebilirsiniz.
-              Size özel kurulum ve destek süreci için hemen yazın.
-            </p>
+            <h2>{t.contact.addBusiness}</h2>
+            <p>{t.contact.addBusinessDesc}</p>
             <a
               className="primary-btn contact-cta"
               href="mailto:rezpointsupport@gmail.com?subject=RezPoint%20İşletme%20Başvurusu"
               target="_blank"
               rel="noopener noreferrer"
             >
-              Başvuru Yap →
+              {t.contact.applyBtn}
             </a>
           </div>
 
@@ -3411,12 +3308,12 @@ function App() {
 
                       {/* Başlık + gönderilme zamanı */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-                        <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1a1a2e" }}>Randevu</h2>
+                        <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1a1a2e" }}>{t.popup.meetingTitle}</h2>
                         {meetingDetailPopup.createdAt && (
                           <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500, lineHeight: 1.4, textAlign: "right" }}>
-                            Gönderildi<br/>
+                            {t.popup.sentAt}<br/>
                             <strong style={{ color: "#6b7280" }}>
-                              {(() => { const d = new Date(meetingDetailPopup.createdAt); return `${d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} ${d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}`; })()}
+                              {(() => { const locale = lang === "en" ? "en-GB" : "tr-TR"; const d = new Date(meetingDetailPopup.createdAt); return `${d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })} ${d.toLocaleDateString(locale, { day: "2-digit", month: "2-digit" })}`; })()}
                             </strong>
                           </span>
                         )}
@@ -3456,9 +3353,9 @@ function App() {
                       {(() => {
                         const s = meetingDetailPopup.status;
                         const map = {
-                          pending: { bg: "rgba(234,179,8,0.1)", color: "#854d0e", label: "Bekliyor" },
-                          accepted: { bg: "rgba(34,197,94,0.1)", color: "#166534", label: "Kabul Edildi" },
-                          rejected: { bg: "rgba(239,68,68,0.1)", color: "#7f1d1d", label: "Reddedildi" },
+                          pending: { bg: "rgba(234,179,8,0.1)", color: "#854d0e", label: t.status.pending },
+                          accepted: { bg: "rgba(34,197,94,0.1)", color: "#166534", label: t.status.accepted },
+                          rejected: { bg: "rgba(239,68,68,0.1)", color: "#7f1d1d", label: t.status.rejected },
                         };
                         const st = map[s] || map.pending;
                         return (
@@ -3478,7 +3375,7 @@ function App() {
                         </div>
                       )}
 
-                      <button className="primary-btn" style={{ marginTop: 8, width: "100%" }} onClick={() => setMeetingDetailPopup(null)}>Kapat</button>
+                      <button className="primary-btn" style={{ marginTop: 8, width: "100%" }} onClick={() => setMeetingDetailPopup(null)}>{t.popup.close}</button>
                     </div>
                   </div>
                 )}
@@ -4356,7 +4253,7 @@ function App() {
                     setMeetingFormError("");
                     setPage("meetingRequest");
                   }}>
-                    📅 Randevu İste
+                    {t.profile.meetingBtn}
                   </button>
                 </div>
               )}
@@ -4374,20 +4271,20 @@ function App() {
             </div>
             <div className="biz-stat-item">
               <strong>{selectedBusiness.availableTimes?.length || 0}</strong>
-              <span>Zaman Dilimi</span>
+              <span>{t.profile.timezone}</span>
             </div>
           </div>
 
           {selectedBusiness.description && (
             <div className="biz-profile-section">
-              <div className="biz-profile-section-title">📋 Hakkımızda</div>
+              <div className="biz-profile-section-title">{t.profile.about}</div>
               <p className="biz-profile-text">{selectedBusiness.description}</p>
             </div>
           )}
 
           {selectedBusiness.menu && (
             <div className="biz-profile-section">
-              <div className="biz-profile-section-title">🍽 Menü</div>
+              <div className="biz-profile-section-title">{t.profile.menu}</div>
               {selectedBusiness.menu.startsWith("http")
                 ? <a href={selectedBusiness.menu} target="_blank" rel="noopener noreferrer" className="biz-profile-link">Menüyü Görüntüle →</a>
                 : <p className="biz-profile-text">{selectedBusiness.menu}</p>}
@@ -4395,17 +4292,17 @@ function App() {
           )}
 
           <div className="biz-profile-section">
-            <div className="biz-profile-section-title">🕐 Müsait Saatler</div>
+            <div className="biz-profile-section-title">{t.profile.times}</div>
             <div className="biz-profile-times">
-              {(selectedBusiness.availableTimes || []).map(t => (
-                <span key={t} className="biz-time-chip">{t}</span>
+              {(selectedBusiness.availableTimes || []).map(slot => (
+                <span key={slot} className="biz-time-chip">{slot}</span>
               ))}
             </div>
           </div>
 
           {selectedBusiness.reservationActive && (
             <div className="biz-profile-cta">
-              <button className="primary-btn" onClick={() => openReservationForm(selectedBusiness)}>Rezervasyon Yap →</button>
+              <button className="primary-btn" onClick={() => openReservationForm(selectedBusiness)}>{t.profile.reserveBtn}</button>
             </div>
           )}
         </section>
@@ -4414,44 +4311,44 @@ function App() {
       {page === "meetingRequest" && meetingFormBusiness && (
         <section className="reservation-section">
           <div className="reservation-box">
-            <button className="back-btn" style={{ marginBottom: 12 }} onClick={() => { setPage("businessProfile"); }}>← Geri</button>
-            <h1>Randevu İste</h1>
-            <p className="description">{meetingFormBusiness.name} — Yetkili ile görüşme talebi oluşturun.</p>
+            <button className="back-btn" style={{ marginBottom: 12 }} onClick={() => { setPage("businessProfile"); }}>{t.meeting.back}</button>
+            <h1>{t.meeting.title}</h1>
+            <p className="description">{t.meeting.subtitle(meetingFormBusiness.name)}</p>
 
             <form className="reservation-form">
               {loggedCustomer ? (
                 <div className="rez-info-row">
                   <div className="rez-info-item">
-                    <span className="rez-info-label">İsim</span>
+                    <span className="rez-info-label">{t.meeting.nameLabel}</span>
                     <span className="rez-info-value">{loggedCustomer.name}</span>
                   </div>
                   <div className="rez-info-item">
-                    <span className="rez-info-label">E-posta</span>
+                    <span className="rez-info-label">{t.meeting.emailLabel}</span>
                     <span className="rez-info-value">{loggedCustomer.email}</span>
                   </div>
                 </div>
               ) : (
                 <div style={{ background: "rgba(109,40,217,0.05)", border: "1px dashed rgba(109,40,217,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 4, fontSize: 13, color: "#6b7280" }}>
-                  İsim ve e-posta bilgileriniz gönderirken giriş yapmanız istenecek
+                  {t.meeting.loginHint}
                 </div>
               )}
-              <input type="tel" placeholder="📞 Telefon *" value={meetingForm.phone} onChange={e => setMeetingForm(p => ({ ...p, phone: e.target.value }))} />
-              <input type="text" placeholder="Şirket Adı (opsiyonel)" value={meetingForm.company} onChange={e => setMeetingForm(p => ({ ...p, company: e.target.value }))} />
+              <input type="tel" placeholder={t.meeting.phonePlaceholder} value={meetingForm.phone} onChange={e => setMeetingForm(p => ({ ...p, phone: e.target.value }))} />
+              <input type="text" placeholder={t.meeting.companyPlaceholder} value={meetingForm.company} onChange={e => setMeetingForm(p => ({ ...p, company: e.target.value }))} />
               <select value={meetingForm.reason} onChange={e => setMeetingForm(p => ({ ...p, reason: e.target.value }))}>
-                <option value="is_gorusmesi">💼 İş Görüşmesi</option>
-                <option value="urun_tanitimi">📦 Ürün Tanıtımı</option>
-                <option value="urun_teslimi">🚚 Ürün Teslimi</option>
-                <option value="diger">💬 Diğer</option>
+                {Object.entries(t.meeting.reasons).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
               </select>
 
               <div className="date-time-row">
                 <div className="strip-section">
-                  <div className="strip-label">📅 Tarih</div>
+                  <div className="strip-label">{t.meeting.dateLabel}</div>
                   <div className="strip-scroll-wrap">
                     <button type="button" className="strip-arrow" onClick={() => meetingDateRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
                     <div className="date-strip" ref={meetingDateRef}>
                       {(() => {
                         const todayMs = new Date().setHours(0,0,0,0);
+                        const locale = lang === "en" ? "en-GB" : "tr-TR";
                         return (meetingFormBusiness.meetingDates || [])
                           .filter(d => new Date(d + "T00:00:00").getTime() >= todayMs)
                           .sort()
@@ -4469,8 +4366,8 @@ function App() {
                                   });
                                   setAvailableSlotsForDate(slots ? slots.split(",").filter(Boolean) : []);
                                 }}>
-                                <span className="strip-day">{parsed.toLocaleDateString("tr-TR", { weekday: "short" })}</span>
-                                <span className="strip-date">{parsed.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}</span>
+                                <span className="strip-day">{parsed.toLocaleDateString(locale, { weekday: "short" })}</span>
+                                <span className="strip-date">{parsed.toLocaleDateString(locale, { day: "2-digit", month: "short" })}</span>
                               </button>
                             );
                           });
@@ -4481,13 +4378,13 @@ function App() {
                 </div>
 
                 <div className="strip-section">
-                  <div className="strip-label">🕐 Saat</div>
+                  <div className="strip-label">{t.meeting.timeLabel}</div>
                   <div className="strip-scroll-wrap">
                     <button type="button" className="strip-arrow" onClick={() => meetingTimeRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
                     <div className="time-strip" ref={meetingTimeRef}>
                       {availableSlotsForDate !== null ? (
                         availableSlotsForDate.length === 0 ? (
-                          <span style={{ padding: "8px 12px", color: "#9ca3af", fontSize: 13 }}>Bu tarihte müsait saat yok</span>
+                          <span style={{ padding: "8px 12px", color: "#9ca3af", fontSize: 13 }}>{t.meeting.noSlotsForDate}</span>
                         ) : availableSlotsForDate.map(time => (
                           <button key={time} type="button"
                             className={meetingForm.time === time ? "strip-btn active" : "strip-btn"}
@@ -4508,7 +4405,7 @@ function App() {
                 </div>
               </div>
 
-              <textarea placeholder="📝 Not (opsiyonel)" value={meetingForm.note} onChange={e => setMeetingForm(p => ({ ...p, note: e.target.value }))} />
+              <textarea placeholder={t.meeting.notePlaceholder} value={meetingForm.note} onChange={e => setMeetingForm(p => ({ ...p, note: e.target.value }))} />
 
               {meetingFormError && <p className="error-message">{meetingFormError}</p>}
 
@@ -4516,12 +4413,12 @@ function App() {
                 <label className="rez-terms-label">
                   <input type="checkbox" checked={meetingTermsChecked.biz} onChange={e => setMeetingTermsChecked(p => ({ ...p, biz: e.target.checked }))} />
                   <span className="rez-check-box">{meetingTermsChecked.biz ? "✓" : ""}</span>
-                  <span><button type="button" className="terms-link" onClick={() => setTermsModal("biz")}>İşletme Koşulları</button>'nı okudum ve kabul ediyorum</span>
+                  <span><button type="button" className="terms-link" onClick={() => setTermsModal("biz")}>{t.meeting.bizTerms}</button>{t.meeting.termsAccept}</span>
                 </label>
                 <label className="rez-terms-label">
                   <input type="checkbox" checked={meetingTermsChecked.rp} onChange={e => setMeetingTermsChecked(p => ({ ...p, rp: e.target.checked }))} />
                   <span className="rez-check-box">{meetingTermsChecked.rp ? "✓" : ""}</span>
-                  <span><button type="button" className="terms-link" onClick={() => setTermsModal("rp")}>RezPoint Koşulları</button>'nı okudum ve kabul ediyorum</span>
+                  <span><button type="button" className="terms-link" onClick={() => setTermsModal("rp")}>{t.meeting.rpTerms}</button>{t.meeting.termsAccept}</span>
                 </label>
               </div>
 
@@ -4538,7 +4435,7 @@ function App() {
                         setPage("customerAuth");
                       }}
                     >
-                      Giriş Yap ve Gönder →
+                      {t.meeting.loginAndSend}
                     </button>
                   );
                 }
@@ -4571,7 +4468,7 @@ function App() {
                   setPage("meetingSuccess");
                 }}
               >
-                {isSendingMeeting ? "Gönderiliyor..." : "Randevu Talebi Gönder →"}
+                {isSendingMeeting ? t.meeting.sending : t.meeting.submitBtn}
               </button>}
 
               {termsModal && (
@@ -4579,7 +4476,7 @@ function App() {
                   <div className="terms-modal" onClick={e => e.stopPropagation()}>
                     <h3>{termsModal === "biz" ? `${meetingFormBusiness?.name} — Koşullar` : "RezPoint Kullanım Koşulları"}</h3>
                     <div className="terms-modal-body">{termsModal === "biz" ? (meetingFormBusiness?.terms || "Bu işletme henüz koşul belirlememiş.") : (rpTerms || "Henüz koşul eklenmemiş.")}</div>
-                    <button type="button" className="primary-btn" style={{ marginTop: 16 }} onClick={() => setTermsModal(null)}>Kapat</button>
+                    <button type="button" className="primary-btn" style={{ marginTop: 16 }} onClick={() => setTermsModal(null)}>{t.common.close}</button>
                   </div>
                 </div>
               )}
@@ -4592,9 +4489,9 @@ function App() {
         <section className="reservation-section">
           <div className="reservation-box" style={{ textAlign: "center" }}>
             <div style={{ fontSize: 56, marginBottom: 12 }}>📅</div>
-            <h1>Randevu Talebiniz Alındı!</h1>
-            <p className="description">İşletme talebinizi inceleyecek ve onaylayacaktır. Sonucu bildirimlerinizde görebilirsiniz.</p>
-            <button className="primary-btn" style={{ marginTop: 20 }} onClick={() => { setPage("customerDashboard"); setCustomerTab("meetings"); }}>Randevularıma Git</button>
+            <h1>{t.meeting.successTitle}</h1>
+            <p className="description">{t.meeting.successDesc}</p>
+            <button className="primary-btn" style={{ marginTop: 20 }} onClick={() => { setPage("customerDashboard"); setCustomerTab("meetings"); }}>{t.meeting.goToMeetings}</button>
           </div>
         </section>
       )}
@@ -4605,12 +4502,12 @@ function App() {
 
             {/* Başlık + gönderilme zamanı */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-              <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1a1a2e" }}>Rezervasyon</h2>
+              <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#1a1a2e" }}>{t.popup.reservationTitle}</h2>
               {selectedReservation.createdAt && (
                 <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500, lineHeight: 1.4, textAlign: "right" }}>
-                  Gönderildi<br/>
+                  {t.popup.sentAt}<br/>
                   <strong style={{ color: "#6b7280" }}>
-                    {(() => { const d = new Date(selectedReservation.createdAt); return `${d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} ${d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}`; })()}
+                    {(() => { const locale = lang === "en" ? "en-GB" : "tr-TR"; const d = new Date(selectedReservation.createdAt); return `${d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })} ${d.toLocaleDateString(locale, { day: "2-digit", month: "2-digit" })}`; })()}
                   </strong>
                 </span>
               )}
@@ -4637,7 +4534,7 @@ function App() {
                 🕐 {selectedReservation.time}
               </span>
               <span style={{ background: "rgba(34,197,94,0.12)", color: "#166534", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
-                👥 {selectedReservation.guests} kişi
+                👥 {t.common.persons(selectedReservation.guests)}
               </span>
             </div>
 
@@ -4647,10 +4544,10 @@ function App() {
             {(() => {
               const s = selectedReservation.status;
               const map = {
-                pending: { bg: "rgba(234,179,8,0.1)", color: "#854d0e", label: "Bekliyor" },
-                accepted: { bg: "rgba(34,197,94,0.1)", color: "#166534", label: "Kabul Edildi" },
-                rejected: { bg: "rgba(239,68,68,0.1)", color: "#7f1d1d", label: "Reddedildi" },
-                completed: { bg: "rgba(109,40,217,0.1)", color: "#4c1d95", label: "Tamamlandı" },
+                pending: { bg: "rgba(234,179,8,0.1)", color: "#854d0e", label: t.status.pending },
+                accepted: { bg: "rgba(34,197,94,0.1)", color: "#166534", label: t.status.accepted },
+                rejected: { bg: "rgba(239,68,68,0.1)", color: "#7f1d1d", label: t.status.rejected },
+                completed: { bg: "rgba(109,40,217,0.1)", color: "#4c1d95", label: t.status.completed },
               };
               const st = map[s] || map.pending;
               return (
@@ -4665,11 +4562,11 @@ function App() {
             {/* Güven puanı + kod */}
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
               <div style={{ flex: 1, background: "rgba(0,0,0,0.03)", borderRadius: 10, padding: "10px 14px" }}>
-                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>Güven Puanı</div>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>{t.popup.fieldSafeScore}</div>
                 <div style={{ fontWeight: 700, color: "#1a1a2e" }}>{selectedReservation.safeScore ?? 100}/100</div>
               </div>
               <div style={{ flex: 1, background: "rgba(0,0,0,0.03)", borderRadius: 10, padding: "10px 14px" }}>
-                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>Rezervasyon Kodu</div>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>{t.popup.fieldCode}</div>
                 <div style={{ fontWeight: 700, color: "#7c3aed" }}>{selectedReservation.code}</div>
               </div>
             </div>
@@ -4678,14 +4575,14 @@ function App() {
             <div style={{ background: "rgba(0,0,0,0.025)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 12px" }}>
                 {[
-                  ["Cinsiyet", selectedReservation.customerProfile?.gender],
-                  ["Doğum Tarihi", selectedReservation.customerProfile?.birthDate],
-                  ["Meslek", selectedReservation.customerProfile?.job],
-                  ["Sigara", selectedReservation.customerProfile?.smoking],
+                  [t.popup.fieldGender, selectedReservation.customerProfile?.gender],
+                  [t.popup.fieldBirth, selectedReservation.customerProfile?.birthDate],
+                  [t.popup.fieldJob, selectedReservation.customerProfile?.job],
+                  [t.popup.fieldSmoking, selectedReservation.customerProfile?.smoking],
                 ].map(([k, v]) => (
                   <div key={k}>
                     <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 1 }}>{k}</div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "#374151" }}>{v || "Belirtilmedi"}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#374151" }}>{v || t.common.notSpecified}</div>
                   </div>
                 ))}
               </div>
@@ -4700,7 +4597,7 @@ function App() {
             )}
 
             <button className="primary-btn" style={{ marginTop: 8, width: "100%" }} onClick={() => setSelectedReservation(null)}>
-              Kapat
+              {t.popup.close}
             </button>
           </div>
         </div>
