@@ -165,6 +165,7 @@ function App() {
   const [expandedDateForTimes, setExpandedDateForTimes] = useState(null);
   const [availableSlotsForDate, setAvailableSlotsForDate] = useState(null);
   const [savedMessage, setSavedMessage] = useState("");
+  const [afterLoginReturnPage, setAfterLoginReturnPage] = useState(null);
 
   const [selectedAcceptedDate, setSelectedAcceptedDate] = useState("");
   const [selectedReservation, setSelectedReservation] = useState(null);
@@ -745,12 +746,6 @@ function App() {
   }
 
   function openReservationForm(business) {
-    if (!loggedCustomer) {
-      setCustomerMode("login");
-      setPage("customerAuth");
-      return;
-    }
-
     setSelectedBusiness(business);
     setReservation({ phone: "", date: "", time: "", guests: "", note: "" });
     setTermsChecked({ biz: false, rp: false });
@@ -1046,7 +1041,7 @@ function App() {
         <>
         <section className="hero">
           <div className="hero-text">
-            <h1>Modern işletmeler için akıllı rezervasyon.</h1>
+            <h1>Modern işletmeler için akıllı rezervasyon ve randevu.</h1>
             <p className="description">
               Konum ve zaman seç, müsait işletmeleri gör — saniyeler içinde rezervasyon oluştur.
             </p>
@@ -1265,7 +1260,6 @@ function App() {
           <div className="business-grid">
             {adminBusinesses
               .filter((business) => {
-                if (!business.reservationActive) return false;
                 const q = businessSearch.toLowerCase();
                 if (q && !business.name.toLowerCase().includes(q) && !business.type.toLowerCase().includes(q) && !business.location.toLowerCase().includes(q)) return false;
                 if (searchLocation !== "Hepsi" && business.location !== searchLocation) return false;
@@ -1304,20 +1298,21 @@ function App() {
                     )}
                   </div>
                   <div className="bc-actions">
-                    <button
-                      className="bc-select-btn"
-                      onClick={(e) => { e.stopPropagation(); openReservationForm(business); }}
-                    >
-                      Rezervasyon Yap <span className="bc-arrow">→</span>
-                    </button>
+                    {business.reservationActive && (
+                      <button
+                        className="bc-select-btn"
+                        onClick={(e) => { e.stopPropagation(); openReservationForm(business); }}
+                      >
+                        Rezervasyon Yap <span className="bc-arrow">→</span>
+                      </button>
+                    )}
                     {business.meetingEnabled && business.meetingDates?.length > 0 && (
                       <button
                         className="bc-info-btn"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!loggedCustomer) { setPage("customerAuth"); return; }
                           setMeetingFormBusiness(business);
-                          setMeetingForm({ fullName: loggedCustomer.name || "", email: loggedCustomer.email || "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
+                          setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
                           setMeetingTermsChecked({ biz: false, rp: false });
                           setMeetingFormError("");
                           setPage("meetingRequest");
@@ -1330,7 +1325,6 @@ function App() {
                 </div>
               ))}
             {adminBusinesses.filter((b) => {
-              if (!b.reservationActive) return false;
               const q = businessSearch.toLowerCase();
               if (q && !b.name.toLowerCase().includes(q) && !b.type.toLowerCase().includes(q) && !b.location.toLowerCase().includes(q)) return false;
               if (searchLocation !== "Hepsi" && b.location !== searchLocation) return false;
@@ -1352,7 +1346,7 @@ function App() {
         </section>
       )}
 
-      {page === "reservation" && selectedBusiness && loggedCustomer && (
+      {page === "reservation" && selectedBusiness && (
         <section className="reservation-section">
           <button className="back-btn" onClick={() => setPage("businesses")}>
             ← Geri
@@ -1364,7 +1358,7 @@ function App() {
               {selectedBusiness.type}{selectedBusiness.location ? ` · ${selectedBusiness.location}` : ""}
             </p>
 
-            {!emailVerified && (
+            {loggedCustomer && !emailVerified && (
               <div className="email-verify-warning">
                 <span>⚠️</span>
                 <div>
@@ -1385,17 +1379,23 @@ function App() {
             )}
 
             <form className="reservation-form">
-              {/* Ad & E-posta (otomatik) */}
-              <div className="rez-info-row">
-                <div className="rez-info-item">
-                  <span className="rez-info-label">İsim</span>
-                  <span className="rez-info-value">{loggedCustomer.name}</span>
+              {/* Ad & E-posta: giriş yapıldıysa otomatik, yapılmadıysa hint */}
+              {loggedCustomer ? (
+                <div className="rez-info-row">
+                  <div className="rez-info-item">
+                    <span className="rez-info-label">İsim</span>
+                    <span className="rez-info-value">{loggedCustomer.name}</span>
+                  </div>
+                  <div className="rez-info-item">
+                    <span className="rez-info-label">E-posta</span>
+                    <span className="rez-info-value">{loggedCustomer.email}</span>
+                  </div>
                 </div>
-                <div className="rez-info-item">
-                  <span className="rez-info-label">E-posta</span>
-                  <span className="rez-info-value">{loggedCustomer.email}</span>
+              ) : (
+                <div style={{ background: "rgba(109,40,217,0.05)", border: "1px dashed rgba(109,40,217,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 4, fontSize: 13, color: "#6b7280" }}>
+                  İsim ve e-posta bilgileriniz gönderirken giriş yapmanız istenenecek
                 </div>
-              </div>
+              )}
 
               {/* Tarih + Saat yan yana strip */}
               <div className="date-time-row">
@@ -1499,14 +1499,31 @@ function App() {
                 </label>
               </div>
 
-              <button
-                type="button"
-                disabled={!emailVerified || !reservation.date || !reservation.time || !reservation.guests || !reservation.phone || !termsChecked.biz || !termsChecked.rp}
-                onClick={sendReservation}
-                style={{ opacity: (!emailVerified || !reservation.date || !reservation.time || !reservation.guests || !reservation.phone || !termsChecked.biz || !termsChecked.rp) ? 0.5 : 1 }}
-              >
-                Rezervasyon İsteği Gönder →
-              </button>
+              {(() => {
+                const formIncomplete = !reservation.date || !reservation.time || !reservation.guests || !reservation.phone || !termsChecked.biz || !termsChecked.rp;
+                if (loggedCustomer) {
+                  const disabled = !emailVerified || formIncomplete;
+                  return (
+                    <button type="button" disabled={disabled} onClick={sendReservation} style={{ opacity: disabled ? 0.5 : 1 }}>
+                      Rezervasyon İsteği Gönder →
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    type="button"
+                    disabled={formIncomplete}
+                    style={{ opacity: formIncomplete ? 0.5 : 1 }}
+                    onClick={() => {
+                      setAfterLoginReturnPage("reservation");
+                      setCustomerMode("login");
+                      setPage("customerAuth");
+                    }}
+                  >
+                    Giriş Yap ve Gönder →
+                  </button>
+                );
+              })()}
 
               {termsModal && (
                 <div className="terms-modal-overlay" onClick={() => setTermsModal(null)}>
@@ -1913,7 +1930,16 @@ function App() {
                     });
                     setEmailVerified(true);
                     loadCustomerExtras(custData.id);
-                    setPage("customerDashboard");
+                    if (afterLoginReturnPage) {
+                      const returnTo = afterLoginReturnPage;
+                      setAfterLoginReturnPage(null);
+                      if (returnTo === "meetingRequest") {
+                        setMeetingForm(prev => ({ ...prev, fullName: foundCustomer.name, email: foundCustomer.email }));
+                      }
+                      setPage(returnTo);
+                    } else {
+                      setPage("customerDashboard");
+                    }
                   }
                 }}
               >
@@ -4324,9 +4350,8 @@ function App() {
               {selectedBusiness.meetingEnabled && selectedBusiness.meetingDates?.length > 0 && (
                 <div className="biz-profile-phone-row">
                   <button className="meeting-request-btn" onClick={() => {
-                    if (!loggedCustomer) { setPage("customerAuth"); return; }
                     setMeetingFormBusiness(selectedBusiness);
-                    setMeetingForm({ fullName: loggedCustomer.name || "", email: loggedCustomer.email || "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
+                    setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
                     setMeetingTermsChecked({ biz: false, rp: false });
                     setMeetingFormError("");
                     setPage("meetingRequest");
@@ -4378,11 +4403,11 @@ function App() {
             </div>
           </div>
 
-          <div className="biz-profile-cta">
-            {loggedCustomer
-              ? <button className="primary-btn" onClick={() => openReservationForm(selectedBusiness)}>Rezervasyon Yap →</button>
-              : <button className="primary-btn" onClick={() => setPage("customerAuth")}>Giriş Yaparak Rezervasyon Yap →</button>}
-          </div>
+          {selectedBusiness.reservationActive && (
+            <div className="biz-profile-cta">
+              <button className="primary-btn" onClick={() => openReservationForm(selectedBusiness)}>Rezervasyon Yap →</button>
+            </div>
+          )}
         </section>
       )}
 
@@ -4394,8 +4419,22 @@ function App() {
             <p className="description">{meetingFormBusiness.name} — Yetkili ile görüşme talebi oluşturun.</p>
 
             <form className="reservation-form">
-              <input type="text" placeholder="İsim Soyisim *" value={meetingForm.fullName} onChange={e => setMeetingForm(p => ({ ...p, fullName: e.target.value }))} />
-              <input type="email" placeholder="E-posta *" value={meetingForm.email} onChange={e => setMeetingForm(p => ({ ...p, email: e.target.value }))} />
+              {loggedCustomer ? (
+                <div className="rez-info-row">
+                  <div className="rez-info-item">
+                    <span className="rez-info-label">İsim</span>
+                    <span className="rez-info-value">{loggedCustomer.name}</span>
+                  </div>
+                  <div className="rez-info-item">
+                    <span className="rez-info-label">E-posta</span>
+                    <span className="rez-info-value">{loggedCustomer.email}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ background: "rgba(109,40,217,0.05)", border: "1px dashed rgba(109,40,217,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 4, fontSize: 13, color: "#6b7280" }}>
+                  İsim ve e-posta bilgileriniz gönderirken giriş yapmanız istenecek
+                </div>
+              )}
               <input type="tel" placeholder="📞 Telefon *" value={meetingForm.phone} onChange={e => setMeetingForm(p => ({ ...p, phone: e.target.value }))} />
               <input type="text" placeholder="Şirket Adı (opsiyonel)" value={meetingForm.company} onChange={e => setMeetingForm(p => ({ ...p, company: e.target.value }))} />
               <select value={meetingForm.reason} onChange={e => setMeetingForm(p => ({ ...p, reason: e.target.value }))}>
@@ -4486,7 +4525,26 @@ function App() {
                 </label>
               </div>
 
-              <button type="button"
+              {(() => {
+                const formIncomplete = !meetingForm.fullName || !meetingForm.email || !meetingForm.phone || !meetingForm.date || !meetingForm.time || !meetingTermsChecked.biz || !meetingTermsChecked.rp;
+                if (!loggedCustomer) {
+                  return (
+                    <button type="button"
+                      disabled={formIncomplete}
+                      style={{ opacity: formIncomplete ? 0.5 : 1 }}
+                      onClick={() => {
+                        setAfterLoginReturnPage("meetingRequest");
+                        setCustomerMode("login");
+                        setPage("customerAuth");
+                      }}
+                    >
+                      Giriş Yap ve Gönder →
+                    </button>
+                  );
+                }
+                return null;
+              })()}
+              {loggedCustomer && <button type="button"
                 disabled={isSendingMeeting || !meetingForm.fullName || !meetingForm.email || !meetingForm.phone || !meetingForm.date || !meetingForm.time || !meetingTermsChecked.biz || !meetingTermsChecked.rp}
                 style={{ opacity: (isSendingMeeting || !meetingForm.fullName || !meetingForm.email || !meetingForm.phone || !meetingForm.date || !meetingForm.time || !meetingTermsChecked.biz || !meetingTermsChecked.rp) ? 0.5 : 1 }}
                 onClick={async () => {
@@ -4514,7 +4572,7 @@ function App() {
                 }}
               >
                 {isSendingMeeting ? "Gönderiliyor..." : "Randevu Talebi Gönder →"}
-              </button>
+              </button>}
 
               {termsModal && (
                 <div className="terms-modal-overlay" onClick={() => setTermsModal(null)}>
