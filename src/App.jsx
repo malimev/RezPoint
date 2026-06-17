@@ -137,6 +137,9 @@ function formatBusiness(b) {
     dateTimes: Object.fromEntries(
       Object.entries(b.date_times || {}).map(([d, v]) => [d, (v || "").split(",").filter(Boolean)])
     ),
+    reservationDateTimes: Object.fromEntries(
+      Object.entries(b.reservation_date_times || {}).map(([d, v]) => [d, (v || "").split(",").filter(Boolean)])
+    ),
     closingPin: b.closing_pin || "",
     meetingTimes: b.meeting_times ? b.meeting_times.split(",") : [],
     meetingDates: b.meeting_dates ? b.meeting_dates.split(",") : [],
@@ -163,7 +166,9 @@ function App() {
   const [availabilityMode, setAvailabilityMode] = useState("weekly");
   const [specificDates, setSpecificDates] = useState([]);
   const [dateTimesMap, setDateTimesMap] = useState({});
+  const [reservationDateTimesMap, setReservationDateTimesMap] = useState({});
   const [expandedDateForTimes, setExpandedDateForTimes] = useState(null);
+  const [expandedRezDateForTimes, setExpandedRezDateForTimes] = useState(null);
   const [availableSlotsForDate, setAvailableSlotsForDate] = useState(null);
   const [savedMessage, setSavedMessage] = useState("");
   const [afterLoginReturnPage, setAfterLoginReturnPage] = useState(null);
@@ -367,6 +372,7 @@ function App() {
           setSpecificDates(restoredBusiness.specificDates || []);
           setAvailableTimes(restoredBusiness.availableTimes || []);
           setDateTimesMap(restoredBusiness.dateTimes || {});
+          setReservationDateTimesMap(restoredBusiness.reservationDateTimes || {});
           setMeetingAvailableTimes(restoredBusiness.meetingTimes || []);
           setMeetingAvailableDays(restoredBusiness.meetingDates || []);
           setBusinessProfileForm({
@@ -839,6 +845,7 @@ function App() {
     setSpecificDates(business.specificDates || []);
     setAvailableTimes(business.availableTimes || []);
     setDateTimesMap(business.dateTimes || {});
+    setReservationDateTimesMap(business.reservationDateTimes || {});
     setMeetingAvailableTimes(business.meetingTimes || []);
     setMeetingAvailableDays(business.meetingDates || []);
     setBusinessProfileForm({
@@ -1410,7 +1417,10 @@ function App() {
                   <div className="strip-scroll-wrap">
                     <button type="button" className="strip-arrow" onClick={() => timeStripRef.current?.scrollBy({ left: -160, behavior: "smooth" })}>‹</button>
                     <div className="time-strip" ref={timeStripRef}>
-                      {(selectedBusiness?.availableTimes?.length ? selectedBusiness.availableTimes : availableTimes).map((time) => (
+                      {(() => {
+                        const perDate = reservation.date && selectedBusiness?.reservationDateTimes?.[reservation.date];
+                        return (perDate?.length ? perDate : (selectedBusiness?.availableTimes?.length ? selectedBusiness.availableTimes : availableTimes));
+                      })().map((time) => (
                         <button key={time} type="button"
                           className={reservation.time === time ? "strip-btn active" : "strip-btn"}
                           onClick={() => setReservation({ ...reservation, time })}>
@@ -3830,6 +3840,53 @@ function App() {
                       })()}
                     </div>
 
+                    {specificDates.length > 0 && (
+                      <>
+                        <p className="description" style={{ marginBottom: 10, marginTop: 20 }}>📆 Tarihe Özel Saatler</p>
+                        <p className="description" style={{ fontSize: 12, marginBottom: 12 }}>Her gün için farklı saat dilimleri ayarlayabilirsiniz. Ayarlanmayan günlerde aşağıdaki genel saatler kullanılır.</p>
+                        {specificDates.filter(d => new Date(d + "T00:00:00") >= new Date().setHours(0,0,0,0)).sort().map(date => {
+                          const customTimes = reservationDateTimesMap[date] || [];
+                          const isExpanded = expandedRezDateForTimes === date;
+                          const d = new Date(date + "T00:00:00");
+                          const label = d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", weekday: "short" });
+                          return (
+                            <div key={date} style={{ marginBottom: 8 }}>
+                              <button className="time-btn"
+                                style={{ width: "100%", textAlign: "left", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                                onClick={() => setExpandedRezDateForTimes(isExpanded ? null : date)}>
+                                <span><strong>{label}</strong> — {customTimes.length > 0 ? customTimes.join(", ") : <em style={{ color: "#9ca3af" }}>genel saatler</em>}</span>
+                                <span>{isExpanded ? "▲" : "▼"}</span>
+                              </button>
+                              {isExpanded && (
+                                <div style={{ background: "rgba(109,40,217,0.04)", border: "1px solid rgba(109,40,217,0.12)", borderRadius: 12, padding: "12px 10px", marginTop: 4 }}>
+                                  <div className="time-slots-grid">
+                                    {ALL_TIME_SLOTS.map(time => (
+                                      <button key={time}
+                                        className={customTimes.includes(time) ? "selected-time" : "time-btn"}
+                                        onClick={() => {
+                                          const updated = customTimes.includes(time) ? customTimes.filter(s => s !== time) : [...customTimes, time].sort();
+                                          setReservationDateTimesMap(prev => {
+                                            if (updated.length === 0) { const next = { ...prev }; delete next[date]; return next; }
+                                            return { ...prev, [date]: updated };
+                                          });
+                                        }}>
+                                        {time}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {customTimes.length > 0 && (
+                                    <button className="time-btn" style={{ marginTop: 8, fontSize: 12 }}
+                                      onClick={() => setReservationDateTimesMap(prev => { const next = { ...prev }; delete next[date]; return next; })}>
+                                      ✕ Genel saatlere dön
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
                   </>
                 )}
 
@@ -3904,6 +3961,11 @@ function App() {
                       p_available_days: availableDays.join(","),
                       p_available_times: availableTimes.join(","),
                       p_specific_dates: specificDates.join(","),
+                      p_reservation_date_times: JSON.stringify(
+                        Object.fromEntries(
+                          Object.entries(reservationDateTimesMap).filter(([,arr]) => arr.length > 0).map(([d,arr]) => [d, arr.join(",")])
+                        )
+                      ),
                     });
 
                     if (error) {
@@ -3922,6 +3984,7 @@ function App() {
                       availableTimes,
                       specificDates,
                       dateTimes: dateTimesMap,
+                      reservationDateTimes: reservationDateTimesMap,
                     };
 
                     setLoggedBusiness(updatedBusiness);
