@@ -144,6 +144,7 @@ function formatBusiness(b) {
     meetingTimes: b.meeting_times ? b.meeting_times.split(",") : [],
     meetingDates: b.meeting_dates ? b.meeting_dates.split(",") : [],
     rating: b.rating || 0,
+    businessHours: b.business_hours || {},
   };
 }
 
@@ -196,8 +197,11 @@ function App() {
   const [actionLoading, setActionLoading] = useState(false);
 
   const [businessSearch, setBusinessSearch] = useState("");
+  const [bizCategory, setBizCategory] = useState("Tümü");
+  const [businessHours, setBusinessHours] = useState({});
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const dateStripRef = useRef(null);
   const timeStripRef = useRef(null);
 
@@ -375,6 +379,7 @@ function App() {
           setReservationDateTimesMap(restoredBusiness.reservationDateTimes || {});
           setMeetingAvailableTimes(restoredBusiness.meetingTimes || []);
           setMeetingAvailableDays(restoredBusiness.meetingDates || []);
+          setBusinessHours(restoredBusiness.businessHours || {});
           setBusinessProfileForm({
             name: restoredBusiness.name || "",
             location: restoredBusiness.location || "",
@@ -848,6 +853,7 @@ function App() {
     setReservationDateTimesMap(business.reservationDateTimes || {});
     setMeetingAvailableTimes(business.meetingTimes || []);
     setMeetingAvailableDays(business.meetingDates || []);
+    setBusinessHours(business.businessHours || {});
     setBusinessProfileForm({
       name: business.name || "",
       location: business.location || "",
@@ -1060,82 +1066,156 @@ function App() {
 
       {page === "home" && (
         <>
-        <section className="hero">
-          <div className="hero-text">
-            <h1>{t.hero.headline}</h1>
-            <p className="description">{t.hero.subheadline}</p>
+        {/* ── OpenTable-style homepage ── */}
+        <section className="ot-hero">
+          <h1 className="ot-headline">{t.hero.headline}</h1>
+          <p className="ot-subline">{t.hero.subheadline}</p>
 
-            <div className="search-panel">
-              <div className="search-field search-loc-row">
-                <label className="search-label">📍 {t.hero.location}</label>
-                <select className="search-select" value={searchLocation} onChange={(e) => setSearchLocation(e.target.value)}>
-                  <option value="Hepsi">{t.hero.locationAll}</option>
-                  <option value="İskele">İskele</option>
-                  <option value="Mağusa">Mağusa</option>
-                </select>
-              </div>
-
-              <div className="search-fields search-desktop-only">
-                <div className="search-field">
-                  <label className="search-label">📅 {t.hero.date}</label>
-                  <input type="date" className="search-input" value={searchDate}
-                    onChange={(e) => setSearchDate(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]}
-                    max={(() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split("T")[0]; })()}
-                  />
-                </div>
-                <div className="search-field">
-                  <label className="search-label">🕐 {t.hero.time}</label>
-                  <select className="search-select" value={searchTime} onChange={(e) => setSearchTime(e.target.value)}>
-                    <option value="">{t.hero.timeAny}</option>
-                    {ALL_TIME_SLOTS.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="search-mobile-only">
-                <label className="search-label" style={{ display: "block", marginBottom: 8 }}>📅 {t.hero.date}</label>
-                <div className="home-date-strip">
-                  <button
-                    className={!searchDate ? "home-strip-btn active" : "home-strip-btn"}
-                    onClick={() => setSearchDate("")}>
-                    <span className="strip-day">{t.hero.dayAll[0]}</span>
-                    <span className="strip-date">{t.hero.dayAll[1]}</span>
-                  </button>
-                  {Array.from({ length: 30 }, (_, i) => {
-                    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
-                    const fullDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-                    const locale = lang === "en" ? "en-GB" : "tr-TR";
-                    return (
-                      <button key={fullDate}
-                        className={searchDate === fullDate ? "home-strip-btn active" : "home-strip-btn"}
-                        onClick={() => setSearchDate(fullDate)}>
-                        <span className="strip-day">{d.toLocaleDateString(locale,{weekday:"short"})}</span>
-                        <span className="strip-date">{d.toLocaleDateString(locale,{day:"2-digit",month:"short"})}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <label className="search-label" style={{ display: "block", margin: "14px 0 8px" }}>🕐 {t.hero.time}</label>
-                <div className="home-time-strip">
-                  <button className={!searchTime ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => setSearchTime("")}>{t.hero.timeAll}</button>
-                  {ALL_TIME_SLOTS.map(slot => (
-                    <button key={slot} className={searchTime === slot ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => setSearchTime(slot)}>{slot}</button>
-                  ))}
-                </div>
-              </div>
-
-              <button className="search-btn" onClick={() => setPage("businesses")}>
-                {t.hero.searchBtn(searchDate, searchTime, formatDate)}
-              </button>
-            </div>
+          {/* Filter chips row */}
+          <div className="ot-filter-row">
+            <button
+              className={`ot-chip${datePickerOpen ? " active" : ""}`}
+              onClick={() => { setDatePickerOpen(p => !p); setTimePickerOpen(false); }}
+            >
+              📅 {searchDate ? (() => { const d = new Date(searchDate + "T00:00:00"); return d.toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR", { day: "numeric", month: "short" }); })() : (lang === "en" ? "Date" : "Tarih")}
+              <span className="ot-chip-arrow">{datePickerOpen ? "▲" : "▼"}</span>
+            </button>
+            <button
+              className={`ot-chip${timePickerOpen ? " active" : ""}`}
+              onClick={() => { setTimePickerOpen(p => !p); setDatePickerOpen(false); }}
+            >
+              🕐 {searchTime || (lang === "en" ? "Time" : "Saat")}
+              <span className="ot-chip-arrow">{timePickerOpen ? "▲" : "▼"}</span>
+            </button>
+            <button
+              className={`ot-chip${locationPickerOpen ? " active" : ""}`}
+              onClick={() => { setLocationPickerOpen(p => !p); setDatePickerOpen(false); setTimePickerOpen(false); }}
+            >
+              📍 {searchLocation === "Hepsi" ? (lang === "en" ? "All locations" : "Tüm konumlar") : searchLocation}
+              <span className="ot-chip-arrow">{locationPickerOpen ? "▲" : "▼"}</span>
+            </button>
           </div>
 
-          <div className="hero-card">
-            <h3>{t.hero.howItWorks}</h3>
-            <div className="card-row"><span>1</span><strong>{t.hero.step1}</strong></div>
-            <div className="card-row"><span>2</span><strong>{t.hero.step2}</strong></div>
-            <div className="card-row"><span>3</span><strong>{t.hero.step3}</strong></div>
+          {/* Location picker dropdown */}
+          {locationPickerOpen && (
+            <div className="ot-picker-panel">
+              <div className="ot-picker-label">{lang === "en" ? "Select location" : "Konum seç"}</div>
+              <div className="ot-loc-options">
+                {["Hepsi","Mağusa","İskele","Lefkoşa","Lefke","Girne"].map(loc => (
+                  <button
+                    key={loc}
+                    className={`ot-loc-opt${searchLocation === loc ? " active" : ""}`}
+                    onClick={() => { setSearchLocation(loc); setLocationPickerOpen(false); }}
+                  >
+                    {loc === "Hepsi" ? (lang === "en" ? "All locations" : "Tüm konumlar") : `📍 ${loc}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Date picker dropdown */}
+          {datePickerOpen && (
+            <div className="ot-picker-panel">
+              <div className="ot-picker-label">{lang === "en" ? "Select date" : "Tarih seç"}</div>
+              <div className="home-date-strip">
+                <button className={!searchDate ? "home-strip-btn active" : "home-strip-btn"} onClick={() => { setSearchDate(""); setDatePickerOpen(false); }}>
+                  <span className="strip-day">{t.hero.dayAll[0]}</span>
+                  <span className="strip-date">{t.hero.dayAll[1]}</span>
+                </button>
+                {Array.from({ length: 30 }, (_, i) => {
+                  const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+                  const fullDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                  const locale = lang === "en" ? "en-GB" : "tr-TR";
+                  return (
+                    <button key={fullDate} className={searchDate === fullDate ? "home-strip-btn active" : "home-strip-btn"}
+                      onClick={() => { setSearchDate(fullDate); setDatePickerOpen(false); }}>
+                      <span className="strip-day">{d.toLocaleDateString(locale,{weekday:"short"})}</span>
+                      <span className="strip-date">{d.toLocaleDateString(locale,{day:"2-digit",month:"short"})}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Time picker dropdown */}
+          {timePickerOpen && (
+            <div className="ot-picker-panel">
+              <div className="ot-picker-label">{lang === "en" ? "Select time" : "Saat seç"}</div>
+              <div className="home-time-strip">
+                <button className={!searchTime ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => { setSearchTime(""); setTimePickerOpen(false); }}>{t.hero.timeAll}</button>
+                {ALL_TIME_SLOTS.map(slot => (
+                  <button key={slot} className={searchTime === slot ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => { setSearchTime(slot); setTimePickerOpen(false); }}>{slot}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Search row */}
+          <div className="ot-search-row">
+            <span className="ot-search-icon">🔍</span>
+            <input
+              className="ot-search-input"
+              type="text"
+              placeholder={t.businesses.searchPlaceholder}
+              value={businessSearch}
+              onChange={e => setBusinessSearch(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && setPage("businesses")}
+            />
+            <button className="ot-search-btn" onClick={() => setPage("businesses")}>
+              {lang === "en" ? "Let's go" : "Ara"}
+            </button>
+          </div>
+
+        </section>
+
+        {/* ── Şu an müsait mekanlar ── */}
+        <section className="ot-section">
+          <div className="ot-section-header">
+            <h2 className="ot-section-title">{lang === "en" ? "Available now" : "Şu an müsait mekanlar"}</h2>
+            <button className="ot-view-all" onClick={() => setPage("businesses")}>{lang === "en" ? "View all" : "Tümünü gör"} →</button>
+          </div>
+          <div className="ot-cards-scroll">
+            {(() => {
+              const now = new Date();
+              const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+              const todayDayName = now.toLocaleDateString("en-US", { weekday: "long" });
+              const nowMins = now.getHours() * 60 + now.getMinutes();
+              const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+              const available = adminBusinesses.filter(biz => {
+                if (!biz.reservationActive) return false;
+                if (searchLocation !== "Hepsi" && biz.location !== searchLocation) return false;
+                // Gün kontrolü
+                const dayOk = biz.availabilityMode === "specific"
+                  ? (biz.specificDates || []).includes(todayStr)
+                  : (biz.availableDays || []).includes(todayDayName);
+                if (!dayOk) return false;
+                // Saat kontrolü (businessHours tanımlıysa)
+                const dayHours = (biz.businessHours || {})[todayDayName];
+                if (dayHours && dayHours.open && dayHours.close) {
+                  return nowMins >= toMins(dayHours.open) && nowMins < toMins(dayHours.close);
+                }
+                return true;
+              });
+              const shown = available.length > 0 ? available : adminBusinesses.filter(b => b.reservationActive && (searchLocation === "Hepsi" || b.location === searchLocation));
+              return shown.slice(0, 8).map(biz => (
+              <div className="ot-card" key={biz.id} onClick={() => { setSelectedBusiness(biz); setPage("businessProfile"); }}>
+                <div className="ot-card-photo">
+                  {biz.logoUrl
+                    ? <img src={biz.logoUrl} alt={biz.name} />
+                    : <div className="ot-card-photo-placeholder">{biz.icon || "🏠"}</div>
+                  }
+                </div>
+                <div className="ot-card-body">
+                  <div className="ot-card-name">{biz.name}</div>
+                  <div className="ot-card-meta">{biz.type}{biz.location ? ` · ${biz.location}` : ""}</div>
+                  <button className="ot-card-btn" onClick={e => { e.stopPropagation(); openReservationForm(biz); }}>
+                    {lang === "en" ? "Find available" : "Rezervasyon yap"}
+                  </button>
+                </div>
+              </div>
+            ));})()}
           </div>
         </section>
 
@@ -1239,6 +1319,23 @@ function App() {
             )}
           </div>
 
+          <div className="biz-category-bar">
+            {["Tümü","Restoranlar","Kafeler","Barlar","Meyhaneler"].map(cat => (
+              <button
+                key={cat}
+                className={`biz-cat-btn${bizCategory === cat ? " active" : ""}`}
+                onClick={() => setBizCategory(cat)}
+              >
+                {cat === "Tümü" && "🏠 "}
+                {cat === "Restoranlar" && "🍽️ "}
+                {cat === "Kafeler" && "☕ "}
+                {cat === "Barlar" && "🍸 "}
+                {cat === "Meyhaneler" && "🍻 "}
+                {cat}
+              </button>
+            ))}
+          </div>
+
           {(searchLocation !== "Hepsi" || searchDate || searchTime) && (
             <div className="search-active-bar">
               {searchLocation !== "Hepsi" && <span className="search-chip">📍 {searchLocation}</span>}
@@ -1259,6 +1356,12 @@ function App() {
                 const q = businessSearch.toLowerCase();
                 if (q && !business.name.toLowerCase().includes(q) && !business.type.toLowerCase().includes(q) && !business.location.toLowerCase().includes(q)) return false;
                 if (searchLocation !== "Hepsi" && business.location !== searchLocation) return false;
+                if (bizCategory !== "Tümü") {
+                  const typeMap = { "Restoranlar": ["restoran","restaurant","yemek","lokanta"], "Kafeler": ["kafe","cafe","kahve","coffee"], "Barlar": ["bar","cocktail","lounge"], "Meyhaneler": ["meyhane","tavern","pub","içki"] };
+                  const keywords = typeMap[bizCategory] || [];
+                  const t = (business.type || "").toLowerCase();
+                  if (!keywords.some(k => t.includes(k))) return false;
+                }
                 if (searchDate) {
                   const dayName = new Date(searchDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
                   const dayOk = business.availabilityMode === "specific"
@@ -1290,7 +1393,15 @@ function App() {
                     <h3 className="bc-name">{business.name}</h3>
                     <span className="bc-type-tag">{business.type}</span>
                     {business.location && (
-                      <p className="bc-location">📍 {business.location}</p>
+                      <a
+                        className="bc-location bc-map-link"
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.name + " " + business.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        📍 {business.location}
+                      </a>
                     )}
                   </div>
                   <div className="bc-actions">
@@ -3913,7 +4024,75 @@ function App() {
                   </>
                 )}
 
-                <h3 style={{ marginTop: "24px" }}>Müsait Saatler</h3>
+                {/* ── Açılış / Kapanış Saatleri ── */}
+                <h3 style={{ marginTop: "28px", marginBottom: "4px" }}>Açılış — Kapanış Saatleri</h3>
+                <p className="description" style={{ fontSize: 12, margin: "4px 0 14px" }}>
+                  Her gün için açılış ve kapanış saatini girin. Boş bırakılan günler kapalı sayılır.
+                </p>
+                <div className="biz-hours-grid">
+                  {[
+                    { key: "Monday",    label: "Pazartesi" },
+                    { key: "Tuesday",   label: "Salı" },
+                    { key: "Wednesday", label: "Çarşamba" },
+                    { key: "Thursday",  label: "Perşembe" },
+                    { key: "Friday",    label: "Cuma" },
+                    { key: "Saturday",  label: "Cumartesi" },
+                    { key: "Sunday",    label: "Pazar" },
+                  ].map(({ key, label }) => {
+                    const dayHours = businessHours[key] || {};
+                    const closed = !dayHours.open && !dayHours.close;
+                    return (
+                      <div key={key} className={`biz-hours-row${closed ? " closed" : ""}`}>
+                        <span className="biz-hours-day">{label}</span>
+                        <div className="biz-hours-inputs">
+                          <input
+                            type="time"
+                            className="biz-hours-time"
+                            value={dayHours.open || ""}
+                            placeholder="--:--"
+                            onChange={e => setBusinessHours(prev => ({ ...prev, [key]: { ...(prev[key] || {}), open: e.target.value } }))}
+                          />
+                          <span className="biz-hours-sep">—</span>
+                          <input
+                            type="time"
+                            className="biz-hours-time"
+                            value={dayHours.close || ""}
+                            placeholder="--:--"
+                            onChange={e => setBusinessHours(prev => ({ ...prev, [key]: { ...(prev[key] || {}), close: e.target.value } }))}
+                          />
+                        </div>
+                        <button
+                          className={`biz-hours-toggle${closed ? "" : " open"}`}
+                          onClick={() => setBusinessHours(prev => closed
+                            ? { ...prev, [key]: { open: "09:00", close: "22:00" } }
+                            : { ...prev, [key]: {} }
+                          )}
+                        >
+                          {closed ? "Kapalı" : "Açık"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  className="save-changes-btn"
+                  style={{ marginTop: "14px", marginBottom: "8px" }}
+                  onClick={async () => {
+                    const { error } = await supabase.rpc("business_save_hours", {
+                      p_token: bizSessionToken,
+                      p_business_hours: businessHours,
+                    });
+                    if (error) { alert("Saatler kaydedilemedi."); return; }
+                    setAdminBusinesses(prev => prev.map(b => b.id === loggedBusiness.id ? { ...b, businessHours } : b));
+                    setLoggedBusiness(prev => ({ ...prev, businessHours }));
+                    setSavedMessage("Saatler kaydedildi ✅");
+                    setTimeout(() => setSavedMessage(""), 3000);
+                  }}
+                >
+                  Saatleri Kaydet
+                </button>
+
+                <h3 style={{ marginTop: "24px" }}>Rezervasyon Saatleri</h3>
                 <p className="description" style={{ fontSize: 12, margin: "4px 0 10px" }}>
                   08:00'den başlayarak yarım saatlik dilimlerle seçin. Seçili saatler müşterilere gösterilir.
                 </p>
@@ -4303,7 +4482,32 @@ function App() {
             <div className="biz-profile-meta">
               <h1 className="biz-profile-name">{selectedBusiness.name}</h1>
               <span className="biz-profile-type">{selectedBusiness.type}</span>
-              {selectedBusiness.location && <span className="biz-profile-loc">📍 {selectedBusiness.location}</span>}
+              {(() => {
+                const todayKey = new Date().toLocaleDateString("en-US", { weekday: "long" });
+                const h = (selectedBusiness.businessHours || {})[todayKey];
+                if (!h?.open || !h?.close) return null;
+                const now = new Date();
+                const nowMins = now.getHours() * 60 + now.getMinutes();
+                const toMins = t => { const [hr, m] = t.split(":").map(Number); return hr * 60 + m; };
+                const isOpen = nowMins >= toMins(h.open) && nowMins < toMins(h.close);
+                return (
+                  <span className={`biz-open-status${isOpen ? " open" : " closed"}`}>
+                    {isOpen ? `✓ Şu an açık · ${h.open}–${h.close}` : `✕ Şu an kapalı · ${h.open}–${h.close} arası açık`}
+                  </span>
+                );
+              })()}
+              {selectedBusiness.location && (
+                <a
+                  className="biz-profile-loc biz-map-link"
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedBusiness.name + " " + selectedBusiness.location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                >
+                  📍 {selectedBusiness.location}
+                  <span className="biz-map-badge">🗺️ Haritada gör</span>
+                </a>
+              )}
               {selectedBusiness.phone && (
                 <span className="biz-profile-phone">📞 {selectedBusiness.phone}</span>
               )}
@@ -4353,6 +4557,44 @@ function App() {
                 : <p className="biz-profile-text">{selectedBusiness.menu}</p>}
             </div>
           )}
+
+          {(() => {
+            const hours = selectedBusiness.businessHours || {};
+            const days = [
+              { key: "Monday",    label: "Pazartesi" },
+              { key: "Tuesday",   label: "Salı" },
+              { key: "Wednesday", label: "Çarşamba" },
+              { key: "Thursday",  label: "Perşembe" },
+              { key: "Friday",    label: "Cuma" },
+              { key: "Saturday",  label: "Cumartesi" },
+              { key: "Sunday",    label: "Pazar" },
+            ];
+            const hasAny = days.some(d => hours[d.key]?.open);
+            if (!hasAny) return null;
+            const todayKey = new Date().toLocaleDateString("en-US", { weekday: "long" });
+            return (
+              <div className="biz-profile-section">
+                <div className="biz-profile-section-title">🕐 Çalışma Saatleri</div>
+                <div className="biz-hours-profile">
+                  {days.map(({ key, label }) => {
+                    const h = hours[key];
+                    const isToday = key === todayKey;
+                    const isOpen = h?.open && h?.close;
+                    return (
+                      <div key={key} className={`biz-hours-profile-row${isToday ? " today" : ""}${!isOpen ? " closed" : ""}`}>
+                        <span className="bhp-day">{label}</span>
+                        <span className="bhp-hours">
+                          {isOpen ? `${h.open} – ${h.close}` : "Kapalı"}
+                        </span>
+                        {isToday && isOpen && <span className="bhp-badge open">Şu an açık</span>}
+                        {isToday && !isOpen && <span className="bhp-badge closed">Bugün kapalı</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="biz-profile-section">
             <div className="biz-profile-section-title">{t.profile.times}</div>
