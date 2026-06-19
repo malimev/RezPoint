@@ -201,6 +201,7 @@ function formatBusiness(b) {
 function App() {
   const [page, setPage] = useState(getSavedPage);
   const [appReady, setAppReady] = useState(false);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [error, setError] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -371,12 +372,20 @@ function App() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
-      /* SW mesajı dinle → bildirime tıklanınca sayfa yönlendirmesi */
       navigator.serviceWorker.addEventListener("message", e => {
         if (e.data?.type === "NOTIFICATION_CLICK" && e.data.url) {
           window.location.href = e.data.url;
         }
       });
+    }
+
+    /* ── Install banner: tarayıcıda açıksa ve daha önce kapatılmamışsa göster ── */
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+      || window.navigator.standalone === true;
+    const dismissed = localStorage.getItem("rp_install_dismissed");
+    if (!isStandalone && !dismissed) {
+      const t = setTimeout(() => setShowInstallBanner(true), 2500);
+      return () => clearTimeout(t);
     }
   }, []);
 
@@ -1040,6 +1049,58 @@ function App() {
 
   return (
     <div className="page">
+
+      {/* ── Ana ekrana ekle banner ── */}
+      {showInstallBanner && (
+        <div className="install-banner">
+          <button
+            className="install-banner-close"
+            onClick={() => {
+              setShowInstallBanner(false);
+              localStorage.setItem("rp_install_dismissed", "1");
+            }}
+            aria-label="Kapat"
+          >✕</button>
+
+          <div className="install-banner-anim">
+            <div className="ib-phone">
+              <div className="ib-screen">
+                <div className="ib-app-icon">
+                  <span>R<em>P</em></span>
+                </div>
+              </div>
+              <div className="ib-home-bar" />
+            </div>
+            <div className="ib-arrow">→</div>
+            <div className="ib-homescreen">
+              <div className="ib-hs-icon">
+                <span>R<em>P</em></span>
+              </div>
+              <div className="ib-hs-label">RezPoint</div>
+              <div className="ib-notif">
+                <span className="ib-notif-dot" />
+                Bildirim
+              </div>
+            </div>
+          </div>
+
+          <div className="install-banner-text">
+            <strong>📲 Ana ekrana ekle</strong>
+            <p>Tarayıcı menüsünden <em>"Ana ekrana ekle"</em> seçerek uygulama gibi kullan ve anlık bildirimler al.</p>
+          </div>
+
+          <button
+            className="install-banner-btn"
+            onClick={() => {
+              setShowInstallBanner(false);
+              localStorage.setItem("rp_install_dismissed", "1");
+            }}
+          >
+            Tamam, anladım
+          </button>
+        </div>
+      )}
+
       <nav className={`navbar${navScrolled ? " navbar--scrolled" : ""}`}>
         <div
           className="logo"
