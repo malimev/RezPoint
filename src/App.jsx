@@ -1123,71 +1123,77 @@ function App() {
           <span className="logo-text">Rez<span className="logo-accent">Point</span></span>
         </div>
 
-        {/* Bildirim / Güncellemeler butonu */}
-        <div className="navbar-notif-wrap">
-          <button
-            className={`navbar-notif-btn${showWhatsNew ? " active" : ""}`}
-            onClick={() => {
-              setShowWhatsNew(p => !p);
-              setMobileMenuOpen(false);
-              if (!whatsNewRead) {
-                setWhatsNewRead(true);
-                localStorage.setItem("rp_whatsnew_read_v1", "1");
-              }
-            }}
-            aria-label="Güncellemeler"
-          >
-            🔔
-            {!whatsNewRead && <span className="navbar-notif-badge" />}
-          </button>
+        {/* Sağ grup: bildirim + hamburger */}
+        <div className="navbar-right">
+          <div className="navbar-notif-wrap">
+            <button
+              className={`navbar-notif-btn${showWhatsNew ? " active" : ""}`}
+              onClick={() => {
+                setShowWhatsNew(p => !p);
+                setMobileMenuOpen(false);
+                if (!whatsNewRead) {
+                  setWhatsNewRead(true);
+                  localStorage.setItem("rp_whatsnew_read_v1", "1");
+                }
+              }}
+              aria-label="Güncellemeler"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="8" cy="8" r="3" fill="currentColor"/>
+                <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                <line x1="8" y1="1" x2="8" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              {!whatsNewRead && <span className="navbar-notif-badge" />}
+            </button>
 
-          {showWhatsNew && (
-            <>
-              <div className="whatsnew-backdrop" onClick={() => setShowWhatsNew(false)} />
-              <div className="whatsnew-panel">
-                <div className="whatsnew-header">
-                  <span className="whatsnew-title">🎉 Yenilikler</span>
-                  <button className="whatsnew-close" onClick={() => setShowWhatsNew(false)}>✕</button>
-                </div>
-                <div className="whatsnew-list">
-                  <div className="whatsnew-item new">
-                    <div className="whatsnew-item-icon">📲</div>
-                    <div className="whatsnew-item-body">
-                      <div className="whatsnew-item-title">Ana Ekrana Ekle</div>
-                      <div className="whatsnew-item-desc">
-                        Siteyi tarayıcı menüsünden <strong>"Ana Ekrana Ekle"</strong> seçerek uygulama gibi kullanabilir, rezervasyon ve randevu <strong>anlık bildirimlerini</strong> alabilirsiniz.
+            {showWhatsNew && (
+              <>
+                <div className="whatsnew-backdrop" onClick={() => setShowWhatsNew(false)} />
+                <div className="whatsnew-panel">
+                  <div className="whatsnew-header">
+                    <span className="whatsnew-title">Yenilikler</span>
+                    <button className="whatsnew-close" onClick={() => setShowWhatsNew(false)}>✕</button>
+                  </div>
+                  <div className="whatsnew-list">
+                    <div className="whatsnew-item new">
+                      <div className="whatsnew-item-icon">📲</div>
+                      <div className="whatsnew-item-body">
+                        <div className="whatsnew-item-title">Ana Ekrana Ekle</div>
+                        <div className="whatsnew-item-desc">
+                          Tarayıcı menüsünden <strong>"Ana Ekrana Ekle"</strong> seçerek uygulama gibi kullanabilir, <strong>anlık bildirim</strong> alabilirsiniz.
+                        </div>
+                        <div className="whatsnew-item-date">Haziran 2026</div>
                       </div>
-                      <div className="whatsnew-item-date">Haziran 2026</div>
                     </div>
-                  </div>
-                  <div className="whatsnew-item">
-                    <div className="whatsnew-item-icon">🗺️</div>
-                    <div className="whatsnew-item-body">
-                      <div className="whatsnew-item-title">Haritada Gör</div>
-                      <div className="whatsnew-item-desc">İşletme profilindeki konuma tıklayarak Google Haritalar'da görebilirsiniz.</div>
-                      <div className="whatsnew-item-date">Haziran 2026</div>
+                    <div className="whatsnew-item">
+                      <div className="whatsnew-item-icon">🗺️</div>
+                      <div className="whatsnew-item-body">
+                        <div className="whatsnew-item-title">Haritada Gör</div>
+                        <div className="whatsnew-item-desc">İşletme profilindeki konuma tıklayarak Google Haritalar'da görebilirsiniz.</div>
+                        <div className="whatsnew-item-date">Haziran 2026</div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="whatsnew-item">
-                    <div className="whatsnew-item-icon">🏷️</div>
-                    <div className="whatsnew-item-body">
-                      <div className="whatsnew-item-title">Kategori Filtresi</div>
-                      <div className="whatsnew-item-desc">İşletmeleri Restoran, Kafe, Bar ve Meyhane olarak filtreleyebilirsiniz.</div>
-                      <div className="whatsnew-item-date">Haziran 2026</div>
+                    <div className="whatsnew-item">
+                      <div className="whatsnew-item-icon">🏷️</div>
+                      <div className="whatsnew-item-body">
+                        <div className="whatsnew-item-title">Kategori Filtresi</div>
+                        <div className="whatsnew-item-desc">İşletmeleri Restoran, Kafe, Bar ve Meyhane olarak filtreleyebilirsiniz.</div>
+                        <div className="whatsnew-item-date">Haziran 2026</div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </>
-          )}
-        </div>
+              </>
+            )}
+          </div>
 
-        <button
-          className="menu-button"
-          onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setShowWhatsNew(false); }}
-        >
-          ☰
-        </button>
+          <button
+            className="menu-button"
+            onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setShowWhatsNew(false); }}
+          >
+            ☰
+          </button>
+        </div>
 
         <div className={mobileMenuOpen ? "nav-links open" : "nav-links"}>
           <button
