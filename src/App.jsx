@@ -202,6 +202,8 @@ function App() {
   const [page, setPage] = useState(getSavedPage);
   const [appReady, setAppReady] = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [whatsNewRead, setWhatsNewRead] = useState(() => !!localStorage.getItem("rp_whatsnew_read_v1"));
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [error, setError] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -1121,9 +1123,68 @@ function App() {
           <span className="logo-text">Rez<span className="logo-accent">Point</span></span>
         </div>
 
+        {/* Bildirim / Güncellemeler butonu */}
+        <div className="navbar-notif-wrap">
+          <button
+            className={`navbar-notif-btn${showWhatsNew ? " active" : ""}`}
+            onClick={() => {
+              setShowWhatsNew(p => !p);
+              setMobileMenuOpen(false);
+              if (!whatsNewRead) {
+                setWhatsNewRead(true);
+                localStorage.setItem("rp_whatsnew_read_v1", "1");
+              }
+            }}
+            aria-label="Güncellemeler"
+          >
+            🔔
+            {!whatsNewRead && <span className="navbar-notif-badge" />}
+          </button>
+
+          {showWhatsNew && (
+            <>
+              <div className="whatsnew-backdrop" onClick={() => setShowWhatsNew(false)} />
+              <div className="whatsnew-panel">
+                <div className="whatsnew-header">
+                  <span className="whatsnew-title">🎉 Yenilikler</span>
+                  <button className="whatsnew-close" onClick={() => setShowWhatsNew(false)}>✕</button>
+                </div>
+                <div className="whatsnew-list">
+                  <div className="whatsnew-item new">
+                    <div className="whatsnew-item-icon">📲</div>
+                    <div className="whatsnew-item-body">
+                      <div className="whatsnew-item-title">Ana Ekrana Ekle</div>
+                      <div className="whatsnew-item-desc">
+                        Siteyi tarayıcı menüsünden <strong>"Ana Ekrana Ekle"</strong> seçerek uygulama gibi kullanabilir, rezervasyon ve randevu <strong>anlık bildirimlerini</strong> alabilirsiniz.
+                      </div>
+                      <div className="whatsnew-item-date">Haziran 2026</div>
+                    </div>
+                  </div>
+                  <div className="whatsnew-item">
+                    <div className="whatsnew-item-icon">🗺️</div>
+                    <div className="whatsnew-item-body">
+                      <div className="whatsnew-item-title">Haritada Gör</div>
+                      <div className="whatsnew-item-desc">İşletme profilindeki konuma tıklayarak Google Haritalar'da görebilirsiniz.</div>
+                      <div className="whatsnew-item-date">Haziran 2026</div>
+                    </div>
+                  </div>
+                  <div className="whatsnew-item">
+                    <div className="whatsnew-item-icon">🏷️</div>
+                    <div className="whatsnew-item-body">
+                      <div className="whatsnew-item-title">Kategori Filtresi</div>
+                      <div className="whatsnew-item-desc">İşletmeleri Restoran, Kafe, Bar ve Meyhane olarak filtreleyebilirsiniz.</div>
+                      <div className="whatsnew-item-date">Haziran 2026</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         <button
           className="menu-button"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setShowWhatsNew(false); }}
         >
           ☰
         </button>
