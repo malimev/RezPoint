@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4c1d95"/>
+      <stop offset="50%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Arka plan -->
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#bg)"/>
+
+  <!-- Parlama efekti -->
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#shine)"/>
+
+  <!-- R harfi -->
+  <text
+    x="82"
+    y="348"
+    font-family="'Inter','Helvetica Neue',Arial,sans-serif"
+    font-size="270"
+    font-weight="900"
+    letter-spacing="-12"
+    fill="white"
+  >R</text>
+
+  <!-- P harfi - italik -->
+  <text
+    x="248"
+    y="348"
+    font-family="'Inter','Helvetica Neue',Arial,sans-serif"
+    font-size="270"
+    font-weight="900"
+    font-style="italic"
+    fill="rgba(255,255,255,0.88)"
+  >P</text>
+
+  <!-- Alt çizgi aksanı -->
+  <rect x="82" y="374" width="348" height="14" rx="7" fill="rgba(255,255,255,0.3)"/>
+</svg>
