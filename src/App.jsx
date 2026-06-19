@@ -5,6 +5,56 @@ import logo from "./assets/logo.png";
 import { supabase } from "./supabaseClient";
 import translations from "./i18n";
 
+/* ── Push notification helpers ── */
+const VAPID_PUBLIC = "BDMjWSUxEiOZtQjtivlisIbDYJLYUcIPjx0lDrZbn8gvSUV8ih9EyCxbHyniyrIpjBnjtLROfxY89XatXo2dZG8";
+const PUSH_FN_URL  = "https://sghwmnagplaolqdfqpvz.supabase.co/functions/v1/send-push";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64  = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw     = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function registerPush(userEmail, userType, userId) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return;
+
+    const existing = await reg.pushManager.getSubscription();
+    const sub = existing || await reg.pushManager.subscribe({
+      userVisibleOnly:      true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+    });
+
+    const { endpoint, keys } = sub.toJSON();
+    await supabase.from("push_subscriptions").upsert({
+      endpoint,
+      p256dh:     keys.p256dh,
+      auth:       keys.auth,
+      user_email: userEmail || null,
+      user_type:  userType  || null,
+      user_id:    userId    ? String(userId) : null,
+    }, { onConflict: "endpoint" });
+  } catch (e) {
+    console.warn("Push registration failed:", e);
+  }
+}
+
+async function sendPush({ userEmail, userType, userId, title, body, url, tag }) {
+  try {
+    await fetch(PUSH_FN_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ user_email: userEmail, user_type: userType, user_id: userId, title, body, url, tag }),
+    });
+  } catch (e) {
+    console.warn("Push send failed:", e);
+  }
+}
+
 function Spinner() {
   return <span className="spinner" />;
 }
@@ -317,6 +367,19 @@ function App() {
   // ---------------------------------------------------------------------
   // Initial data load
   // ---------------------------------------------------------------------
+  /* ── Service Worker kaydı ── */
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      /* SW mesajı dinle → bildirime tıklanınca sayfa yönlendirmesi */
+      navigator.serviceWorker.addEventListener("message", e => {
+        if (e.data?.type === "NOTIFICATION_CLICK" && e.data.url) {
+          window.location.href = e.data.url;
+        }
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const loadInitialData = async () => {
       // 1. Restore Supabase Auth customer session
@@ -865,6 +928,7 @@ function App() {
 
     localStorage.setItem("rp_biz_id", String(business.id));
     setLoginError("");
+    registerPush(business.email, "business", business.id);
     setBizLoginAttempts(0);
     setPanelTab("incoming");
     setPage("businessPanel");
@@ -1734,6 +1798,8 @@ function App() {
 
                 setReservations([...reservations, newReservation]);
                 setIsCreatingReservation(false);
+                // İşletmeye yeni rezervasyon bildirimi
+                sendPush({ userType: "business", userId: selectedBusiness?.id, title: "🔔 Yeni Rezervasyon İsteği", body: `${loggedCustomer?.name || "Misafir"} rezervasyon oluşturdu · ${newReservation.date} ${newReservation.time}`, url: "/" });
                 setPage("success");
               }}
             >
@@ -1964,6 +2030,7 @@ function App() {
                     });
                     setEmailVerified(true);
                     loadCustomerExtras(custData.id);
+                    registerPush(foundCustomer.email, "customer", foundCustomer.id);
                     if (afterLoginReturnPage) {
                       const returnTo = afterLoginReturnPage;
                       setAfterLoginReturnPage(null);
@@ -3636,6 +3703,8 @@ function App() {
                                     : item,
                                 ),
                               );
+                              // Müşteriye bildirim gönder
+                              sendPush({ userEmail: rez.email, title: "✅ Rezervasyonunuz Kabul Edildi!", body: `${loggedBusiness?.name || "İşletme"} rezervasyonunuzu onayladı. ${rez.date} · ${rez.time}`, url: "/" });
                               setLoadingReservationId(null);
                             }}
                           >
@@ -3668,6 +3737,8 @@ function App() {
                                     : item,
                                 ),
                               );
+                              // Müşteriye bildirim gönder
+                              sendPush({ userEmail: rez.email, title: "❌ Rezervasyon Reddedildi", body: `${loggedBusiness?.name || "İşletme"} bu tarih için uygun değil. ${rez.date} · ${rez.time}`, url: "/" });
                               setLoadingReservationId(null);
                             }}
                           >
