@@ -209,7 +209,7 @@ function App() {
   const [meetings, setMeetings] = useState([]);
   const [bizMode, setBizMode] = useState("reservations"); // "reservations" | "meetings"
   const [meetingPanelTab, setMeetingPanelTab] = useState("incoming");
-  const [meetingForm, setMeetingForm] = useState({ fullName: "", email: "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
+  const [meetingForm, setMeetingForm] = useState({ fullName: "", email: "", phone: "", company: "", reason: "is_gorusmesi", productCategory: "", date: "", time: "", note: "" });
   const [meetingTermsChecked, setMeetingTermsChecked] = useState({ biz: false, rp: false });
   const [meetingFormBusiness, setMeetingFormBusiness] = useState(null);
   const [meetingFormError, setMeetingFormError] = useState("");
@@ -964,7 +964,12 @@ function App() {
   if (!appReady) {
     return (
       <div className="app-loading">
-        <div className="app-loading-spinner" />
+        <div className="app-loading-logo">
+          <span className="app-loading-rp">R<span>P</span></span>
+          <div className="app-loading-dots">
+            <span /><span /><span />
+          </div>
+        </div>
       </div>
     );
   }
@@ -1075,14 +1080,14 @@ function App() {
           <div className="ot-filter-row">
             <button
               className={`ot-chip${datePickerOpen ? " active" : ""}`}
-              onClick={() => { setDatePickerOpen(p => !p); setTimePickerOpen(false); }}
+              onClick={() => { setDatePickerOpen(p => !p); setTimePickerOpen(false); setLocationPickerOpen(false); }}
             >
               📅 {searchDate ? (() => { const d = new Date(searchDate + "T00:00:00"); return d.toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR", { day: "numeric", month: "short" }); })() : (lang === "en" ? "Date" : "Tarih")}
               <span className="ot-chip-arrow">{datePickerOpen ? "▲" : "▼"}</span>
             </button>
             <button
               className={`ot-chip${timePickerOpen ? " active" : ""}`}
-              onClick={() => { setTimePickerOpen(p => !p); setDatePickerOpen(false); }}
+              onClick={() => { setTimePickerOpen(p => !p); setDatePickerOpen(false); setLocationPickerOpen(false); }}
             >
               🕐 {searchTime || (lang === "en" ? "Time" : "Saat")}
               <span className="ot-chip-arrow">{timePickerOpen ? "▲" : "▼"}</span>
@@ -1182,7 +1187,7 @@ function App() {
               const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
               const todayDayName = now.toLocaleDateString("en-US", { weekday: "long" });
               const nowMins = now.getHours() * 60 + now.getMinutes();
-              const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+              const toMins = str => { const [h,m] = (str||"00:00").split(":").map(Number); return (h||0)*60+(m||0); };
               const available = adminBusinesses.filter(biz => {
                 if (!biz.reservationActive) return false;
                 if (searchLocation !== "Hepsi" && biz.location !== searchLocation) return false;
@@ -1300,7 +1305,7 @@ function App() {
 
       {page === "businesses" && (
         <section className="business-section">
-          <button className="back-btn" onClick={() => setPage("home")}>{t.businesses.back}</button>
+          <button className="back-btn" onClick={() => { setPage("home"); setBizCategory("Tümü"); setBusinessSearch(""); }}>{t.businesses.back}</button>
 
           <h1>{t.businesses.title}</h1>
           <p className="description">{t.businesses.subtitle}</p>
@@ -1354,13 +1359,15 @@ function App() {
             {adminBusinesses
               .filter((business) => {
                 const q = businessSearch.toLowerCase();
-                if (q && !business.name.toLowerCase().includes(q) && !business.type.toLowerCase().includes(q) && !business.location.toLowerCase().includes(q)) return false;
+                const bizName = (business.name || "").toLowerCase();
+                const bizType = (business.type || "").toLowerCase();
+                const bizLoc  = (business.location || "").toLowerCase();
+                if (q && !bizName.includes(q) && !bizType.includes(q) && !bizLoc.includes(q)) return false;
                 if (searchLocation !== "Hepsi" && business.location !== searchLocation) return false;
                 if (bizCategory !== "Tümü") {
                   const typeMap = { "Restoranlar": ["restoran","restaurant","yemek","lokanta"], "Kafeler": ["kafe","cafe","kahve","coffee"], "Barlar": ["bar","cocktail","lounge"], "Meyhaneler": ["meyhane","tavern","pub","içki"] };
                   const keywords = typeMap[bizCategory] || [];
-                  const t = (business.type || "").toLowerCase();
-                  if (!keywords.some(k => t.includes(k))) return false;
+                  if (!keywords.some(k => bizType.includes(k))) return false;
                 }
                 if (searchDate) {
                   const dayName = new Date(searchDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
@@ -1419,7 +1426,7 @@ function App() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setMeetingFormBusiness(business);
-                          setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
+                          setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", productCategory: "", date: "", time: "", note: "" });
                           setMeetingTermsChecked({ biz: false, rp: false });
                           setMeetingFormError("");
                           setPage("meetingRequest");
@@ -4488,7 +4495,7 @@ function App() {
                 if (!h?.open || !h?.close) return null;
                 const now = new Date();
                 const nowMins = now.getHours() * 60 + now.getMinutes();
-                const toMins = t => { const [hr, m] = t.split(":").map(Number); return hr * 60 + m; };
+                const toMins = str => { const [hr, m] = (str||"00:00").split(":").map(Number); return (hr||0)*60+(m||0); };
                 const isOpen = nowMins >= toMins(h.open) && nowMins < toMins(h.close);
                 return (
                   <span className={`biz-open-status${isOpen ? " open" : " closed"}`}>
@@ -4515,7 +4522,7 @@ function App() {
                 <div className="biz-profile-phone-row">
                   <button className="meeting-request-btn" onClick={() => {
                     setMeetingFormBusiness(selectedBusiness);
-                    setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", date: "", time: "", note: "" });
+                    setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", productCategory: "", date: "", time: "", note: "" });
                     setMeetingTermsChecked({ biz: false, rp: false });
                     setMeetingFormError("");
                     setPage("meetingRequest");
@@ -4639,11 +4646,38 @@ function App() {
               )}
               <input type="tel" placeholder={t.meeting.phonePlaceholder} value={meetingForm.phone} onChange={e => setMeetingForm(p => ({ ...p, phone: e.target.value }))} />
               <input type="text" placeholder={t.meeting.companyPlaceholder} value={meetingForm.company} onChange={e => setMeetingForm(p => ({ ...p, company: e.target.value }))} />
-              <select value={meetingForm.reason} onChange={e => setMeetingForm(p => ({ ...p, reason: e.target.value }))}>
+              <select value={meetingForm.reason} onChange={e => setMeetingForm(p => ({ ...p, reason: e.target.value, productCategory: "" }))}>
                 {Object.entries(t.meeting.reasons).map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
                 ))}
               </select>
+
+              {meetingForm.reason === "urun_tanitimi" && (
+                <select
+                  value={meetingForm.productCategory}
+                  onChange={e => setMeetingForm(p => ({ ...p, productCategory: e.target.value }))}
+                  style={{ borderColor: meetingForm.productCategory ? "rgba(124,58,237,0.4)" : "rgba(239,68,68,0.35)" }}
+                >
+                  <option value="">📂 {lang === "en" ? "Select product category" : "Ürün kategorisi seçin"}</option>
+                  {[
+                    ["icecek",       "🥤 İçecek"],
+                    ["yiyecek",      "🍽️ Yiyecek & Gıda"],
+                    ["alkol_sigara", "🍷 Alkol & Sigara"],
+                    ["hijen",        "🧴 Hijyen & Bakım"],
+                    ["gunluk",       "🧹 Günlük Kullanım"],
+                    ["giyim",        "👗 Giyim & Tekstil"],
+                    ["teknoloji",    "💻 Teknoloji & Elektronik"],
+                    ["ev_yasam",     "🏠 Ev & Yaşam"],
+                    ["kozmetik",     "💄 Kozmetik & Güzellik"],
+                    ["spor",         "🏋️ Spor & Outdoor"],
+                    ["cocuk",        "🧸 Çocuk Ürünleri"],
+                    ["ofis",         "📎 Ofis & Kırtasiye"],
+                    ["diger",        "📦 Diğer"],
+                  ].map(([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ))}
+                </select>
+              )}
 
               <div className="date-time-row">
                 <div className="strip-section">
@@ -4728,53 +4762,65 @@ function App() {
               </div>
 
               {(() => {
-                const formIncomplete = !meetingForm.fullName || !meetingForm.email || !meetingForm.phone || !meetingForm.date || !meetingForm.time || !meetingTermsChecked.biz || !meetingTermsChecked.rp;
-                if (!loggedCustomer) {
-                  return (
-                    <button type="button"
-                      disabled={formIncomplete}
-                      style={{ opacity: formIncomplete ? 0.5 : 1 }}
-                      onClick={() => {
+                const catOk = meetingForm.reason !== "urun_tanitimi" || !!meetingForm.productCategory;
+                // Giriş yapılmamışsa ad/email henüz yok — login sonrası gelecek, kontrol etme
+                const fieldsOk = loggedCustomer
+                  ? (!!meetingForm.fullName && !!meetingForm.email && !!meetingForm.phone && !!meetingForm.date && !!meetingForm.time && catOk && meetingTermsChecked.biz && meetingTermsChecked.rp)
+                  : (!!meetingForm.phone && !!meetingForm.date && !!meetingForm.time && catOk && meetingTermsChecked.biz && meetingTermsChecked.rp);
+                const isDisabled = !fieldsOk || isSendingMeeting;
+
+                return (
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    style={{ width: "100%", marginTop: 4, opacity: isDisabled ? 0.45 : 1 }}
+                    disabled={isDisabled}
+                    onClick={async () => {
+                      setMeetingFormError("");
+                      if (!loggedCustomer) {
                         setAfterLoginReturnPage("meetingRequest");
                         setCustomerMode("login");
                         setPage("customerAuth");
-                      }}
-                    >
-                      {t.meeting.loginAndSend}
-                    </button>
-                  );
-                }
-                return null;
+                        return;
+                      }
+                      setIsSendingMeeting(true);
+                      const code = "MT-" + Math.floor(10000 + Math.random() * 90000);
+                      const { data: inserted, error } = await supabase.from("meetings").insert([{
+                        business_id: meetingFormBusiness.id,
+                        business_name: meetingFormBusiness.name,
+                        full_name: meetingForm.fullName,
+                        email: meetingForm.email,
+                        phone: meetingForm.phone,
+                        company_name: meetingForm.company || null,
+                        reason: meetingForm.reason,
+                        date: meetingForm.date,
+                        time: meetingForm.time,
+                        note: meetingForm.reason === "urun_tanitimi" && meetingForm.productCategory
+                          ? `[Kategori: ${meetingForm.productCategory}]${meetingForm.note ? " " + meetingForm.note : ""}`
+                          : meetingForm.note || null,
+                        status: "pending",
+                        code,
+                      }]).select().single();
+                      setIsSendingMeeting(false);
+                      if (error) { setMeetingFormError((lang === "en" ? "Could not send: " : "Gönderilemedi: ") + error.message); return; }
+                      setMeetings(prev => [...prev, {
+                        id: inserted.id, businessId: meetingFormBusiness.id, businessName: meetingFormBusiness.name,
+                        fullName: meetingForm.fullName, email: meetingForm.email, phone: meetingForm.phone,
+                        company: meetingForm.company || "", reason: meetingForm.reason,
+                        date: meetingForm.date, time: meetingForm.time, note: meetingForm.note || "",
+                        status: "pending", code, createdAt: inserted.created_at || new Date().toISOString()
+                      }]);
+                      setPage("meetingSuccess");
+                    }}
+                  >
+                    {isSendingMeeting
+                      ? t.meeting.sending
+                      : loggedCustomer
+                        ? t.meeting.submitBtn
+                        : (lang === "en" ? "Log in & Send Request" : "Giriş Yap & Randevu İste")}
+                  </button>
+                );
               })()}
-              {loggedCustomer && <button type="button"
-                disabled={isSendingMeeting || !meetingForm.fullName || !meetingForm.email || !meetingForm.phone || !meetingForm.date || !meetingForm.time || !meetingTermsChecked.biz || !meetingTermsChecked.rp}
-                style={{ opacity: (isSendingMeeting || !meetingForm.fullName || !meetingForm.email || !meetingForm.phone || !meetingForm.date || !meetingForm.time || !meetingTermsChecked.biz || !meetingTermsChecked.rp) ? 0.5 : 1 }}
-                onClick={async () => {
-                  setIsSendingMeeting(true);
-                  setMeetingFormError("");
-                  const code = "MT-" + Math.floor(10000 + Math.random() * 90000);
-                  const { data: inserted, error } = await supabase.from("meetings").insert([{
-                    business_id: meetingFormBusiness.id,
-                    business_name: meetingFormBusiness.name,
-                    full_name: meetingForm.fullName,
-                    email: meetingForm.email,
-                    phone: meetingForm.phone,
-                    company_name: meetingForm.company || null,
-                    reason: meetingForm.reason,
-                    date: meetingForm.date,
-                    time: meetingForm.time,
-                    note: meetingForm.note || null,
-                    status: "pending",
-                    code,
-                  }]).select().single();
-                  if (error) { setMeetingFormError("Randevu gönderilemedi: " + error.message); setIsSendingMeeting(false); return; }
-                  setMeetings(prev => [...prev, { id: inserted.id, businessId: meetingFormBusiness.id, businessName: meetingFormBusiness.name, fullName: meetingForm.fullName, email: meetingForm.email, phone: meetingForm.phone, company: meetingForm.company || "", reason: meetingForm.reason, date: meetingForm.date, time: meetingForm.time, note: meetingForm.note || "", status: "pending", code, createdAt: inserted.created_at || new Date().toISOString() }]);
-                  setIsSendingMeeting(false);
-                  setPage("meetingSuccess");
-                }}
-              >
-                {isSendingMeeting ? t.meeting.sending : t.meeting.submitBtn}
-              </button>}
 
               {termsModal && (
                 <div className="terms-modal-overlay" onClick={() => setTermsModal(null)}>
