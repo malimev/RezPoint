@@ -204,6 +204,7 @@ function App() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [whatsNewRead, setWhatsNewRead] = useState(() => !!localStorage.getItem("rp_whatsnew_read_v1"));
+  const [swUpdate, setSwUpdate] = useState(false); // yeni SW bekliyor
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [error, setError] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -370,18 +371,44 @@ function App() {
   // ---------------------------------------------------------------------
   // Initial data load
   // ---------------------------------------------------------------------
-  /* ── Service Worker kaydı ── */
+  /* ── Service Worker kaydı + güncelleme tespiti ── */
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-      navigator.serviceWorker.addEventListener("message", e => {
-        if (e.data?.type === "NOTIFICATION_CLICK" && e.data.url) {
-          window.location.href = e.data.url;
-        }
-      });
-    }
+    if (!("serviceWorker" in navigator)) return;
 
-    /* ── Install banner: tarayıcıda açıksa ve daha önce kapatılmamışsa göster ── */
+    navigator.serviceWorker.register("/sw.js").then(reg => {
+      /* Sayfa açıkken güncelleme gelirse */
+      reg.addEventListener("updatefound", () => {
+        const newSW = reg.installing;
+        if (!newSW) return;
+        newSW.addEventListener("statechange", () => {
+          /* Yeni SW yüklendi, eski hâlâ kontrolde → banner göster */
+          if (newSW.state === "installed" && navigator.serviceWorker.controller) {
+            setSwUpdate(true);
+          }
+        });
+      });
+
+      /* Zaten bekleyen bir SW var mı? (sekme kapalıyken güncelleme geldiyse) */
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        setSwUpdate(true);
+      }
+    }).catch(() => {});
+
+    /* SW kontrolü değişince (yenileme sonrası) sayfayı yenile */
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!refreshing) { refreshing = true; window.location.reload(); }
+    });
+
+    navigator.serviceWorker.addEventListener("message", e => {
+      if (e.data?.type === "NOTIFICATION_CLICK" && e.data.url) {
+        window.location.href = e.data.url;
+      }
+    });
+  }, []);
+
+  /* ── Install banner ── */
+  useEffect(() => {
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches
       || window.navigator.standalone === true;
     const dismissed = localStorage.getItem("rp_install_dismissed");
@@ -1051,6 +1078,24 @@ function App() {
 
   return (
     <div className="page">
+
+      {/* ── SW güncelleme banner ── */}
+      {swUpdate && (
+        <div className="sw-update-banner">
+          <span>🆕 Yeni sürüm mevcut</span>
+          <button
+            className="sw-update-btn"
+            onClick={async () => {
+              const reg = await navigator.serviceWorker.getRegistration();
+              if (reg?.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+              setSwUpdate(false);
+            }}
+          >
+            Güncelle →
+          </button>
+          <button className="sw-update-close" onClick={() => setSwUpdate(false)}>✕</button>
+        </div>
+      )}
 
       {/* ── Ana ekrana ekle banner ── */}
       {showInstallBanner && (
