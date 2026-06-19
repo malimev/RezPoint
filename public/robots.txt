@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://getrezpoint.com/sitemap.xml

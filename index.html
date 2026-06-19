@@ -2,16 +2,67 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- ── İkonlar ── -->
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- ── Viewport & PWA ── -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#7c3aed" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="RezPoint" />
-    <link rel="manifest" href="/manifest.json" />
-    <title>RezPoint</title>
+
+    <!-- ── Temel SEO ── -->
+    <title>RezPoint — Online Rezervasyon ve Randevu Sistemi</title>
+    <meta name="description" content="RezPoint ile restoranlar, kafeler ve işletmeler için kolayca online rezervasyon yapın. Kıbrıs'ın en hızlı randevu ve masa rezervasyon platformu." />
+    <meta name="keywords" content="rezervasyon, randevu, online rezervasyon, masa rezervasyon, kıbrıs restoran, kafe rezervasyon, rezpoint, getrezpoint" />
+    <meta name="author" content="RezPoint" />
+    <link rel="canonical" href="https://getrezpoint.com/" />
+
+    <!-- ── Open Graph (sosyal medya önizleme) ── -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:url"         content="https://getrezpoint.com/" />
+    <meta property="og:title"       content="RezPoint — Online Rezervasyon ve Randevu" />
+    <meta property="og:description" content="Kıbrıs'taki restoranlar, kafeler ve işletmeler için anlık online rezervasyon. Saniyeler içinde masa ayırtın." />
+    <meta property="og:image"       content="https://getrezpoint.com/icon-512.png" />
+    <meta property="og:site_name"   content="RezPoint" />
+    <meta property="og:locale"      content="tr_CY" />
+
+    <!-- ── Twitter Card ── -->
+    <meta name="twitter:card"        content="summary" />
+    <meta name="twitter:title"       content="RezPoint — Online Rezervasyon ve Randevu" />
+    <meta name="twitter:description" content="Kıbrıs'taki restoranlar ve kafeler için anlık online rezervasyon." />
+    <meta name="twitter:image"       content="https://getrezpoint.com/icon-512.png" />
+
+    <!-- ── JSON-LD Yapısal Veri ── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "RezPoint",
+      "url": "https://getrezpoint.com",
+      "description": "Kıbrıs'taki restoranlar, kafeler ve işletmeler için online rezervasyon ve randevu platformu.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web, iOS, Android",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "TRY" },
+      "inLanguage": ["tr", "en"],
+      "areaServed": {
+        "@type": "Place",
+        "name": "Kuzey Kıbrıs",
+        "containsPlace": [
+          { "@type": "City", "name": "Mağusa" },
+          { "@type": "City", "name": "İskele" },
+          { "@type": "City", "name": "Lefkoşa" },
+          { "@type": "City", "name": "Girne" },
+          { "@type": "City", "name": "Lefke" }
+        ]
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
