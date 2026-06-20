@@ -204,7 +204,10 @@ function App() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [whatsNewRead, setWhatsNewRead] = useState(() => !!localStorage.getItem("rp_whatsnew_read_v1"));
-  const [swUpdate, setSwUpdate] = useState(false); // yeni SW bekliyor
+  const [swUpdate, setSwUpdate] = useState(false);
+  const [broadTitle, setBroadTitle] = useState("");
+  const [broadBody, setBroadBody] = useState("");
+  const [broadSending, setBroadSending] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [error, setError] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -447,6 +450,7 @@ function App() {
           setCustomerForm({ name: custData.name, email: custData.email, password: "" });
           setEmailVerified(true);
           loadCustomerExtras(custData.id);
+          registerPush(custData.email, "customer", custData.id);
           // Email doğrulama linkinden dönen kullanıcıyı dashboard'a yönlendir
           const savedPage = localStorage.getItem("rp_page") || "home";
           if (savedPage === "customerAuth") setPage("customerDashboard");
@@ -496,6 +500,7 @@ function App() {
             menu: restoredBusiness.menu || "",
             terms: restoredBusiness.terms || "",
           });
+          registerPush(restoredBusiness.email, "business", String(restoredBusiness.id));
         }
       }
 
@@ -1980,7 +1985,7 @@ function App() {
                 setReservations([...reservations, newReservation]);
                 setIsCreatingReservation(false);
                 // İşletmeye yeni rezervasyon bildirimi
-                sendPush({ userType: "business", userId: selectedBusiness?.id, title: "🔔 Yeni Rezervasyon İsteği", body: `${loggedCustomer?.name || "Misafir"} rezervasyon oluşturdu · ${newReservation.date} ${newReservation.time}`, url: "/" });
+                sendPush({ userType: "business", userId: String(selectedBusiness?.id), title: "🔔 Yeni Rezervasyon İsteği", body: `${loggedCustomer?.name || "Misafir"} rezervasyon oluşturdu · ${newReservation.date} ${newReservation.time}`, url: "/" });
                 setPage("success");
               }}
             >
@@ -2853,37 +2858,46 @@ function App() {
           </div>
 
           {/* ── Toplu Push Bildirimi ── */}
-          <div className="reservation-box" style={{ marginTop: "24px" }}>
-            <h2>📣 Toplu Bildirim Gönder</h2>
-            <p className="description">Uygulamayı yükleyen tüm kullanıcılara anlık bildirim gönder.</p>
-            <form className="reservation-form" onSubmit={async e => {
-              e.preventDefault();
-              const fd = new FormData(e.target);
-              const title = fd.get("btitle");
-              const body  = fd.get("bbody");
-              if (!title || !body) return;
-              const btn = e.target.querySelector("button[type=submit]");
-              btn.disabled = true; btn.textContent = "Gönderiliyor...";
-              try {
-                const res = await fetch("https://sghwmnagplaolqdfqpvz.supabase.co/functions/v1/send-push", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ send_to_all: true, title, body }),
-                });
-                const json = await res.json();
-                alert(`✅ Gönderildi! ${json.sent ?? 0} kullanıcıya ulaştı.`);
-                e.target.reset();
-              } catch {
-                alert("Gönderilemedi, tekrar deneyin.");
-              } finally {
-                btn.disabled = false; btn.textContent = "Herkese Gönder 🚀";
-              }
-            }}>
-              <input name="btitle" type="text" placeholder="Bildirim başlığı  (örn: Babalar Günü 🎁)" required />
-              <textarea name="bbody" placeholder="Bildirim mesajı  (örn: Tüm işletmeler sizi bekliyor!)" rows={3} required />
-              <button type="submit" className="primary-btn" style={{ width: "100%" }}>Herkese Gönder 🚀</button>
-            </form>
-          </div>
+          {(() => {
+            const [bTitle, setBTitle] = [broadTitle, setBroadTitle];
+            const [bBody,  setBBody]  = [broadBody,  setBroadBody];
+            const [bSending, setBSending] = [broadSending, setBroadSending];
+            return (
+              <div className="reservation-box" style={{ marginTop: "24px" }}>
+                <h2>📣 Toplu Bildirim Gönder</h2>
+                <p className="description">Uygulamayı yükleyen tüm kullanıcılara anlık bildirim gönder.</p>
+                <div className="reservation-form">
+                  <input type="text" placeholder="Bildirim başlığı  (örn: Babalar Günü 🎁)" value={bTitle} onChange={e => setBTitle(e.target.value)} />
+                  <textarea placeholder="Bildirim mesajı  (örn: Tüm işletmeler sizi bekliyor!)" rows={3} value={bBody} onChange={e => setBBody(e.target.value)} />
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    style={{ width: "100%" }}
+                    disabled={bSending || !bTitle.trim() || !bBody.trim()}
+                    onClick={async () => {
+                      setBSending(true);
+                      try {
+                        const res = await fetch("https://sghwmnagplaolqdfqpvz.supabase.co/functions/v1/send-push", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ send_to_all: true, title: bTitle.trim(), body: bBody.trim() }),
+                        });
+                        const json = await res.json();
+                        alert(`✅ Gönderildi! ${json.sent ?? 0} kullanıcıya ulaştı.`);
+                        setBTitle(""); setBBody("");
+                      } catch {
+                        alert("Gönderilemedi, tekrar deneyin.");
+                      } finally {
+                        setBSending(false);
+                      }
+                    }}
+                  >
+                    {bSending ? "Gönderiliyor..." : "Herkese Gönder 🚀"}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="reservation-box" style={{ marginTop: "24px" }}>
             <h2>📄 RezPoint Kullanım Koşulları</h2>
@@ -3538,13 +3552,19 @@ function App() {
                           <button className="req-accept-btn" disabled={loadingReservationId === m.id} onClick={async () => {
                             setLoadingReservationId(m.id);
                             const { error } = await supabase.rpc("business_update_meeting_status", { p_token: bizSessionToken, p_meeting_id: m.id, p_status: "accepted" });
-                            if (!error) setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "accepted" } : x));
+                            if (!error) {
+                              setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "accepted" } : x));
+                              sendPush({ userEmail: m.email, title: "✅ Randevu Talebiniz Kabul Edildi", body: `${loggedBusiness?.name || "İşletme"} randevu talebinizi onayladı. ${m.date} · ${m.time}`, url: "/" });
+                            }
                             setLoadingReservationId(null);
                           }}>{loadingReservationId === m.id ? <Spinner /> : "✓"}</button>
                           <button className="req-reject-btn" disabled={loadingReservationId === m.id} onClick={async () => {
                             setLoadingReservationId(m.id);
                             const { error } = await supabase.rpc("business_update_meeting_status", { p_token: bizSessionToken, p_meeting_id: m.id, p_status: "rejected" });
-                            if (!error) setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "rejected" } : x));
+                            if (!error) {
+                              setMeetings(prev => prev.map(x => x.id === m.id ? { ...x, status: "rejected" } : x));
+                              sendPush({ userEmail: m.email, title: "❌ Randevu Talebi Reddedildi", body: `${loggedBusiness?.name || "İşletme"} bu tarih için uygun değil. ${m.date} · ${m.time}`, url: "/" });
+                            }
                             setLoadingReservationId(null);
                           }}>{loadingReservationId === m.id ? <Spinner /> : "✗"}</button>
                         </div>
@@ -4377,7 +4397,11 @@ function App() {
                     });
                     if (error) { alert("Saatler kaydedilemedi."); return; }
                     setAdminBusinesses(prev => prev.map(b => b.id === loggedBusiness.id ? { ...b, businessHours } : b));
-                    setLoggedBusiness(prev => ({ ...prev, businessHours }));
+                    setLoggedBusiness(prev => {
+                      const updated = { ...prev, businessHours };
+                      localStorage.setItem("rp_biz_cache", JSON.stringify(updated));
+                      return updated;
+                    });
                     setSavedMessage("Saatler kaydedildi ✅");
                     setTimeout(() => setSavedMessage(""), 3000);
                   }}
@@ -4460,6 +4484,7 @@ function App() {
                     };
 
                     setLoggedBusiness(updatedBusiness);
+                    localStorage.setItem("rp_biz_cache", JSON.stringify(updatedBusiness));
 
                     setAdminBusinesses((prev) =>
                       prev.map((b) =>
@@ -4561,6 +4586,7 @@ function App() {
                         logoUrl: loggedBusiness.logoUrl,
                       };
                       setLoggedBusiness(updatedBusiness);
+                      localStorage.setItem("rp_biz_cache", JSON.stringify(updatedBusiness));
                       setAdminBusinesses((prev) =>
                         prev.map((b) => b.id === loggedBusiness.id ? { ...updatedBusiness, logoUrl: b.logoUrl || updatedBusiness.logoUrl } : b)
                       );
@@ -5096,6 +5122,7 @@ function App() {
                         date: meetingForm.date, time: meetingForm.time, note: meetingForm.note || "",
                         status: "pending", code, createdAt: inserted.created_at || new Date().toISOString()
                       }]);
+                      sendPush({ userType: "business", userId: String(meetingFormBusiness?.id), title: "📅 Yeni Randevu Talebi", body: `${meetingForm.fullName || "Misafir"} randevu talebi gönderdi · ${meetingForm.date} ${meetingForm.time}`, url: "/" });
                       setPage("meetingSuccess");
                     }}
                   >

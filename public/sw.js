@@ -1,21 +1,20 @@
-/* RezPoint Service Worker — Push + Update */
-const CACHE_NAME = "rezpoint-v2";
+/* RezPoint Service Worker v3 */
+const CACHE_NAME = "rezpoint-v3";
 
-self.addEventListener("install", e => {
-  /* Yeni SW hemen beklemeden devreye girsin */
-  self.skipWaiting();
+self.addEventListener("install", () => {
+  /* skipWaiting burada YOK — bilerek. SW bekleme durumuna girmeli ki
+     App.jsx banner gösterebilsin ve kullanıcı güncellemeyi onaylasın. */
 });
 
 self.addEventListener("activate", e => {
-  /* Eski cache'leri temizle */
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(() => clients.claim())
   );
 });
 
-/* Güncelleme mesajı — sayfa SW'ye "güncelle" der */
+/* Kullanıcı "Güncelle" düğmesine basınca buraya mesaj gelir */
 self.addEventListener("message", e => {
   if (e.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
@@ -23,23 +22,20 @@ self.addEventListener("message", e => {
 /* Push bildirimleri */
 self.addEventListener("push", e => {
   if (!e.data) return;
-  let payload;
-  try { payload = e.data.json(); }
-  catch { payload = { title: "RezPoint", body: e.data.text() }; }
+  let p;
+  try { p = e.data.json(); } catch { p = { title: "RezPoint", body: e.data.text() }; }
 
-  e.waitUntil(self.registration.showNotification(payload.title || "RezPoint", {
-    body:    payload.body  || "",
+  e.waitUntil(self.registration.showNotification(p.title || "RezPoint", {
+    body:    p.body || "",
     icon:    "/icon-192.png",
     badge:   "/icon-192.png",
-    tag:     payload.tag   || "rezpoint",
-    data:    payload.data  || {},
+    tag:     p.tag  || "rezpoint",
+    data:    p.data || {},
     vibrate: [200, 100, 200],
-    requireInteraction: false,
-    actions: payload.actions || [],
   }));
 });
 
-/* Bildirime tıklanınca */
+/* Bildirime tıklanınca uygulamayı öne getir */
 self.addEventListener("notificationclick", e => {
   e.notification.close();
   const url = e.notification.data?.url || "/";
