@@ -469,7 +469,14 @@ function App() {
       let restoredBusiness = null;
       const savedBizId = localStorage.getItem("rp_biz_id");
       if (savedBizId) {
+        // Önce Supabase'den gelen listede ara; bulamazsan cache'i kullan
         restoredBusiness = formattedBusinesses.find(b => String(b.id) === String(savedBizId));
+        if (!restoredBusiness) {
+          try {
+            const cached = localStorage.getItem("rp_biz_cache");
+            if (cached) restoredBusiness = JSON.parse(cached);
+          } catch {}
+        }
         if (restoredBusiness) {
           setLoggedBusiness(restoredBusiness);
           setAvailabilityMode(restoredBusiness.availabilityMode || "weekly");
@@ -965,6 +972,7 @@ function App() {
     });
 
     localStorage.setItem("rp_biz_id", String(business.id));
+    localStorage.setItem("rp_biz_cache", JSON.stringify(business));
     setLoginError("");
     registerPush(business.email, "business", business.id);
     setBizLoginAttempts(0);
@@ -1268,11 +1276,11 @@ function App() {
           <button
             className="nav-button"
             onClick={() => {
-              setPage("businessLogin");
+              setPage(loggedBusiness ? "businessPanel" : "businessLogin");
               setMobileMenuOpen(false);
             }}
           >
-            {t.nav.businessLogin}
+            {loggedBusiness ? (lang === "en" ? "My Business" : "İşletmem") : t.nav.businessLogin}
           </button>
 
           <button
@@ -3446,6 +3454,7 @@ function App() {
               onClick={() => {
                 localStorage.removeItem("rp_biz_id");
                 localStorage.removeItem("rp_biz_token");
+                localStorage.removeItem("rp_biz_cache");
                 setBizSessionToken("");
                 localStorage.setItem("rp_page", "home");
                 setLoggedBusiness(null);
