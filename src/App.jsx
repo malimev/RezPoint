@@ -2852,6 +2852,39 @@ function App() {
             </div>
           </div>
 
+          {/* ── Toplu Push Bildirimi ── */}
+          <div className="reservation-box" style={{ marginTop: "24px" }}>
+            <h2>📣 Toplu Bildirim Gönder</h2>
+            <p className="description">Uygulamayı yükleyen tüm kullanıcılara anlık bildirim gönder.</p>
+            <form className="reservation-form" onSubmit={async e => {
+              e.preventDefault();
+              const fd = new FormData(e.target);
+              const title = fd.get("btitle");
+              const body  = fd.get("bbody");
+              if (!title || !body) return;
+              const btn = e.target.querySelector("button[type=submit]");
+              btn.disabled = true; btn.textContent = "Gönderiliyor...";
+              try {
+                const res = await fetch("https://sghwmnagplaolqdfqpvz.supabase.co/functions/v1/send-push", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ send_to_all: true, title, body }),
+                });
+                const json = await res.json();
+                alert(`✅ Gönderildi! ${json.sent ?? 0} kullanıcıya ulaştı.`);
+                e.target.reset();
+              } catch {
+                alert("Gönderilemedi, tekrar deneyin.");
+              } finally {
+                btn.disabled = false; btn.textContent = "Herkese Gönder 🚀";
+              }
+            }}>
+              <input name="btitle" type="text" placeholder="Bildirim başlığı  (örn: Babalar Günü 🎁)" required />
+              <textarea name="bbody" placeholder="Bildirim mesajı  (örn: Tüm işletmeler sizi bekliyor!)" rows={3} required />
+              <button type="submit" className="primary-btn" style={{ width: "100%" }}>Herkese Gönder 🚀</button>
+            </form>
+          </div>
+
           <div className="reservation-box" style={{ marginTop: "24px" }}>
             <h2>📄 RezPoint Kullanım Koşulları</h2>
             <p className="description">Müşterilerin rezervasyon öncesi onaylaması gereken platform koşulları.</p>
