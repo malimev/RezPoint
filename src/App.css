@@ -2421,44 +2421,66 @@ body::after{
 
 @media(max-width:850px){
   /* Sayfa alt kısmında bottom-nav için boşluk */
-  .page{padding-bottom:76px!important;}
+  .page{padding-bottom:90px!important;}
 
   .bottom-nav{
     display:flex;
-    position:fixed;bottom:0;left:0;right:0;
+    position:fixed;bottom:12px;left:12px;right:12px;
     z-index:500;
-    background:rgba(255,255,255,0.96);
-    backdrop-filter:blur(20px) saturate(1.8);
-    -webkit-backdrop-filter:blur(20px) saturate(1.8);
-    border-top:1px solid rgba(124,58,237,0.1);
-    box-shadow:0 -4px 24px rgba(124,58,237,0.08);
-    padding:6px 4px env(safe-area-inset-bottom, 6px);
+    background:rgba(255,255,255,0.95);
+    backdrop-filter:blur(24px) saturate(2);
+    -webkit-backdrop-filter:blur(24px) saturate(2);
+    border:1px solid rgba(124,58,237,0.12);
+    border-radius:24px;
+    box-shadow:0 8px 32px rgba(124,58,237,0.14),0 2px 8px rgba(0,0,0,0.06);
+    padding:8px 4px;
   }
 
   .bn-item{
     flex:1;display:flex;flex-direction:column;align-items:center;
-    gap:3px;padding:4px 0;
+    gap:4px;padding:6px 4px;
     background:none;border:none;cursor:pointer;font-family:inherit;
     color:var(--ink-4);
-    transition:color 0.15s;
     position:relative;
+    border-radius:16px;
+    transition:color 0.22s var(--ease-out),background 0.22s var(--ease-out);
     -webkit-tap-highlight-color:transparent;
   }
-  .bn-item:active{transform:scale(0.92);}
+  .bn-item:active{transform:scale(0.88);transition-duration:80ms;}
+
+  /* Aktif item: mor pill arka plan */
   .bn-item.active{color:var(--purple);}
-  .bn-item span{
-    font-size:10px;font-weight:600;letter-spacing:0.01em;
-    line-height:1;
+  .bn-item.active::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    background:rgba(124,58,237,0.1);
+    border-radius:16px;
+    animation:bnPillIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
   }
+  @keyframes bnPillIn{
+    from{opacity:0;transform:scale(0.7);}
+    to  {opacity:1;transform:scale(1);}
+  }
+
+  .bn-item span{
+    font-size:10px;font-weight:700;letter-spacing:0.01em;
+    line-height:1;transition:color 0.22s;
+  }
+  .bn-item.active span{color:var(--purple);}
+
   .bn-icon{
     width:22px;height:22px;flex-shrink:0;
-    transition:transform 0.15s var(--ease-spring);
+    transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1),color 0.22s;
   }
-  .bn-item.active .bn-icon{transform:scale(1.12);}
+  .bn-item.active .bn-icon{
+    transform:translateY(-3px) scale(1.18);
+    color:var(--purple);
+  }
 
   /* Bildirim kırmızı nokta */
   .bn-item.bn-dot::after{
-    content:'';position:absolute;top:3px;right:calc(50% - 14px);
+    content:'';position:absolute;top:4px;right:calc(50% - 15px);
     width:7px;height:7px;border-radius:50%;
     background:#ef4444;border:2px solid #fff;
   }
