@@ -201,6 +201,7 @@ function formatBusiness(b) {
 function App() {
   const [page, setPage] = useState(getSavedPage);
   const [appReady, setAppReady] = useState(false);
+  const [loadProgress, setLoadProgress] = useState(0);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [whatsNewRead, setWhatsNewRead] = useState(() => !!localStorage.getItem("rp_whatsnew_read_v1"));
@@ -208,6 +209,19 @@ function App() {
   const [broadTitle, setBroadTitle] = useState("");
   const [broadBody, setBroadBody] = useState("");
   const [broadSending, setBroadSending] = useState(false);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [showFavPanel, setShowFavPanel] = useState(false);
+  const [favorites, setFavorites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("rp_favorites") || "[]"); } catch { return []; }
+  });
+  const toggleFavorite = (biz) => {
+    setFavorites(prev => {
+      const exists = prev.some(f => f.id === biz.id);
+      const next = exists ? prev.filter(f => f.id !== biz.id) : [...prev, { id: biz.id, name: biz.name, type: biz.type, location: biz.location, icon: biz.icon, logoUrl: biz.logoUrl, rating: biz.rating }];
+      localStorage.setItem("rp_favorites", JSON.stringify(next));
+      return next;
+    });
+  };
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [error, setError] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -423,6 +437,7 @@ function App() {
 
   useEffect(() => {
     const loadInitialData = async () => {
+      setLoadProgress(8);
       // 1. Restore Supabase Auth customer session
       let sessionCustomer = null;
       const { data: { session } } = await supabase.auth.getSession();
@@ -457,6 +472,7 @@ function App() {
         }
       }
 
+      setLoadProgress(25);
       // 2. Load businesses
       const { data: businessData, error: businessError } = await supabase
         .from("businesses")
@@ -504,6 +520,7 @@ function App() {
         }
       }
 
+      setLoadProgress(55);
       // 4. Load reservations
       const { data: reservationData, error: reservationError } =
         await supabase.from("reservations").select("*");
@@ -534,6 +551,7 @@ function App() {
         else setPage("businesses");
       }
 
+      setLoadProgress(75);
       // 6b. Load meetings
       const { data: meetingData } = await supabase.from("meetings").select("*");
       if (meetingData) {
@@ -546,11 +564,13 @@ function App() {
         })));
       }
 
+      setLoadProgress(90);
       // 7. Load RezPoint terms
       const { data: rpTermsData } = await supabase.from("site_settings").select("value").eq("key", "rezpoint_terms").single();
       if (rpTermsData?.value) { setRpTerms(rpTermsData.value); setRpTermsEdit(rpTermsData.value); }
 
-      setAppReady(true);
+      setLoadProgress(100);
+      setTimeout(() => setAppReady(true), 200);
     };
 
     loadInitialData();
@@ -1077,14 +1097,17 @@ function App() {
     setTimeout(() => setSavedMessage(""), 3000);
   }
   if (!appReady) {
+    const fillPct = 100 - loadProgress; // inset: 100% = boş, 0% = dolu
     return (
       <div className="app-loading">
-        <div className="app-loading-logo">
-          <span className="app-loading-rp">R<span>P</span></span>
-          <div className="app-loading-dots">
-            <span /><span /><span />
-          </div>
+        <div className="app-loading-fill-wrap">
+          <div className="alf-bg">RP</div>
+          <div className="alf-fill" style={{ clipPath: `inset(${fillPct}% 0 0 0)` }}>RP</div>
         </div>
+        <div className="alf-bar-wrap">
+          <div className="alf-bar" style={{ width: `${loadProgress}%` }} />
+        </div>
+        <div className="alf-label">RezPoint</div>
       </div>
     );
   }
@@ -1321,53 +1344,135 @@ function App() {
 
       {page === "home" && (
         <>
-        {/* ── OpenTable-style homepage ── */}
-        <section className="ot-hero">
-          <h1 className="ot-headline">{t.hero.headline}</h1>
-          <p className="ot-subline">{t.hero.subheadline}</p>
-
-          {/* Filter chips row */}
-          <div className="ot-filter-row">
-            <button
-              className={`ot-chip${datePickerOpen ? " active" : ""}`}
-              onClick={() => { setDatePickerOpen(p => !p); setTimePickerOpen(false); setLocationPickerOpen(false); }}
-            >
-              📅 {searchDate ? (() => { const d = new Date(searchDate + "T00:00:00"); return d.toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR", { day: "numeric", month: "short" }); })() : (lang === "en" ? "Date" : "Tarih")}
-              <span className="ot-chip-arrow">{datePickerOpen ? "▲" : "▼"}</span>
-            </button>
-            <button
-              className={`ot-chip${timePickerOpen ? " active" : ""}`}
-              onClick={() => { setTimePickerOpen(p => !p); setDatePickerOpen(false); setLocationPickerOpen(false); }}
-            >
-              🕐 {searchTime || (lang === "en" ? "Time" : "Saat")}
-              <span className="ot-chip-arrow">{timePickerOpen ? "▲" : "▼"}</span>
-            </button>
-            <button
-              className={`ot-chip${locationPickerOpen ? " active" : ""}`}
-              onClick={() => { setLocationPickerOpen(p => !p); setDatePickerOpen(false); setTimePickerOpen(false); }}
-            >
-              📍 {searchLocation === "Hepsi" ? (lang === "en" ? "All locations" : "Tüm konumlar") : searchLocation}
-              <span className="ot-chip-arrow">{locationPickerOpen ? "▲" : "▼"}</span>
-            </button>
+        {/* ══ YENİ ANASAYFA ══ */}
+        <section className="hp-hero">
+          {/* Başlık sol + emoji sağ */}
+          <div className="hp-hero-top">
+            <div className="hp-hero-text">
+              <h1 className="hp-headline">
+                {lang === "en"
+                  ? <><span className="hp-hl-plain">Smart </span><span className="hp-hl-purple">reservations</span><span className="hp-hl-plain"><br/>and appointments.</span></>
+                  : <><span className="hp-hl-plain">Modern işletmeler için<br/></span><span className="hp-hl-purple">akıllı rezervasyon</span><span className="hp-hl-plain"><br/>ve randevu.</span></>
+                }
+              </h1>
+              <p className="hp-subline">{t.hero.subheadline}</p>
+            </div>
+            <div className="hp-hero-emoji" aria-hidden>📅</div>
           </div>
 
-          {/* Location picker dropdown */}
-          {locationPickerOpen && (
-            <div className="ot-picker-panel">
-              <div className="ot-picker-label">{lang === "en" ? "Select location" : "Konum seç"}</div>
-              <div className="ot-loc-options">
-                {["Hepsi","Mağusa","İskele","Lefkoşa","Lefke","Girne"].map(loc => (
-                  <button
-                    key={loc}
-                    className={`ot-loc-opt${searchLocation === loc ? " active" : ""}`}
-                    onClick={() => { setSearchLocation(loc); setLocationPickerOpen(false); }}
-                  >
-                    {loc === "Hepsi" ? (lang === "en" ? "All locations" : "Tüm konumlar") : `📍 ${loc}`}
-                  </button>
-                ))}
-              </div>
+          {/* Arama kartı */}
+          <div className="hp-search-card">
+            {/* Tarih + Saat yan yana */}
+            <div className="hp-row-2">
+              <button
+                className={`hp-field${datePickerOpen ? " open" : ""}`}
+                onClick={() => { setDatePickerOpen(p => !p); setTimePickerOpen(false); setLocationPickerOpen(false); }}
+              >
+                <span className="hp-field-icon">📅</span>
+                <span className="hp-field-inner">
+                  <span className="hp-field-label">{lang === "en" ? "Date" : "Tarih"}</span>
+                  <span className="hp-field-value">
+                    {searchDate
+                      ? new Date(searchDate + "T00:00:00").toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR", { day: "numeric", month: "long" })
+                      : (lang === "en" ? "Any date" : "Herhangi bir gün")}
+                  </span>
+                </span>
+                <span className="hp-field-arrow">›</span>
+              </button>
+              <button
+                className={`hp-field${timePickerOpen ? " open" : ""}`}
+                onClick={() => { setTimePickerOpen(p => !p); setDatePickerOpen(false); setLocationPickerOpen(false); }}
+              >
+                <span className="hp-field-icon">🕐</span>
+                <span className="hp-field-inner">
+                  <span className="hp-field-label">{lang === "en" ? "Time" : "Saat"}</span>
+                  <span className="hp-field-value">{searchTime || (lang === "en" ? "Any time" : "Herhangi")}</span>
+                </span>
+                <span className="hp-field-arrow">›</span>
+              </button>
             </div>
-          )}
+
+            {/* Konum */}
+            <button
+              className={`hp-field hp-field-full${locationPickerOpen ? " open" : ""}`}
+              onClick={() => { setLocationPickerOpen(p => !p); setDatePickerOpen(false); setTimePickerOpen(false); }}
+            >
+              <span className="hp-field-icon">📍</span>
+              <span className="hp-field-inner">
+                <span className="hp-field-label">{lang === "en" ? "Location" : "Konum"}</span>
+                <span className="hp-field-value">
+                  {searchLocation === "Hepsi" ? (lang === "en" ? "All locations" : "Tüm konumlar") : searchLocation}
+                </span>
+              </span>
+              <span className="hp-field-arrow">›</span>
+            </button>
+
+            {/* Picker panelleri */}
+            {locationPickerOpen && (
+              <div className="ot-picker-panel">
+                <div className="ot-picker-label">{lang === "en" ? "Select location" : "Konum seç"}</div>
+                <div className="ot-loc-options">
+                  {["Hepsi","Mağusa","İskele","Lefkoşa","Lefke","Girne"].map(loc => (
+                    <button key={loc} className={`ot-loc-opt${searchLocation === loc ? " active" : ""}`}
+                      onClick={() => { setSearchLocation(loc); setLocationPickerOpen(false); }}>
+                      {loc === "Hepsi" ? (lang === "en" ? "All locations" : "Tüm konumlar") : `📍 ${loc}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {datePickerOpen && (
+              <div className="ot-picker-panel">
+                <div className="ot-picker-label">{lang === "en" ? "Select date" : "Tarih seç"}</div>
+                <div className="home-date-strip">
+                  <button className={!searchDate ? "home-strip-btn active" : "home-strip-btn"} onClick={() => { setSearchDate(""); setDatePickerOpen(false); }}>
+                    <span className="strip-day">{t.hero.dayAll[0]}</span>
+                    <span className="strip-date">{t.hero.dayAll[1]}</span>
+                  </button>
+                  {Array.from({ length: 30 }, (_, i) => {
+                    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+                    const fullDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                    const locale = lang === "en" ? "en-GB" : "tr-TR";
+                    return (
+                      <button key={fullDate} className={searchDate === fullDate ? "home-strip-btn active" : "home-strip-btn"}
+                        onClick={() => { setSearchDate(fullDate); setDatePickerOpen(false); }}>
+                        <span className="strip-day">{d.toLocaleDateString(locale,{weekday:"short"})}</span>
+                        <span className="strip-date">{d.toLocaleDateString(locale,{day:"2-digit",month:"short"})}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {timePickerOpen && (
+              <div className="ot-picker-panel">
+                <div className="ot-picker-label">{lang === "en" ? "Select time" : "Saat seç"}</div>
+                <div className="home-time-strip">
+                  <button className={!searchTime ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => { setSearchTime(""); setTimePickerOpen(false); }}>{t.hero.timeAll}</button>
+                  {ALL_TIME_SLOTS.map(slot => (
+                    <button key={slot} className={searchTime === slot ? "home-strip-btn compact active" : "home-strip-btn compact"} onClick={() => { setSearchTime(slot); setTimePickerOpen(false); }}>{slot}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Arama satırı */}
+            <div className="hp-search-row">
+              <span className="hp-search-icon">🔍</span>
+              <input
+                className="hp-search-input"
+                type="text"
+                placeholder={lang === "en" ? "Search business, category or service..." : "İşletme, kategori veya hizmet ara..."}
+                value={businessSearch}
+                onChange={e => setBusinessSearch(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && setPage("businesses")}
+              />
+              <button className="hp-search-btn" onClick={() => setPage("businesses")}>
+                {lang === "en" ? "Search" : "Ara"}
+              </button>
+            </div>
+          </div>
+        </section>
 
           {/* Date picker dropdown */}
           {datePickerOpen && (
@@ -1407,31 +1512,16 @@ function App() {
             </div>
           )}
 
-          {/* Search row */}
-          <div className="ot-search-row">
-            <span className="ot-search-icon">🔍</span>
-            <input
-              className="ot-search-input"
-              type="text"
-              placeholder={t.businesses.searchPlaceholder}
-              value={businessSearch}
-              onChange={e => setBusinessSearch(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && setPage("businesses")}
-            />
-            <button className="ot-search-btn" onClick={() => setPage("businesses")}>
-              {lang === "en" ? "Let's go" : "Ara"}
-            </button>
-          </div>
-
-        </section>
-
-        {/* ── Şu an müsait mekanlar ── */}
-        <section className="ot-section">
-          <div className="ot-section-header">
-            <h2 className="ot-section-title">{lang === "en" ? "Available now" : "Şu an müsait mekanlar"}</h2>
+        {/* ── Öne çıkanlar ── */}
+        <section className="hp-featured">
+          <div className="hp-featured-header">
+            <div>
+              <h2 className="hp-featured-title">{lang === "en" ? "Featured" : "Öne çıkanlar"}</h2>
+              <p className="hp-featured-sub">{lang === "en" ? "Available and popular venues" : "Şu an müsait ve popüler mekanlar"}</p>
+            </div>
             <button className="ot-view-all" onClick={() => setPage("businesses")}>{lang === "en" ? "View all" : "Tümünü gör"} →</button>
           </div>
-          <div className="ot-cards-scroll">
+          <div className="hp-cards-scroll">
             {(() => {
               const now = new Date();
               const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
@@ -1441,109 +1531,75 @@ function App() {
               const available = adminBusinesses.filter(biz => {
                 if (!biz.reservationActive) return false;
                 if (searchLocation !== "Hepsi" && biz.location !== searchLocation) return false;
-                // Gün kontrolü
                 const dayOk = biz.availabilityMode === "specific"
                   ? (biz.specificDates || []).includes(todayStr)
                   : (biz.availableDays || []).includes(todayDayName);
                 if (!dayOk) return false;
-                // Saat kontrolü (businessHours tanımlıysa)
                 const dayHours = (biz.businessHours || {})[todayDayName];
-                if (dayHours && dayHours.open && dayHours.close) {
+                if (dayHours?.open && dayHours?.close) {
                   return nowMins >= toMins(dayHours.open) && nowMins < toMins(dayHours.close);
                 }
                 return true;
               });
-              const shown = available.length > 0 ? available : adminBusinesses.filter(b => b.reservationActive && (searchLocation === "Hepsi" || b.location === searchLocation));
+              const shown = available.length > 0
+                ? available
+                : adminBusinesses.filter(b => b.reservationActive && (searchLocation === "Hepsi" || b.location === searchLocation));
+              if (shown.length === 0) return <p className="description" style={{padding:"20px 0"}}>{lang === "en" ? "No venues available right now." : "Şu an müsait mekan yok."}</p>;
               return shown.slice(0, 8).map(biz => (
-              <div className="ot-card" key={biz.id} onClick={() => { setSelectedBusiness(biz); setPage("businessProfile"); }}>
-                <div className="ot-card-photo">
-                  {biz.logoUrl
-                    ? <img src={biz.logoUrl} alt={biz.name} />
-                    : <div className="ot-card-photo-placeholder">{biz.icon || "🏠"}</div>
-                  }
+                <div className="hp-card" key={biz.id} onClick={() => { setSelectedBusiness(biz); setPage("businessProfile"); }}>
+                  <div className="hp-card-photo">
+                    {biz.logoUrl
+                      ? <img src={biz.logoUrl} alt={biz.name} />
+                      : <div className="hp-card-photo-placeholder">{biz.icon || "🏠"}</div>
+                    }
+                    <span className="hp-card-badge">{lang === "en" ? "Available" : "Müsait"}</span>
+                    <button className={`hp-card-heart${favorites.some(f => f.id === biz.id) ? " active" : ""}`}
+                      onClick={e => { e.stopPropagation(); toggleFavorite(biz); }} aria-label="Favori">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill={favorites.some(f => f.id === biz.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="hp-card-body">
+                    <div className="hp-card-name">{biz.name}</div>
+                    <div className="hp-card-meta">
+                      {biz.type}{biz.location ? ` · ${biz.location}` : ""}
+                    </div>
+                    {biz.rating > 0 && (
+                      <div className="hp-card-rating">
+                        <span className="hp-card-star">★</span>
+                        <span>{biz.rating.toFixed(1)}</span>
+                      </div>
+                    )}
+                    <button
+                      className="hp-card-btn"
+                      onClick={e => { e.stopPropagation(); openReservationForm(biz); }}
+                    >
+                      {lang === "en" ? "Make Reservation" : "Rezervasyon yap"}
+                    </button>
+                  </div>
                 </div>
-                <div className="ot-card-body">
-                  <div className="ot-card-name">{biz.name}</div>
-                  <div className="ot-card-meta">{biz.type}{biz.location ? ` · ${biz.location}` : ""}</div>
-                  <button className="ot-card-btn" onClick={e => { e.stopPropagation(); openReservationForm(biz); }}>
-                    {lang === "en" ? "Find available" : "Rezervasyon yap"}
-                  </button>
-                </div>
-              </div>
-            ));})()}
+              ));
+            })()}
           </div>
         </section>
 
-        <section className="lp-section">
-          <div className="lp-section-header lp-animate">
-            <h2>{t.landing.stepsTitle}</h2>
-            <p>{t.landing.stepsSub}</p>
-          </div>
-          <div className="lp-steps-grid">
-            <div className="lp-step lp-animate" style={{ transitionDelay: "0.05s" }}>
-              <div className="lp-step-num">1</div>
-              <div className="lp-step-icon">🔍</div>
-              <h3>{t.landing.step1Title}</h3>
-              <p>{t.landing.step1Desc}</p>
+        {/* ── Özellikler satırı ── */}
+        <div className="hp-features-row">
+          {[
+            { icon: "🛡️", label: lang === "en" ? "Secure Reservation" : "Güvenli Rezervasyon" },
+            { icon: "⚡", label: lang === "en" ? "Fast & Easy" : "Hızlı ve Kolay" },
+            { icon: "📍", label: lang === "en" ? "Nearby Venues" : "Yakındaki Mekanlar" },
+            { icon: "⭐", label: lang === "en" ? "Best Experience" : "En iyi Deneyim" },
+          ].map(f => (
+            <div key={f.label} className="hp-feature-item">
+              <span className="hp-feature-icon">{f.icon}</span>
+              <span className="hp-feature-label">{f.label}</span>
             </div>
-            <div className="lp-step lp-animate" style={{ transitionDelay: "0.15s" }}>
-              <div className="lp-step-num">2</div>
-              <div className="lp-step-icon">📋</div>
-              <h3>{t.landing.step2Title}</h3>
-              <p>{t.landing.step2Desc}</p>
-            </div>
-            <div className="lp-step lp-animate" style={{ transitionDelay: "0.25s" }}>
-              <div className="lp-step-num">3</div>
-              <div className="lp-step-icon">✅</div>
-              <h3>{t.landing.step3Title}</h3>
-              <p>{t.landing.step3Desc}</p>
-            </div>
-          </div>
-        </section>
+          ))}
+        </div>
 
-        <section className="lp-section">
-          <div className="lp-section-header lp-animate">
-            <h2>{t.landing.whyTitle}</h2>
-            <p>{t.landing.whySub}</p>
-          </div>
-          <div className="lp-features-grid">
-            <div className="lp-feature lp-animate" style={{ transitionDelay: "0.05s" }}>
-              <div className="lp-feature-icon">🛡️</div>
-              <h3>{t.landing.feat1Title}</h3>
-              <p>{t.landing.feat1Desc}</p>
-            </div>
-            <div className="lp-feature lp-animate" style={{ transitionDelay: "0.12s" }}>
-              <div className="lp-feature-icon">⚡</div>
-              <h3>{t.landing.feat2Title}</h3>
-              <p>{t.landing.feat2Desc}</p>
-            </div>
-            <div className="lp-feature lp-animate" style={{ transitionDelay: "0.19s" }}>
-              <div className="lp-feature-icon">💎</div>
-              <h3>{t.landing.feat3Title}</h3>
-              <p>{t.landing.feat3Desc}</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="lp-section">
-          <div className="lp-props-grid">
-            <div className="lp-prop lp-animate" style={{ transitionDelay: "0.05s" }}>
-              <div className="lp-prop-icon">⏱️</div>
-              <div className="lp-prop-title">{t.landing.prop1Title}</div>
-              <div className="lp-prop-desc">{t.landing.prop1Desc}</div>
-            </div>
-            <div className="lp-prop lp-animate" style={{ transitionDelay: "0.15s" }}>
-              <div className="lp-prop-icon">📱</div>
-              <div className="lp-prop-title">{t.landing.prop2Title}</div>
-              <div className="lp-prop-desc">{t.landing.prop2Desc}</div>
-            </div>
-            <div className="lp-prop lp-animate" style={{ transitionDelay: "0.25s" }}>
-              <div className="lp-prop-icon">🔒</div>
-              <div className="lp-prop-title">{t.landing.prop3Title}</div>
-              <div className="lp-prop-desc">{t.landing.prop3Desc}</div>
-            </div>
-          </div>
-        </section>
+        <div style={{ height: 80 }} />
 
         <section className="lp-cta-section lp-animate">
           <h2>{t.landing.ctaTitle}</h2>
@@ -1645,6 +1701,12 @@ function App() {
                       ? <img src={business.logoUrl} alt={business.name} className="bc-logo-img" />
                       : <span className="bc-icon">{business.icon}</span>
                     }
+                    <button className={`hp-card-heart${favorites.some(f => f.id === business.id) ? " active" : ""}`}
+                      onClick={e => { e.stopPropagation(); toggleFavorite(business); }} aria-label="Favori">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill={favorites.some(f => f.id === business.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                      </svg>
+                    </button>
                   </div>
                   <div className="bc-body">
                     <h3 className="bc-name">{business.name}</h3>
@@ -5266,6 +5328,163 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* ── Favoriler paneli ── */}
+      {showFavPanel && (
+        <div className="bn-notif-overlay" onClick={() => setShowFavPanel(false)}>
+          <div className="bn-notif-panel" onClick={e => e.stopPropagation()}>
+            <div className="bn-notif-header">
+              <span className="bn-notif-title">❤️ {lang === "en" ? "Favorites" : "Favorilerim"}</span>
+              <button className="bn-notif-close" onClick={() => setShowFavPanel(false)}>✕</button>
+            </div>
+            <div className="bn-notif-body">
+              {favorites.length === 0 ? (
+                <div style={{ padding: "32px 16px", textAlign: "center" }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>💔</div>
+                  <p className="description">{lang === "en" ? "No favorites yet. Tap ♡ on a venue to save it." : "Henüz favori yok. Bir işletmede ♡ simgesine bas."}</p>
+                </div>
+              ) : favorites.map(fav => {
+                const fullBiz = adminBusinesses.find(b => b.id === fav.id) || fav;
+                return (
+                  <div key={fav.id} className="fav-row" onClick={() => { setSelectedBusiness(fullBiz); setPage("businessProfile"); setShowFavPanel(false); }}>
+                    <div className="fav-photo">
+                      {fav.logoUrl ? <img src={fav.logoUrl} alt={fav.name} /> : <span>{fav.icon || "🏠"}</span>}
+                    </div>
+                    <div className="fav-info">
+                      <div className="fav-name">{fav.name}</div>
+                      <div className="fav-meta">{fav.type}{fav.location ? ` · ${fav.location}` : ""}</div>
+                    </div>
+                    <button className="fav-remove" onClick={e => { e.stopPropagation(); toggleFavorite(fav); }} aria-label="Kaldır">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bildirim paneli (bottom nav'dan açılır) ── */}
+      {showNotifPanel && (
+        <div className="bn-notif-overlay" onClick={() => setShowNotifPanel(false)}>
+          <div className="bn-notif-panel" onClick={e => e.stopPropagation()}>
+            <div className="bn-notif-header">
+              <span className="bn-notif-title">
+                {lang === "en" ? "Notifications" : "Bildirimler"}
+                {loggedCustomer && customerNotifications.filter(n => !n.is_read).length > 0 && (
+                  <span className="notif-count">{customerNotifications.filter(n => !n.is_read).length}</span>
+                )}
+              </span>
+              <button className="bn-notif-close" onClick={() => setShowNotifPanel(false)}>✕</button>
+            </div>
+            <div className="bn-notif-body">
+              {!loggedCustomer ? (
+                <div style={{ padding: "32px 16px", textAlign: "center" }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🔔</div>
+                  <p className="description" style={{ marginBottom: 16 }}>
+                    {lang === "en" ? "Log in to see your notifications." : "Bildirimlerinizi görmek için giriş yapın."}
+                  </p>
+                  <button className="primary-btn" onClick={() => { setShowNotifPanel(false); setPage("customerAuth"); }}>
+                    {lang === "en" ? "Log In" : "Giriş Yap"}
+                  </button>
+                </div>
+              ) : customerNotifications.length === 0 ? (
+                <p className="description" style={{ padding: "32px 16px", textAlign: "center" }}>
+                  {lang === "en" ? "No notifications yet." : "Henüz bildirim yok."}
+                </p>
+              ) : (
+                customerNotifications.map(notif => (
+                  <div
+                    key={notif.id}
+                    className={`notif-row${notif.is_read ? "" : " unread"}`}
+                    onClick={async () => {
+                      if (!notif.is_read) {
+                        await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id);
+                        setCustomerNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+                      }
+                    }}
+                  >
+                    {!notif.is_read && <span className="notif-dot" />}
+                    <div className="notif-body">
+                      <div className="notif-title">{notif.title}</div>
+                      {notif.message && <div className="notif-message">{notif.message}</div>}
+                      <div className="notif-time">
+                        {new Date(notif.created_at).toLocaleDateString("tr-TR", { day:"2-digit", month:"long", hour:"2-digit", minute:"2-digit" })}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Alt navigation bar (mobile) ── */}
+      <nav className="bottom-nav">
+        <button
+          className={`bn-item${page === "home" ? " active" : ""}`}
+          onClick={() => { setPage("home"); setMobileMenuOpen(false); }}
+        >
+          <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span>{lang === "en" ? "Home" : "Ana Sayfa"}</span>
+        </button>
+
+        <button
+          className={`bn-item${page === "customerDashboard" && customerTab === "reservations" ? " active" : ""}`}
+          onClick={() => {
+            setMobileMenuOpen(false);
+            if (loggedCustomer) {
+              setCustomerTab("reservations");
+              setPage("customerDashboard");
+            } else {
+              setAfterLoginReturnPage("customerDashboard");
+              setCustomerMode("login");
+              setPage("customerAuth");
+            }
+          }}
+        >
+          <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span>{lang === "en" ? "Reservations" : "Rezervasyon"}</span>
+        </button>
+
+        <button
+          className={`bn-item${showFavPanel ? " active" : ""}`}
+          onClick={() => { setShowFavPanel(p => !p); setShowNotifPanel(false); setMobileMenuOpen(false); }}
+        >
+          <svg className="bn-icon" viewBox="0 0 24 24" fill={showFavPanel ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+          </svg>
+          <span>{lang === "en" ? "Favorites" : "Favoriler"}</span>
+        </button>
+
+        <button
+          className={`bn-item${showNotifPanel ? " active" : ""}${loggedCustomer && customerNotifications.filter(n => !n.is_read).length > 0 ? " bn-dot" : ""}`}
+          onClick={() => { setShowNotifPanel(p => !p); setMobileMenuOpen(false); setShowWhatsNew(false); }}
+        >
+          <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+          </svg>
+          <span>{lang === "en" ? "Alerts" : "Bildirimler"}</span>
+        </button>
+
+        <button
+          className={`bn-item${page === "customerDashboard" && loggedCustomer ? " active" : ""}`}
+          onClick={() => { loggedCustomer ? setPage("customerDashboard") : setPage("customerAuth"); setMobileMenuOpen(false); }}
+        >
+          <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span>{lang === "en" ? "Profile" : "Profil"}</span>
+        </button>
+      </nav>
     </div>
   );
 }
