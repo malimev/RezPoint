@@ -2334,16 +2334,19 @@ function App() {
                 </button>
 
                 <div className="panel-tabs">
-                  <button className={customerTab === "reservations" ? "active-tab" : ""} onClick={() => setCustomerTab("reservations")}>{t.dashboard.reservationsTab}</button>
-                  <button className={customerTab === "safescore" ? "active-tab" : ""} onClick={() => setCustomerTab("safescore")}>SafeScore</button>
-                  <button className={customerTab === "statistics" ? "active-tab" : ""} onClick={() => setCustomerTab("statistics")}>{lang === "en" ? "My Stats" : "İstatistiklerim"}</button>
-                  <button className={customerTab === "loyalty" ? "active-tab" : ""} onClick={() => setCustomerTab("loyalty")}>{lang === "en" ? "Loyalty" : "Sadakat Puanları"}</button>
-                  <button className={customerTab === "profile" ? "active-tab" : ""} onClick={() => setCustomerTab("profile")}>{lang === "en" ? "Profile" : "Profil"}</button>
-                  <button className={customerTab === "notifications" ? "active-tab" : ""} onClick={() => setCustomerTab("notifications")}>
-                    {t.dashboard.notificationsTab}{customerNotifications.filter(n => !n.is_read).length > 0 && <span className="notif-count">{customerNotifications.filter(n => !n.is_read).length}</span>}
+                  <button className={customerTab === "reservations" ? "active-tab" : ""} onClick={() => setCustomerTab("reservations")}>
+                    {lang === "en" ? "Reservations" : "Rezervasyonlarım"}
                   </button>
-                  <button className={customerTab === "meetings" ? "active-tab" : ""} onClick={() => setCustomerTab("meetings")}>📅 {t.dashboard.meetingsTab}</button>
-                  <button className={customerTab === "account" ? "active-tab" : ""} onClick={() => { setCustomerTab("account"); setAccountMsg({ text: "", type: "" }); setAccountNewEmail(""); setAccountNewPassword(""); setAccountNewPassword2(""); }}>⚙ {t.dashboard.accountTab}</button>
+                  <button className={customerTab === "meetings" ? "active-tab" : ""} onClick={() => setCustomerTab("meetings")}>
+                    {lang === "en" ? "Appointments" : "Randevularım"}
+                  </button>
+                  <button className={customerTab === "notifications" ? "active-tab" : ""} onClick={() => setCustomerTab("notifications")}>
+                    {lang === "en" ? "Notifications" : "Bildirimler"}
+                    {customerNotifications.filter(n => !n.is_read).length > 0 && <span className="notif-count">{customerNotifications.filter(n => !n.is_read).length}</span>}
+                  </button>
+                  <button className={customerTab === "account" ? "active-tab" : ""} onClick={() => { setCustomerTab("account"); setAccountMsg({ text: "", type: "" }); setAccountNewEmail(""); setAccountNewPassword(""); setAccountNewPassword2(""); }}>
+                    {lang === "en" ? "My Account" : "Hesabım"}
+                  </button>
                 </div>
 
                 {/* ── Rezervasyonlarım ── */}
@@ -2418,167 +2421,6 @@ function App() {
                 })()}
 
                 {/* ── SafeScore ── */}
-                {customerTab === "safescore" && (() => {
-                  const score = loggedCustomer.safeScore ?? 100;
-                  const col = score >= 80 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444";
-                  const circ = 2 * Math.PI * 42;
-                  return (
-                    <div style={{ marginTop: 16 }}>
-                      <div className="safescore-page">
-                        <div className="safescore-circle-wrap">
-                          <svg viewBox="0 0 100 100" className="safescore-svg">
-                            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10"/>
-                            <circle cx="50" cy="50" r="42" fill="none" stroke={col} strokeWidth="10"
-                              strokeDasharray={`${circ * score / 100} ${circ * (1 - score / 100)}`}
-                              strokeDashoffset={circ * 0.25} strokeLinecap="round"
-                              style={{ transition: "stroke-dasharray 1s ease" }}/>
-                          </svg>
-                          <div className="safescore-center">
-                            <span className="safescore-number" style={{ color: col }}><AnimatedNumber value={score} /></span>
-                            <span className="safescore-sub">/ 100</span>
-                          </div>
-                        </div>
-                        <h2 className="safescore-title">SafeScore</h2>
-                        <p className="safescore-desc">
-                          Rezervasyonlarınıza ne kadar güvenilir katıldığınızı gösterir.
-                          Yüksek puan, işletmelerin taleplerini öncelikli kabul etmesini sağlar.
-                        </p>
-                        <div className="safescore-legend">
-                          <span style={{ color: "#10b981" }}>● 80–100 Güvenilir</span>
-                          <span style={{ color: "#f59e0b" }}>● 50–79 Orta</span>
-                          <span style={{ color: "#ef4444" }}>● 0–49 Riskli</span>
-                        </div>
-                      </div>
-                      <p className="rez-section-title" style={{ marginTop: 24 }}>Son Hareketler</p>
-                      {safescoreHistory.length > 0
-                        ? safescoreHistory.slice(0, 5).map((h, i) => (
-                          <div key={i} className="safescore-history-row">
-                            <div>
-                              <div className="safescore-history-reason">
-                                {h.reason === "attended" ? "Rezervasyona katıldın" : h.reason === "no_show" ? "Rezervasyona katılmadın" : h.reason}
-                              </div>
-                              <div className="safescore-history-date">{new Date(h.created_at).toLocaleDateString("tr-TR")}</div>
-                            </div>
-                            <span className={`safescore-delta ${h.delta > 0 ? "pos" : "neg"}`}>{h.delta > 0 ? `+${h.delta}` : h.delta}</span>
-                          </div>
-                        ))
-                        : <p className="description">Henüz SafeScore hareketi yok.</p>}
-                    </div>
-                  );
-                })()}
-
-                {/* ── İstatistiklerim ── */}
-                {customerTab === "statistics" && (() => {
-                  const myRezs = reservations.filter(r => r.email === loggedCustomer.email);
-                  const total = myRezs.length;
-                  const attended = myRezs.filter(r => r.attendanceStatus === "attended").length;
-                  const noshow = myRezs.filter(r => r.attendanceStatus === "no_show").length;
-                  const pending = myRezs.filter(r => r.status === "pending").length;
-                  const accepted = myRezs.filter(r => r.status === "accepted").length;
-                  const rejected = myRezs.filter(r => r.status === "rejected" || r.status === "cancelled").length;
-                  const uniqueB = [...new Set(myRezs.map(r => r.businessId))].length;
-                  return (
-                    <div style={{ marginTop: 16 }}>
-                      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
-                        <div className="stat-card"><span className="stat-icon">📋</span><span>Toplam Rezervasyon</span><strong><AnimatedNumber value={total} /></strong></div>
-                        <div className="stat-card"><span className="stat-icon">🏢</span><span>Keşfedilen İşletme</span><strong><AnimatedNumber value={uniqueB} /></strong></div>
-                        <div className="stat-card"><span className="stat-icon">✅</span><span>Katıldım</span><strong><AnimatedNumber value={attended} /></strong></div>
-                        <div className="stat-card"><span className="stat-icon">❌</span><span>Katılmadım</span><strong><AnimatedNumber value={noshow} /></strong></div>
-                        <div className="stat-card"><span className="stat-icon">⏳</span><span>Bekleyen</span><strong><AnimatedNumber value={pending} /></strong></div>
-                        <div className="stat-card"><span className="stat-icon">🚫</span><span>İptal/Red</span><strong><AnimatedNumber value={rejected} /></strong></div>
-                      </div>
-                      {total > 0 && <div style={{ marginTop: 16 }}>
-                        {[
-                          { label: "Katıldım", val: attended, color: "green" },
-                          { label: "Kabul Bekliyor", val: pending + accepted, color: "" },
-                          { label: "Katılmadım", val: noshow, color: "orange" },
-                          { label: "İptal/Red", val: rejected, color: "pink" },
-                        ].filter(i => i.val > 0).map(item => (
-                          <div className="progress-row" key={item.label}>
-                            <div className="progress-label">
-                              <span>{item.label}</span>
-                              <strong>{item.val} ({Math.round(item.val / total * 100)}%)</strong>
-                            </div>
-                            <ProgressBar percent={Math.round(item.val / total * 100)} color={item.color} />
-                          </div>
-                        ))}
-                      </div>}
-                    </div>
-                  );
-                })()}
-
-                {/* ── Sadakat Puanları ── */}
-                {customerTab === "loyalty" && (
-                  <div style={{ marginTop: 16 }}>
-                    <p className="description" style={{ marginBottom: 16 }}>
-                      Her rezervasyona katıldığınızda işletme bazında +2 puan kazanırsınız.
-                    </p>
-                    {loyaltyPoints.length > 0
-                      ? [...loyaltyPoints].sort((a, b) => b.points - a.points).map((lp, i) => (
-                        <div key={i} className="loyalty-row">
-                          <div className="loyalty-rank">#{i + 1}</div>
-                          <div className="loyalty-info">
-                            <div className="loyalty-business">{lp.businessName}</div>
-                            <div className="loyalty-sub">{Math.floor(lp.points / 2)} ziyaret</div>
-                          </div>
-                          <div className="loyalty-badge">
-                            <span className="loyalty-trophy">{lp.points >= 20 ? "🏆" : lp.points >= 10 ? "🥈" : "🥉"}</span>
-                            <span className="loyalty-pts">{lp.points} puan</span>
-                          </div>
-                        </div>
-                      ))
-                      : <p className="description">Henüz sadakat puanınız yok. Rezervasyonlara katıldıkça puan kazanırsınız.</p>}
-                  </div>
-                )}
-
-                {/* ── Profil ── */}
-                {customerTab === "profile" && (
-                  <div className="reservation-box" style={{ marginTop: 16 }}>
-                    <h2>Profilim</h2>
-                    <p className="description">Bu alanlar isteğe bağlıdır. İstediğiniz zaman güncelleyebilirsiniz.</p>
-                    <form className="reservation-form">
-                      <input type="tel" placeholder="Telefon Numarası" value={customerProfile.phone}
-                        onChange={e => setCustomerProfile({ ...customerProfile, phone: e.target.value })} />
-                      <h3>Cinsiyet</h3>
-                      <div className="time-slots">
-                        {[["Male","Erkek"],["Female","Kadın"],["Prefer not to say","Belirtmek istemiyorum"]].map(([val, label]) => (
-                          <button key={val} type="button"
-                            className={customerProfile.gender === val ? "profile-option selected-time" : "profile-option time-btn"}
-                            onClick={() => setCustomerProfile({ ...customerProfile, gender: val })}>
-                            {customerProfile.gender === val ? "✓ " : ""}{label}
-                          </button>
-                        ))}
-                      </div>
-                      <h3 style={{ marginTop: 20 }}>Doğum Tarihi</h3>
-                      <input type="date" value={customerProfile.birthDate}
-                        onChange={e => setCustomerProfile({ ...customerProfile, birthDate: e.target.value })} />
-                      <input type="text" placeholder="Meslek" value={customerProfile.job}
-                        onChange={e => setCustomerProfile({ ...customerProfile, job: e.target.value })} />
-                      <h3 style={{ marginTop: 20 }}>Sigara Tercihi</h3>
-                      <div className="time-slots">
-                        {[["Smoker","İçiyor"],["Non-smoker","İçmiyor"],["No preference","Fark Etmez"]].map(([val, label]) => (
-                          <button key={val} type="button"
-                            className={customerProfile.smoking === val ? "profile-option selected-time" : "profile-option time-btn"}
-                            onClick={() => setCustomerProfile({ ...customerProfile, smoking: val })}>
-                            {customerProfile.smoking === val ? "✓ " : ""}{label}
-                          </button>
-                        ))}
-                      </div>
-                      <button type="button" onClick={async () => {
-                        const { error } = await supabase.rpc("customer_update_profile", {
-                          p_phone: customerProfile.phone,
-                          p_gender: customerProfile.gender,
-                          p_birth_date: customerProfile.birthDate,
-                          p_job: customerProfile.job,
-                          p_smoking: customerProfile.smoking,
-                        });
-                        if (error) { alert("Profil kaydedilemedi."); return; }
-                        alert("Profil başarıyla kaydedildi.");
-                      }}>Profili Kaydet</button>
-                    </form>
-                  </div>
-                )}
-
                 {/* ── Bildirimler ── */}
                 {customerTab === "notifications" && (
                   <div style={{ marginTop: 16 }}>
@@ -2629,6 +2471,129 @@ function App() {
                 {/* ── Hesap Ayarları ── */}
                 {customerTab === "account" && (
                   <div style={{ marginTop: 16, maxWidth: 480 }}>
+
+                    {/* ── SafeScore ── */}
+                    {(() => {
+                      const score = loggedCustomer.safeScore ?? 100;
+                      const col = score >= 80 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444";
+                      const circ = 2 * Math.PI * 42;
+                      return (
+                        <div className="reservation-box" style={{ marginBottom: 16 }}>
+                          <h3 style={{ marginBottom: 12, fontSize: 15 }}>🛡️ SafeScore</h3>
+                          <div className="safescore-page" style={{ padding: 0 }}>
+                            <div className="safescore-circle-wrap">
+                              <svg viewBox="0 0 100 100" className="safescore-svg">
+                                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(124,58,237,0.1)" strokeWidth="10"/>
+                                <circle cx="50" cy="50" r="42" fill="none" stroke={col} strokeWidth="10"
+                                  strokeDasharray={`${circ * score / 100} ${circ * (1 - score / 100)}`}
+                                  strokeDashoffset={circ * 0.25} strokeLinecap="round"
+                                  style={{ transition: "stroke-dasharray 1s ease" }}/>
+                              </svg>
+                              <div className="safescore-center">
+                                <span className="safescore-number" style={{ color: col }}><AnimatedNumber value={score} /></span>
+                                <span className="safescore-sub">/ 100</span>
+                              </div>
+                            </div>
+                            <div className="safescore-legend">
+                              <span style={{ color: "#10b981" }}>● 80–100 Güvenilir</span>
+                              <span style={{ color: "#f59e0b" }}>● 50–79 Orta</span>
+                              <span style={{ color: "#ef4444" }}>● 0–49 Riskli</span>
+                            </div>
+                          </div>
+                          {safescoreHistory.length > 0 && <>
+                            <p className="rez-section-title" style={{ marginTop: 16 }}>Son Hareketler</p>
+                            {safescoreHistory.slice(0, 3).map((h, i) => (
+                              <div key={i} className="safescore-history-row">
+                                <div>
+                                  <div className="safescore-history-reason">{h.reason === "attended" ? "Rezervasyona katıldın" : h.reason === "no_show" ? "Rezervasyona katılmadın" : h.reason}</div>
+                                  <div className="safescore-history-date">{new Date(h.created_at).toLocaleDateString("tr-TR")}</div>
+                                </div>
+                                <span className={`safescore-delta ${h.delta > 0 ? "pos" : "neg"}`}>{h.delta > 0 ? `+${h.delta}` : h.delta}</span>
+                              </div>
+                            ))}
+                          </>}
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── İstatistiklerim ── */}
+                    {(() => {
+                      const myRezs = reservations.filter(r => r.email === loggedCustomer.email);
+                      const total = myRezs.length;
+                      const attended = myRezs.filter(r => r.attendanceStatus === "attended").length;
+                      const noshow = myRezs.filter(r => r.attendanceStatus === "no_show").length;
+                      const uniqueB = [...new Set(myRezs.map(r => r.businessId))].length;
+                      return (
+                        <div className="reservation-box" style={{ marginBottom: 16 }}>
+                          <h3 style={{ marginBottom: 12, fontSize: 15 }}>📊 İstatistiklerim</h3>
+                          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
+                            <div className="stat-card"><span className="stat-icon">📋</span><span>Toplam</span><strong><AnimatedNumber value={total} /></strong></div>
+                            <div className="stat-card"><span className="stat-icon">🏢</span><span>İşletme</span><strong><AnimatedNumber value={uniqueB} /></strong></div>
+                            <div className="stat-card"><span className="stat-icon">✅</span><span>Katıldım</span><strong><AnimatedNumber value={attended} /></strong></div>
+                            <div className="stat-card"><span className="stat-icon">❌</span><span>Katılmadım</span><strong><AnimatedNumber value={noshow} /></strong></div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── Sadakat Puanları ── */}
+                    <div className="reservation-box" style={{ marginBottom: 16 }}>
+                      <h3 style={{ marginBottom: 12, fontSize: 15 }}>🏆 Sadakat Puanları</h3>
+                      {loyaltyPoints.length > 0
+                        ? [...loyaltyPoints].sort((a, b) => b.points - a.points).slice(0, 5).map((lp, i) => (
+                          <div key={i} className="loyalty-row">
+                            <div className="loyalty-rank">#{i + 1}</div>
+                            <div className="loyalty-info">
+                              <div className="loyalty-business">{lp.businessName}</div>
+                              <div className="loyalty-sub">{Math.floor(lp.points / 2)} ziyaret</div>
+                            </div>
+                            <div className="loyalty-badge">
+                              <span className="loyalty-trophy">{lp.points >= 20 ? "🏆" : lp.points >= 10 ? "🥈" : "🥉"}</span>
+                              <span className="loyalty-pts">{lp.points} puan</span>
+                            </div>
+                          </div>
+                        ))
+                        : <p className="description">Henüz puan yok. Rezervasyonlara katıldıkça kazanırsınız.</p>}
+                    </div>
+
+                    {/* ── Profil Bilgileri ── */}
+                    <div className="reservation-box" style={{ marginBottom: 16 }}>
+                      <h3 style={{ marginBottom: 12, fontSize: 15 }}>👤 Profil Bilgileri</h3>
+                      <form className="reservation-form">
+                        <input type="tel" placeholder="Telefon Numarası" value={customerProfile.phone}
+                          onChange={e => setCustomerProfile({ ...customerProfile, phone: e.target.value })} />
+                        <div className="time-slots">
+                          {[["Male","Erkek"],["Female","Kadın"],["Prefer not to say","Belirtmek istemiyorum"]].map(([val, label]) => (
+                            <button key={val} type="button"
+                              className={customerProfile.gender === val ? "profile-option selected-time" : "profile-option time-btn"}
+                              onClick={() => setCustomerProfile({ ...customerProfile, gender: val })}>
+                              {customerProfile.gender === val ? "✓ " : ""}{label}
+                            </button>
+                          ))}
+                        </div>
+                        <input type="date" value={customerProfile.birthDate}
+                          onChange={e => setCustomerProfile({ ...customerProfile, birthDate: e.target.value })} />
+                        <input type="text" placeholder="Meslek" value={customerProfile.job}
+                          onChange={e => setCustomerProfile({ ...customerProfile, job: e.target.value })} />
+                        <div className="time-slots">
+                          {[["Smoker","İçiyor"],["Non-smoker","İçmiyor"],["No preference","Fark Etmez"]].map(([val, label]) => (
+                            <button key={val} type="button"
+                              className={customerProfile.smoking === val ? "profile-option selected-time" : "profile-option time-btn"}
+                              onClick={() => setCustomerProfile({ ...customerProfile, smoking: val })}>
+                              {customerProfile.smoking === val ? "✓ " : ""}{label}
+                            </button>
+                          ))}
+                        </div>
+                        <button type="button" className="save-changes-btn" onClick={async () => {
+                          const { error } = await supabase.rpc("customer_update_profile", {
+                            p_phone: customerProfile.phone, p_gender: customerProfile.gender,
+                            p_birth_date: customerProfile.birthDate, p_job: customerProfile.job, p_smoking: customerProfile.smoking,
+                          });
+                          if (error) { alert("Profil kaydedilemedi."); return; }
+                          alert("Profil başarıyla kaydedildi.");
+                        }}>Profili Kaydet</button>
+                      </form>
+                    </div>
 
                     {accountMsg.text && (
                       <div className={accountMsg.type === "success" ? "success-message" : "error-message"} style={{ marginBottom: 20 }}>
@@ -5503,7 +5468,8 @@ function App() {
               className={`bn-item${bnActive === "profile" ? " active" : ""}`}
               onClick={() => {
                 closeAll();
-                loggedCustomer ? setPage("customerDashboard") : setPage("customerAuth");
+                if (loggedCustomer) { setCustomerTab("account"); setPage("customerDashboard"); }
+                else setPage("customerAuth");
               }}
             >
               <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
