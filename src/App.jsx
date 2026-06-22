@@ -1614,12 +1614,19 @@ function App() {
               const todayDayName = now.toLocaleDateString("en-US", { weekday: "long" });
               const nowMins = now.getHours() * 60 + now.getMinutes();
               const toMins = str => { const [h,m] = (str||"00:00").split(":").map(Number); return (h||0)*60+(m||0); };
+              // 00:00 kapanış = gece yarısı biter (1440 dk) veya gece yarısını geçen aralık
+              const isInHours = (open, close, now) => {
+                let o = toMins(open), c = toMins(close);
+                if (c === 0) c = 1440;           // 00:00 → gece yarısı sonu
+                if (c <= o) return now >= o || now < c;  // gece yarısını geçen aralık (22:00–02:00)
+                return now >= o && now < c;
+              };
 
               // Açık/Kapalı hesapla
               const isOpenNow = biz => {
                 const h = (biz.businessHours || {})[todayDayName];
                 if (!h?.open || !h?.close) return null; // saat ayarlanmamış
-                return nowMins >= toMins(h.open) && nowMins < toMins(h.close);
+                return isInHours(h.open, h.close, nowMins);
               };
 
               // Tüm aktif işletmeleri göster (konum filtresi varsa uygula)
@@ -5009,7 +5016,13 @@ function App() {
                 const now = new Date();
                 const nowMins = now.getHours() * 60 + now.getMinutes();
                 const toMins = str => { const [hr, m] = (str||"00:00").split(":").map(Number); return (hr||0)*60+(m||0); };
-                const isOpen = nowMins >= toMins(h.open) && nowMins < toMins(h.close);
+                const calcOpen = (open, close, now) => {
+                  let o = toMins(open), c = toMins(close);
+                  if (c === 0) c = 1440;
+                  if (c <= o) return now >= o || now < c;
+                  return now >= o && now < c;
+                };
+                const isOpen = calcOpen(h.open, h.close, nowMins);
                 return (
                   <span className={`biz-open-status${isOpen ? " open" : " closed"}`}>
                     {isOpen ? `✓ Şu an açık · ${h.open}–${h.close}` : `✕ Şu an kapalı · ${h.open}–${h.close} arası açık`}
