@@ -228,6 +228,7 @@ function App() {
   const [panelTab, setPanelTab] = useState(() => localStorage.getItem("rp_panel_tab") || "incoming");
   const [customerInsightTab, setCustomerInsightTab] = useState("age");
   const [customerTab, setCustomerTab] = useState(() => localStorage.getItem("rp_customer_tab") || "reservations");
+  const [accountSubTab, setAccountSubTab] = useState("safescore");
 
   const [availableTimes, setAvailableTimes] = useState([
     "18:00",
@@ -2471,14 +2472,32 @@ function App() {
                 {/* ── Hesap Ayarları ── */}
                 {customerTab === "account" && (
                   <div style={{ marginTop: 16, maxWidth: 480 }}>
+                    {/* Alt menü */}
+                    <div className="account-submenu">
+                      {[
+                        { key: "safescore", icon: "🛡️", label: "SafeScore" },
+                        { key: "stats",     icon: "📊", label: "İstatistikler" },
+                        { key: "loyalty",   icon: "🏆", label: "Sadakat Puanları" },
+                        { key: "profile",   icon: "👤", label: "Profil Bilgileri" },
+                        { key: "settings",  icon: "⚙️", label: "Hesap Ayarları" },
+                      ].map(item => (
+                        <button key={item.key}
+                          className={`accsub-btn${accountSubTab === item.key ? " active" : ""}`}
+                          onClick={() => setAccountSubTab(item.key)}>
+                          <span className="accsub-icon">{item.icon}</span>
+                          <span className="accsub-label">{item.label}</span>
+                          <svg className="accsub-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
+                      ))}
+                    </div>
 
-                    {/* ── SafeScore ── */}
-                    {(() => {
+                    {/* SafeScore */}
+                    {accountSubTab === "safescore" && (() => {
                       const score = loggedCustomer.safeScore ?? 100;
                       const col = score >= 80 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444";
                       const circ = 2 * Math.PI * 42;
                       return (
-                        <div className="reservation-box" style={{ marginBottom: 16 }}>
+                        <div className="reservation-box" style={{ marginTop: 16 }}>
                           <h3 style={{ marginBottom: 12, fontSize: 15 }}>🛡️ SafeScore</h3>
                           <div className="safescore-page" style={{ padding: 0 }}>
                             <div className="safescore-circle-wrap">
@@ -2516,15 +2535,15 @@ function App() {
                       );
                     })()}
 
-                    {/* ── İstatistiklerim ── */}
-                    {(() => {
+                    {/* İstatistikler */}
+                    {accountSubTab === "stats" && (() => {
                       const myRezs = reservations.filter(r => r.email === loggedCustomer.email);
                       const total = myRezs.length;
                       const attended = myRezs.filter(r => r.attendanceStatus === "attended").length;
                       const noshow = myRezs.filter(r => r.attendanceStatus === "no_show").length;
                       const uniqueB = [...new Set(myRezs.map(r => r.businessId))].length;
                       return (
-                        <div className="reservation-box" style={{ marginBottom: 16 }}>
+                        <div className="reservation-box" style={{ marginTop: 16 }}>
                           <h3 style={{ marginBottom: 12, fontSize: 15 }}>📊 İstatistiklerim</h3>
                           <div className="stats-grid" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>
                             <div className="stat-card"><span className="stat-icon">📋</span><span>Toplam</span><strong><AnimatedNumber value={total} /></strong></div>
@@ -2536,204 +2555,149 @@ function App() {
                       );
                     })()}
 
-                    {/* ── Sadakat Puanları ── */}
-                    <div className="reservation-box" style={{ marginBottom: 16 }}>
-                      <h3 style={{ marginBottom: 12, fontSize: 15 }}>🏆 Sadakat Puanları</h3>
-                      {loyaltyPoints.length > 0
-                        ? [...loyaltyPoints].sort((a, b) => b.points - a.points).slice(0, 5).map((lp, i) => (
-                          <div key={i} className="loyalty-row">
-                            <div className="loyalty-rank">#{i + 1}</div>
-                            <div className="loyalty-info">
-                              <div className="loyalty-business">{lp.businessName}</div>
-                              <div className="loyalty-sub">{Math.floor(lp.points / 2)} ziyaret</div>
+                    {/* Sadakat Puanları */}
+                    {accountSubTab === "loyalty" && (
+                      <div className="reservation-box" style={{ marginTop: 16 }}>
+                        <h3 style={{ marginBottom: 12, fontSize: 15 }}>🏆 Sadakat Puanları</h3>
+                        {loyaltyPoints.length > 0
+                          ? [...loyaltyPoints].sort((a, b) => b.points - a.points).slice(0, 5).map((lp, i) => (
+                            <div key={i} className="loyalty-row">
+                              <div className="loyalty-rank">#{i + 1}</div>
+                              <div className="loyalty-info">
+                                <div className="loyalty-business">{lp.businessName}</div>
+                                <div className="loyalty-sub">{Math.floor(lp.points / 2)} ziyaret</div>
+                              </div>
+                              <div className="loyalty-badge">
+                                <span className="loyalty-trophy">{lp.points >= 20 ? "🏆" : lp.points >= 10 ? "🥈" : "🥉"}</span>
+                                <span className="loyalty-pts">{lp.points} puan</span>
+                              </div>
                             </div>
-                            <div className="loyalty-badge">
-                              <span className="loyalty-trophy">{lp.points >= 20 ? "🏆" : lp.points >= 10 ? "🥈" : "🥉"}</span>
-                              <span className="loyalty-pts">{lp.points} puan</span>
-                            </div>
-                          </div>
-                        ))
-                        : <p className="description">Henüz puan yok. Rezervasyonlara katıldıkça kazanırsınız.</p>}
-                    </div>
-
-                    {/* ── Profil Bilgileri ── */}
-                    <div className="reservation-box" style={{ marginBottom: 16 }}>
-                      <h3 style={{ marginBottom: 12, fontSize: 15 }}>👤 Profil Bilgileri</h3>
-                      <form className="reservation-form">
-                        <input type="tel" placeholder="Telefon Numarası" value={customerProfile.phone}
-                          onChange={e => setCustomerProfile({ ...customerProfile, phone: e.target.value })} />
-                        <div className="time-slots">
-                          {[["Male","Erkek"],["Female","Kadın"],["Prefer not to say","Belirtmek istemiyorum"]].map(([val, label]) => (
-                            <button key={val} type="button"
-                              className={customerProfile.gender === val ? "profile-option selected-time" : "profile-option time-btn"}
-                              onClick={() => setCustomerProfile({ ...customerProfile, gender: val })}>
-                              {customerProfile.gender === val ? "✓ " : ""}{label}
-                            </button>
-                          ))}
-                        </div>
-                        <input type="date" value={customerProfile.birthDate}
-                          onChange={e => setCustomerProfile({ ...customerProfile, birthDate: e.target.value })} />
-                        <input type="text" placeholder="Meslek" value={customerProfile.job}
-                          onChange={e => setCustomerProfile({ ...customerProfile, job: e.target.value })} />
-                        <div className="time-slots">
-                          {[["Smoker","İçiyor"],["Non-smoker","İçmiyor"],["No preference","Fark Etmez"]].map(([val, label]) => (
-                            <button key={val} type="button"
-                              className={customerProfile.smoking === val ? "profile-option selected-time" : "profile-option time-btn"}
-                              onClick={() => setCustomerProfile({ ...customerProfile, smoking: val })}>
-                              {customerProfile.smoking === val ? "✓ " : ""}{label}
-                            </button>
-                          ))}
-                        </div>
-                        <button type="button" className="save-changes-btn" onClick={async () => {
-                          const { error } = await supabase.rpc("customer_update_profile", {
-                            p_phone: customerProfile.phone, p_gender: customerProfile.gender,
-                            p_birth_date: customerProfile.birthDate, p_job: customerProfile.job, p_smoking: customerProfile.smoking,
-                          });
-                          if (error) { alert("Profil kaydedilemedi."); return; }
-                          alert("Profil başarıyla kaydedildi.");
-                        }}>Profili Kaydet</button>
-                      </form>
-                    </div>
-
-                    {accountMsg.text && (
-                      <div className={accountMsg.type === "success" ? "success-message" : "error-message"} style={{ marginBottom: 20 }}>
-                        {accountMsg.text}
+                          ))
+                          : <p className="description">Henüz puan yok. Rezervasyonlara katıldıkça kazanırsınız.</p>}
                       </div>
                     )}
 
-                    {/* Mevcut bilgiler */}
-                    <div className="profile-card" style={{ marginBottom: 24 }}>
-                      <div className="profile-field-row">
-                        <span className="profile-field-label">Mevcut E-posta</span>
-                        <span className="profile-field-value">{loggedCustomer.email}</span>
+                    {/* Profil Bilgileri */}
+                    {accountSubTab === "profile" && (
+                      <div className="reservation-box" style={{ marginTop: 16 }}>
+                        <h3 style={{ marginBottom: 12, fontSize: 15 }}>👤 Profil Bilgileri</h3>
+                        <form className="reservation-form">
+                          <input type="tel" placeholder="Telefon Numarası" value={customerProfile.phone}
+                            onChange={e => setCustomerProfile({ ...customerProfile, phone: e.target.value })} />
+                          <div className="time-slots">
+                            {[["Male","Erkek"],["Female","Kadın"],["Prefer not to say","Belirtmek istemiyorum"]].map(([val, label]) => (
+                              <button key={val} type="button"
+                                className={customerProfile.gender === val ? "profile-option selected-time" : "profile-option time-btn"}
+                                onClick={() => setCustomerProfile({ ...customerProfile, gender: val })}>
+                                {customerProfile.gender === val ? "✓ " : ""}{label}
+                              </button>
+                            ))}
+                          </div>
+                          <input type="date" value={customerProfile.birthDate}
+                            onChange={e => setCustomerProfile({ ...customerProfile, birthDate: e.target.value })} />
+                          <input type="text" placeholder="Meslek" value={customerProfile.job}
+                            onChange={e => setCustomerProfile({ ...customerProfile, job: e.target.value })} />
+                          <div className="time-slots">
+                            {[["Smoker","İçiyor"],["Non-smoker","İçmiyor"],["No preference","Fark Etmez"]].map(([val, label]) => (
+                              <button key={val} type="button"
+                                className={customerProfile.smoking === val ? "profile-option selected-time" : "profile-option time-btn"}
+                                onClick={() => setCustomerProfile({ ...customerProfile, smoking: val })}>
+                                {customerProfile.smoking === val ? "✓ " : ""}{label}
+                              </button>
+                            ))}
+                          </div>
+                          <button type="button" className="save-changes-btn" onClick={async () => {
+                            const { error } = await supabase.rpc("customer_update_profile", {
+                              p_phone: customerProfile.phone, p_gender: customerProfile.gender,
+                              p_birth_date: customerProfile.birthDate, p_job: customerProfile.job, p_smoking: customerProfile.smoking,
+                            });
+                            if (error) { alert("Profil kaydedilemedi."); return; }
+                            alert("Profil başarıyla kaydedildi.");
+                          }}>Profili Kaydet</button>
+                        </form>
                       </div>
-                    </div>
+                    )}
 
-                    {/* E-posta değiştir */}
-                    <div className="reservation-box" style={{ marginBottom: 20 }}>
-                      <h3 style={{ marginBottom: 12, fontSize: 15 }}>✉️ E-posta Değiştir</h3>
-                      <p className="description" style={{ fontSize: 13, marginBottom: 14 }}>
-                        Yeni e-postanıza bir doğrulama linki gönderilir. Linke tıkladıktan sonra değişiklik geçerli olur.
-                      </p>
-                      <form className="reservation-form" onSubmit={async (e) => {
-                        e.preventDefault();
-                        const newEmail = accountNewEmail.trim().toLowerCase();
-                        if (!newEmail) return setAccountMsg({ text: "Yeni e-posta adresini girin.", type: "error" });
-                        if (newEmail === loggedCustomer.email) return setAccountMsg({ text: "Bu zaten mevcut e-posta adresiniz.", type: "error" });
-                        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return setAccountMsg({ text: "Geçerli bir e-posta adresi girin.", type: "error" });
-
-                        setAccountLoading("email");
-                        const { error } = await supabase.auth.updateUser({ email: newEmail }, { emailRedirectTo: "https://getrezpoint.com" });
-                        setAccountLoading("");
-
-                        if (error) {
-                          setAccountMsg({ text: "E-posta değiştirilemedi: " + error.message, type: "error" });
-                        } else {
-                          setAccountNewEmail("");
-                          setAccountMsg({ text: `${newEmail} adresine doğrulama linki gönderildi. Linke tıkladıktan sonra e-postanız güncellenir.`, type: "success" });
-                        }
-                      }}>
-                        <input
-                          type="email"
-                          placeholder="Yeni e-posta adresi"
-                          value={accountNewEmail}
-                          onChange={e => setAccountNewEmail(e.target.value)}
-                          autoComplete="email"
-                          disabled={accountLoading === "email"}
-                        />
-                        <button type="submit" className="save-changes-btn" disabled={accountLoading === "email"}>
-                          {accountLoading === "email" ? <Spinner /> : "Doğrulama Linki Gönder"}
-                        </button>
-                      </form>
-                    </div>
-
-                    {/* Şifre değiştir */}
-                    <div className="reservation-box" style={{ marginBottom: 20 }}>
-                      <h3 style={{ marginBottom: 12, fontSize: 15 }}>🔒 Şifre Değiştir</h3>
-                      <form className="reservation-form" onSubmit={async (e) => {
-                        e.preventDefault();
-                        if (!accountNewPassword) return setAccountMsg({ text: "Yeni şifre girin.", type: "error" });
-                        if (accountNewPassword.length < 6) return setAccountMsg({ text: "Şifre en az 6 karakter olmalıdır.", type: "error" });
-                        if (accountNewPassword !== accountNewPassword2) return setAccountMsg({ text: "Şifreler eşleşmiyor.", type: "error" });
-
-                        setAccountLoading("password");
-                        const { error } = await supabase.auth.updateUser({ password: accountNewPassword });
-                        setAccountLoading("");
-
-                        if (error) {
-                          setAccountMsg({ text: "Şifre değiştirilemedi: " + error.message, type: "error" });
-                        } else {
-                          setAccountNewPassword("");
-                          setAccountNewPassword2("");
-                          setAccountMsg({ text: "Şifreniz başarıyla güncellendi.", type: "success" });
-                        }
-                      }}>
-                        <input
-                          type="password"
-                          placeholder="Yeni şifre (en az 6 karakter)"
-                          value={accountNewPassword}
-                          onChange={e => setAccountNewPassword(e.target.value)}
-                          autoComplete="new-password"
-                          disabled={accountLoading === "password"}
-                        />
-                        <input
-                          type="password"
-                          placeholder="Yeni şifre (tekrar)"
-                          value={accountNewPassword2}
-                          onChange={e => setAccountNewPassword2(e.target.value)}
-                          autoComplete="new-password"
-                          disabled={accountLoading === "password"}
-                        />
-                        <button type="submit" className="save-changes-btn" disabled={accountLoading === "password"}>
-                          {accountLoading === "password" ? <Spinner /> : "Şifreyi Güncelle"}
-                        </button>
-                      </form>
-                    </div>
-
-                    {/* Şifremi unuttum */}
-                    <div className="reservation-box">
-                      <h3 style={{ marginBottom: 8, fontSize: 15 }}>🔑 Şifremi Unuttum</h3>
-                      <p className="description" style={{ fontSize: 13, marginBottom: 14 }}>
-                        Mevcut şifrenizi bilmiyorsanız e-postanıza sıfırlama linki gönderebilirsiniz.
-                      </p>
-                      <button
-                        className="secondary-btn"
-                        disabled={accountLoading === "reset"}
-                        onClick={async () => {
-                          setAccountLoading("reset");
-                          const { error } = await supabase.auth.resetPasswordForEmail(loggedCustomer.email, {
-                            redirectTo: window.location.origin,
-                          });
-                          setAccountLoading("");
-                          if (error) {
-                            setAccountMsg({ text: "Gönderilemedi: " + error.message, type: "error" });
-                          } else {
-                            setAccountMsg({ text: `${loggedCustomer.email} adresine şifre sıfırlama linki gönderildi.`, type: "success" });
-                          }
-                        }}
-                      >
-                        {accountLoading === "reset" ? <Spinner /> : "Sıfırlama Linki Gönder"}
-                      </button>
-                    </div>
+                    {/* Hesap Ayarları */}
+                    {accountSubTab === "settings" && (
+                      <div style={{ marginTop: 16 }}>
+                        {accountMsg.text && (
+                          <div className={accountMsg.type === "success" ? "success-message" : "error-message"} style={{ marginBottom: 16 }}>
+                            {accountMsg.text}
+                          </div>
+                        )}
+                        <div className="reservation-box" style={{ marginBottom: 16 }}>
+                          <div className="profile-field-row">
+                            <span className="profile-field-label">Mevcut E-posta</span>
+                            <span className="profile-field-value">{loggedCustomer.email}</span>
+                          </div>
+                        </div>
+                        <div className="reservation-box" style={{ marginBottom: 16 }}>
+                          <h3 style={{ marginBottom: 12, fontSize: 15 }}>✉️ E-posta Değiştir</h3>
+                          <form className="reservation-form" onSubmit={async (e) => {
+                            e.preventDefault();
+                            const newEmail = accountNewEmail.trim().toLowerCase();
+                            if (!newEmail) return setAccountMsg({ text: "Yeni e-posta adresini girin.", type: "error" });
+                            if (newEmail === loggedCustomer.email) return setAccountMsg({ text: "Bu zaten mevcut e-posta adresiniz.", type: "error" });
+                            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return setAccountMsg({ text: "Geçerli bir e-posta adresi girin.", type: "error" });
+                            setAccountLoading("email");
+                            const { error } = await supabase.auth.updateUser({ email: newEmail }, { emailRedirectTo: "https://getrezpoint.com" });
+                            setAccountLoading("");
+                            if (error) { setAccountMsg({ text: "E-posta değiştirilemedi: " + error.message, type: "error" }); }
+                            else { setAccountNewEmail(""); setAccountMsg({ text: `${newEmail} adresine doğrulama linki gönderildi.`, type: "success" }); }
+                          }}>
+                            <input type="email" placeholder="Yeni e-posta adresi" value={accountNewEmail}
+                              onChange={e => setAccountNewEmail(e.target.value)} autoComplete="email" disabled={accountLoading === "email"} />
+                            <button type="submit" className="save-changes-btn" disabled={accountLoading === "email"}>
+                              {accountLoading === "email" ? <Spinner /> : "Doğrulama Linki Gönder"}
+                            </button>
+                          </form>
+                        </div>
+                        <div className="reservation-box" style={{ marginBottom: 16 }}>
+                          <h3 style={{ marginBottom: 12, fontSize: 15 }}>🔒 Şifre Değiştir</h3>
+                          <form className="reservation-form" onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!accountNewPassword) return setAccountMsg({ text: "Yeni şifre girin.", type: "error" });
+                            if (accountNewPassword.length < 6) return setAccountMsg({ text: "Şifre en az 6 karakter olmalıdır.", type: "error" });
+                            if (accountNewPassword !== accountNewPassword2) return setAccountMsg({ text: "Şifreler eşleşmiyor.", type: "error" });
+                            setAccountLoading("password");
+                            const { error } = await supabase.auth.updateUser({ password: accountNewPassword });
+                            setAccountLoading("");
+                            if (error) { setAccountMsg({ text: "Şifre değiştirilemedi: " + error.message, type: "error" }); }
+                            else { setAccountNewPassword(""); setAccountNewPassword2(""); setAccountMsg({ text: "Şifreniz başarıyla güncellendi.", type: "success" }); }
+                          }}>
+                            <input type="password" placeholder="Yeni şifre (en az 6 karakter)" value={accountNewPassword}
+                              onChange={e => setAccountNewPassword(e.target.value)} autoComplete="new-password" disabled={accountLoading === "password"} />
+                            <input type="password" placeholder="Yeni şifre (tekrar)" value={accountNewPassword2}
+                              onChange={e => setAccountNewPassword2(e.target.value)} autoComplete="new-password" disabled={accountLoading === "password"} />
+                            <button type="submit" className="save-changes-btn" disabled={accountLoading === "password"}>
+                              {accountLoading === "password" ? <Spinner /> : "Şifreyi Güncelle"}
+                            </button>
+                          </form>
+                        </div>
+                        <div className="reservation-box" style={{ marginBottom: 16 }}>
+                          <h3 style={{ marginBottom: 8, fontSize: 15 }}>🔑 Şifremi Unuttum</h3>
+                          <button className="secondary-btn" disabled={accountLoading === "reset"} onClick={async () => {
+                            setAccountLoading("reset");
+                            const { error } = await supabase.auth.resetPasswordForEmail(loggedCustomer.email, { redirectTo: window.location.origin });
+                            setAccountLoading("");
+                            if (error) { setAccountMsg({ text: "Gönderilemedi: " + error.message, type: "error" }); }
+                            else { setAccountMsg({ text: `${loggedCustomer.email} adresine şifre sıfırlama linki gönderildi.`, type: "success" }); }
+                          }}>
+                            {accountLoading === "reset" ? <Spinner /> : "Sıfırlama Linki Gönder"}
+                          </button>
+                        </div>
+                        <button className="primary-btn" style={{ width: "100%" }} onClick={async () => {
+                          await supabase.auth.signOut();
+                          localStorage.setItem("rp_page", "home");
+                          setLoggedCustomer(null); setEmailVerified(false);
+                          setCustomerForm({ name: "", email: "", password: "" });
+                          setCustomerProfile({ phone: "", gender: "", birthDate: "", job: "", smoking: "" });
+                          setPage("home");
+                        }}>Çıkış Yap</button>
+                      </div>
+                    )}
                   </div>
-                )}
-
-                {customerTab === "account" && (
-                  <button
-                    className="primary-btn"
-                    style={{ marginTop: 16, maxWidth: 480 }}
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      localStorage.setItem("rp_page", "home");
-                      setLoggedCustomer(null);
-                      setEmailVerified(false);
-                      setCustomerForm({ name: "", email: "", password: "" });
-                      setCustomerProfile({ phone: "", gender: "", birthDate: "", job: "", smoking: "" });
-                      setPage("home");
-                    }}
-                  >
-                    Çıkış Yap
-                  </button>
                 )}
               </>
             ) : (

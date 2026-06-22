@@ -1925,6 +1925,25 @@ body::after{
   border:1px solid rgba(239,68,68,0.2);
 }
 
+/* ── Hesabım alt menü ── */
+.account-submenu{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.accsub-btn{
+  display:flex;align-items:center;gap:12px;
+  width:100%;padding:14px 16px;
+  background:#fff;border:1px solid rgba(124,58,237,0.1);
+  border-radius:14px;cursor:pointer;font-family:inherit;
+  text-align:left;
+  box-shadow:0 1px 4px rgba(0,0,0,0.04);
+  transition:all 0.15s ease;
+}
+.accsub-btn:hover{border-color:rgba(124,58,237,0.3);background:#f9f7ff;transform:translateX(3px);}
+.accsub-btn.active{border-color:var(--purple);background:rgba(124,58,237,0.06);box-shadow:0 0 0 3px rgba(124,58,237,0.08);}
+.accsub-icon{font-size:20px;flex-shrink:0;width:28px;text-align:center;}
+.accsub-label{flex:1;font-size:14px;font-weight:600;color:var(--ink-2);}
+.accsub-btn.active .accsub-label{color:var(--purple);}
+.accsub-arrow{color:var(--ink-4);flex-shrink:0;transition:transform 0.15s,color 0.15s;}
+.accsub-btn:hover .accsub-arrow,.accsub-btn.active .accsub-arrow{transform:translateX(3px);color:var(--purple);}
+
 /* ── Business Hours Grid ── */
 .biz-hours-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:4px;}
 .biz-hours-row{
