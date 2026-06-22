@@ -242,6 +242,8 @@ function formatBusiness(b) {
     icon: b.icon || "🏢",
     logoUrl: b.logo_url || null,
     meetingEnabled: b.meeting_enabled ?? false,
+    adminReservationLocked: b.admin_reservation_locked ?? false,
+    adminMeetingLocked: b.admin_meeting_locked ?? false,
     availabilityMode: b.availability_mode === "everyday" ? "specific" : (b.availability_mode || "weekly"),
     availableDays: b.available_days ? b.available_days.split(",") : ["Friday", "Saturday"],
     specificDates: b.specific_dates ? b.specific_dates.split(",") : [],
@@ -963,6 +965,10 @@ function App() {
   }
 
   function openReservationForm(business) {
+    if (!business.reservationActive) {
+      alert("Bu işletme şu an rezervasyon kabul etmiyor.");
+      return;
+    }
     setSelectedBusiness(business);
     setReservation({ phone: "", date: "", time: "", guests: "", note: "" });
     setTermsChecked({ biz: false, rp: false });
@@ -4464,15 +4470,20 @@ function App() {
                     <div className="biz-status-info">
                       <span className="biz-status-label">📋 Rezervasyon Sistemi</span>
                       <span className="biz-status-sub">
-                        {loggedBusiness?.reservationActive ? "Müşteriler rezervasyon yapabilir" : "Rezervasyon şu an kapalı"}
+                        {loggedBusiness?.adminReservationLocked && !loggedBusiness?.reservationActive
+                          ? "⛔ Admin tarafından kilitlendi"
+                          : loggedBusiness?.reservationActive ? "Müşteriler rezervasyon yapabilir" : "Rezervasyon şu an kapalı"}
                       </span>
                     </div>
                     <button
                       className={`biz-toggle-btn${loggedBusiness?.reservationActive ? " on" : " off"}`}
+                      disabled={!loggedBusiness?.reservationActive && loggedBusiness?.adminReservationLocked}
+                      title={!loggedBusiness?.reservationActive && loggedBusiness?.adminReservationLocked ? "Admin tarafından kilitlendi" : ""}
                       onClick={async () => {
                         const newVal = !loggedBusiness.reservationActive;
-                        const { error } = await supabase.rpc("business_set_status", { p_token: bizSessionToken, p_reservation_enabled: newVal });
+                        const { data, error } = await supabase.rpc("business_set_status", { p_token: bizSessionToken, p_reservation_enabled: newVal });
                         if (error) { alert("Güncellenemedi: " + error.message); return; }
+                        if (data?.reservation_error === "admin_locked") { alert("⛔ Bu sistem admin tarafından kilitlenmiştir. Açmak için yöneticinizle iletişime geçin."); return; }
                         setLoggedBusiness(prev => {
                           const updated = { ...prev, reservationActive: newVal };
                           localStorage.setItem("rp_biz_cache", JSON.stringify(updated));
@@ -4489,15 +4500,20 @@ function App() {
                     <div className="biz-status-info">
                       <span className="biz-status-label">📅 Randevu Sistemi</span>
                       <span className="biz-status-sub">
-                        {loggedBusiness?.meetingEnabled ? "Müşteriler randevu talep edebilir" : "Randevu şu an kapalı"}
+                        {loggedBusiness?.adminMeetingLocked && !loggedBusiness?.meetingEnabled
+                          ? "⛔ Admin tarafından kilitlendi"
+                          : loggedBusiness?.meetingEnabled ? "Müşteriler randevu talep edebilir" : "Randevu şu an kapalı"}
                       </span>
                     </div>
                     <button
                       className={`biz-toggle-btn${loggedBusiness?.meetingEnabled ? " on" : " off"}`}
+                      disabled={!loggedBusiness?.meetingEnabled && loggedBusiness?.adminMeetingLocked}
+                      title={!loggedBusiness?.meetingEnabled && loggedBusiness?.adminMeetingLocked ? "Admin tarafından kilitlendi" : ""}
                       onClick={async () => {
                         const newVal = !loggedBusiness.meetingEnabled;
-                        const { error } = await supabase.rpc("business_set_status", { p_token: bizSessionToken, p_meeting_enabled: newVal });
+                        const { data, error } = await supabase.rpc("business_set_status", { p_token: bizSessionToken, p_meeting_enabled: newVal });
                         if (error) { alert("Güncellenemedi: " + error.message); return; }
+                        if (data?.meeting_error === "admin_locked") { alert("⛔ Bu sistem admin tarafından kilitlenmiştir. Açmak için yöneticinizle iletişime geçin."); return; }
                         setLoggedBusiness(prev => {
                           const updated = { ...prev, meetingEnabled: newVal };
                           localStorage.setItem("rp_biz_cache", JSON.stringify(updated));

@@ -2005,6 +2005,7 @@ body::after{
 }
 .biz-toggle-btn.on {background:var(--green);}
 .biz-toggle-btn.off{background:#d1d5db;}
+.biz-toggle-btn:disabled{opacity:0.5;cursor:not-allowed;}
 .biz-toggle-knob{
   position:absolute;top:3px;
   width:22px;height:22px;border-radius:50%;
