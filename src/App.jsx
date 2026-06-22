@@ -5,6 +5,51 @@ import logo from "./assets/logo.png";
 import { supabase } from "./supabaseClient";
 import translations from "./i18n";
 
+/* ══════════════════════════════════
+   Rate Limiter — localStorage tabanlı
+   Sayfa yenilemesi bypas etmez
+══════════════════════════════════ */
+const RL_KEYS = { customer: "rp_rl_cust", business: "rp_rl_biz", admin: "rp_rl_admin" };
+
+function rlGet(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
+}
+function rlSet(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+
+/** Mevcut durum — locked:true ise remaining saniye döner */
+function rlCheck(key) {
+  const d = rlGet(key);
+  if (d.until && Date.now() < d.until) {
+    return { locked: true, remaining: Math.ceil((d.until - Date.now()) / 1000), attempts: d.attempts || 0 };
+  }
+  return { locked: false, attempts: d.attempts || 0 };
+}
+
+/** Başarısız deneme — yeni kilit süresini döner */
+function rlFail(key) {
+  const d = rlGet(key);
+  // Kilit süresi dolmuşsa sayacı sıfırla
+  const prev = (d.until && Date.now() >= d.until) ? 0 : (d.attempts || 0);
+  const attempts = prev + 1;
+  let until = null;
+  if      (attempts >= 10) until = Date.now() + 30 * 60 * 1000; // 30 dk
+  else if (attempts >=  7) until = Date.now() + 10 * 60 * 1000; // 10 dk
+  else if (attempts >=  5) until = Date.now() +  2 * 60 * 1000; //  2 dk
+  else if (attempts >=  3) until = Date.now() +      30 * 1000; // 30 sn
+  rlSet(key, { attempts, until });
+  return { attempts, locked: !!until, until, remaining: until ? Math.ceil((until - Date.now()) / 1000) : 0 };
+}
+
+/** Başarılı giriş — sayacı sıfırla */
+function rlReset(key) { localStorage.removeItem(key); }
+
+/** Kilit mesajı */
+function rlMsg(remaining) {
+  if (remaining >= 3600) return `${Math.ceil(remaining / 60)} dakika sonra tekrar deneyin.`;
+  if (remaining >= 60)   return `${Math.ceil(remaining / 60)} dakika ${remaining % 60} saniye sonra tekrar deneyin.`;
+  return `${remaining} saniye sonra tekrar deneyin.`;
+}
+
 /* ── E-posta domain MX kontrolü ── */
 async function checkEmailDomainMX(email) {
   try {
@@ -964,7 +1009,12 @@ function App() {
   }
 
   async function handleBusinessLogin() {
-    if (bizLoginLocked) return;
+    const rlBiz = rlCheck(RL_KEYS.business);
+    if (rlBiz.locked) {
+      setLoginError(`Hesap geçici olarak kilitlendi. ${rlMsg(rlBiz.remaining)}`);
+      setBizLoginLocked(true);
+      return;
+    }
 
     const email = businessLogin.email.trim().toLowerCase();
     const password = businessLogin.password;
@@ -982,13 +1032,13 @@ function App() {
     setLoginLoading(false);
 
     if (error || !data || data.length === 0) {
-      const attempts = bizLoginAttempts + 1;
+      const { attempts, locked, remaining } = rlFail(RL_KEYS.business);
       setBizLoginAttempts(attempts);
-      if (attempts >= 5) {
+      if (locked) {
         setBizLoginLocked(true);
-        setLoginError("Çok fazla hatalı deneme. Sayfayı yenileyin ve tekrar deneyin.");
+        setLoginError(`Çok fazla hatalı deneme. ${rlMsg(remaining)}`);
       } else {
-        setLoginError(`Hatalı e-posta veya şifre. (${attempts}/5)`);
+        setLoginError(`Hatalı e-posta veya şifre. (${attempts}. deneme)`);
       }
       return;
     }
@@ -1020,14 +1070,21 @@ function App() {
     localStorage.setItem("rp_biz_id", String(business.id));
     localStorage.setItem("rp_biz_cache", JSON.stringify(business));
     setLoginError("");
+    rlReset(RL_KEYS.business);
     registerPush(business.email, "business", business.id);
     setBizLoginAttempts(0);
+    setBizLoginLocked(false);
     setPanelTab("incoming");
     setPage("businessPanel");
   }
 
   async function handleAdminLogin() {
-    if (adminLoginLocked) return;
+    const rlState = rlCheck(RL_KEYS.admin);
+    if (rlState.locked) {
+      setAdminError(`Hesap geçici olarak kilitlendi. ${rlMsg(rlState.remaining)}`);
+      return;
+    }
+    setAdminLoginLocked(rlState.locked);
 
     const email = adminLogin.email.trim().toLowerCase();
     const password = adminLogin.password;
@@ -1045,19 +1102,20 @@ function App() {
     setLoginLoading(false);
 
     if (error || !data) {
-      const attempts = adminLoginAttempts + 1;
+      const { attempts, locked, remaining } = rlFail(RL_KEYS.admin);
       setAdminLoginAttempts(attempts);
-      if (attempts >= 5) {
+      if (locked) {
         setAdminLoginLocked(true);
-        setAdminError("Çok fazla hatalı deneme. Sayfayı yenileyin ve tekrar deneyin.");
+        setAdminError(`Çok fazla hatalı deneme. ${rlMsg(remaining)}`);
       } else {
-        setAdminError(`Hatalı yönetici e-postası veya şifre. (${attempts}/5)`);
+        setAdminError(`Hatalı yönetici bilgileri. (${attempts}. deneme)`);
       }
       return;
     }
 
     setAdminError("");
     setAdminLoginAttempts(0);
+    rlReset(RL_KEYS.admin);
     setAdminPassword(adminLogin.password);
     setPage("adminPanel");
     supabase.from("business_types").select("*").order("name").then(({ data: bt }) => {
@@ -2277,16 +2335,13 @@ function App() {
                     setEmailPending(true);
                   } else {
                     /* ── Kilit kontrolü ── */
-                    if (custLoginLocked) {
-                      const remaining = custLockUntil ? Math.max(0, Math.ceil((custLockUntil - Date.now()) / 1000)) : 0;
-                      if (Date.now() < custLockUntil) {
-                        setCustomerAuthError(`Çok fazla hatalı deneme. ${remaining} saniye bekleyin.`);
-                        return;
-                      }
-                      setCustLoginLocked(false);
-                      setCustLoginAttempts(0);
-                      setCustLockUntil(null);
+                    const rlCust = rlCheck(RL_KEYS.customer);
+                    if (rlCust.locked) {
+                      setCustLoginLocked(true);
+                      setCustomerAuthError(`Hesap geçici olarak kilitlendi. ${rlMsg(rlCust.remaining)}`);
+                      return;
                     }
+                    setCustLoginLocked(false);
 
                     /* ── Giriş doğrulaması ── */
                     const emailTrimmed = customerForm.email.trim().toLowerCase();
@@ -2318,21 +2373,23 @@ function App() {
                       });
 
                     if (authError) {
-                      const newAttempts = custLoginAttempts + 1;
-                      setCustLoginAttempts(newAttempts);
-                      if (newAttempts >= 5) {
-                        const unlockAt = Date.now() + 2 * 60 * 1000; // 2 dakika kilit
-                        setCustLoginLocked(true);
-                        setCustLockUntil(unlockAt);
-                        setCustomerAuthError("Çok fazla hatalı deneme. 2 dakika sonra tekrar deneyin.");
-                      } else if (authError.message.toLowerCase().includes("email not confirmed")) {
+                      if (authError.message.toLowerCase().includes("email not confirmed")) {
                         setCustomerAuthError("E-posta adresinizi henüz doğrulamadınız. Mail kutunuzu kontrol edin.");
+                        return;
+                      }
+                      const { attempts, locked, remaining } = rlFail(RL_KEYS.customer);
+                      setCustLoginAttempts(attempts);
+                      if (locked) {
+                        setCustLoginLocked(true);
+                        setCustomerAuthError(`Çok fazla hatalı deneme. ${rlMsg(remaining)}`);
                       } else {
-                        setCustomerAuthError(`Hatalı e-posta veya şifre. (${newAttempts}/5)`);
+                        setCustomerAuthError(`Hatalı e-posta veya şifre. (${attempts}. deneme)`);
                       }
                       return;
                     }
+                    rlReset(RL_KEYS.customer);
                     setCustLoginAttempts(0);
+                    setCustLoginLocked(false);
 
                     const { data: custData, error: custError } = await supabase
                       .from("customers")
