@@ -1611,35 +1611,49 @@ function App() {
           <div className="hp-cards-scroll">
             {(() => {
               const now = new Date();
-              const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
               const todayDayName = now.toLocaleDateString("en-US", { weekday: "long" });
               const nowMins = now.getHours() * 60 + now.getMinutes();
               const toMins = str => { const [h,m] = (str||"00:00").split(":").map(Number); return (h||0)*60+(m||0); };
-              const available = adminBusinesses.filter(biz => {
-                if (!biz.reservationActive) return false;
-                if (searchLocation !== "Hepsi" && biz.location !== searchLocation) return false;
-                const dayOk = biz.availabilityMode === "specific"
-                  ? (biz.specificDates || []).includes(todayStr)
-                  : (biz.availableDays || []).includes(todayDayName);
-                if (!dayOk) return false;
-                const dayHours = (biz.businessHours || {})[todayDayName];
-                if (dayHours?.open && dayHours?.close) {
-                  return nowMins >= toMins(dayHours.open) && nowMins < toMins(dayHours.close);
-                }
-                return true;
+
+              // Açık/Kapalı hesapla
+              const isOpenNow = biz => {
+                const h = (biz.businessHours || {})[todayDayName];
+                if (!h?.open || !h?.close) return null; // saat ayarlanmamış
+                return nowMins >= toMins(h.open) && nowMins < toMins(h.close);
+              };
+
+              // Tüm aktif işletmeleri göster (konum filtresi varsa uygula)
+              const shown = adminBusinesses.filter(b =>
+                b.reservationActive &&
+                (searchLocation === "Hepsi" || b.location === searchLocation)
+              );
+
+              if (shown.length === 0) return (
+                <p className="description" style={{padding:"20px 0"}}>
+                  {lang === "en" ? "No venues found." : "Mekan bulunamadı."}
+                </p>
+              );
+
+              // Önce açık olanlar, sonra kapalı
+              const sorted = [...shown].sort((a, b) => {
+                const aOpen = isOpenNow(a); const bOpen = isOpenNow(b);
+                if (aOpen === true && bOpen !== true) return -1;
+                if (bOpen === true && aOpen !== true) return 1;
+                return 0;
               });
-              const shown = available.length > 0
-                ? available
-                : adminBusinesses.filter(b => b.reservationActive && (searchLocation === "Hepsi" || b.location === searchLocation));
-              if (shown.length === 0) return <p className="description" style={{padding:"20px 0"}}>{lang === "en" ? "No venues available right now." : "Şu an müsait mekan yok."}</p>;
-              return shown.slice(0, 8).map(biz => (
+
+              return sorted.map(biz => {
+                const openStatus = isOpenNow(biz);
+                return (
                 <div className="hp-card" key={biz.id} onClick={() => { setSelectedBusiness(biz); setPage("businessProfile"); }}>
                   <div className="hp-card-photo">
                     {biz.logoUrl
                       ? <img src={biz.logoUrl} alt={biz.name} />
                       : <div className="hp-card-photo-placeholder">{biz.icon || "🏠"}</div>
                     }
-                    <span className="hp-card-badge">{lang === "en" ? "Available" : "Müsait"}</span>
+                    {openStatus === true  && <span className="hp-card-badge open">{lang === "en" ? "Open" : "Açık"}</span>}
+                    {openStatus === false && <span className="hp-card-badge closed">{lang === "en" ? "Closed" : "Kapalı"}</span>}
+                    {openStatus === null  && <span className="hp-card-badge neutral">{lang === "en" ? "Active" : "Aktif"}</span>}
                     <button className={`hp-card-heart${favorites.some(f => f.id === biz.id) ? " active" : ""}`}
                       onClick={e => { e.stopPropagation(); toggleFavorite(biz); }} aria-label="Favori">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill={favorites.some(f => f.id === biz.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1666,7 +1680,8 @@ function App() {
                     </button>
                   </div>
                 </div>
-              ));
+              );
+              });
             })()}
           </div>
         </section>
