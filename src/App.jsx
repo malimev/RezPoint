@@ -587,12 +587,9 @@ function App() {
       }
 
       setLoadProgress(55);
-      // 4. Load reservations — son 6 ay (eski iptal/red zaten temizleniyor)
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      // 4. Load reservations — tümünü çek (istatistikler için gerekli, sınır yok)
       const { data: reservationData, error: reservationError } =
-        await supabase.from("reservations").select("*")
-          .or(`status.in.(pending,accepted),created_at.gte.${sixMonthsAgo.toISOString()}`);
+        await supabase.from("reservations").select("*");
       if (reservationError) console.log("Reservations fetch error:", reservationError);
 
       if (reservationData) {
@@ -622,8 +619,7 @@ function App() {
 
       setLoadProgress(75);
       // 6b. Load meetings
-      const { data: meetingData } = await supabase.from("meetings").select("*")
-        .or(`status.in.(pending,accepted),created_at.gte.${sixMonthsAgo.toISOString()}`);
+      const { data: meetingData } = await supabase.from("meetings").select("*");
       if (meetingData) {
         setMeetings(meetingData.map(m => ({
           id: m.id, businessId: m.business_id, businessName: m.business_name,
@@ -3040,8 +3036,9 @@ function App() {
           <div className="reservation-box" style={{ marginTop: "24px" }}>
             <h2>🧹 Veritabanı Temizliği</h2>
             <p className="description">
-              Okunmuş bildirimleri (30+ gün), iptal/red rezervasyonları (90+ gün),
-              reddedilen randevuları (90+ gün) ve fazla geçmiş kayıtları temizler.
+              Okunmuş bildirimleri (30+ gün), reddedilen randevuları (90+ gün)
+              ve fazla SafeScore geçmişini temizler.
+              Rezervasyonlar istatistikler için tutulur, silinmez.
             </p>
             <button
               type="button"
