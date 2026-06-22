@@ -288,6 +288,7 @@ function App() {
   const [error, setError] = useState("");
   const [loginError, setLoginError] = useState("");
   const [panelTab, setPanelTab] = useState(() => localStorage.getItem("rp_panel_tab") || "incoming");
+  const [bizStatsArchive, setBizStatsArchive] = useState({ total:0, attended:0, no_show:0, cancelled:0, rejected:0, unique_customers:0 });
   const [customerInsightTab, setCustomerInsightTab] = useState("age");
   const [customerTab, setCustomerTab] = useState(() => localStorage.getItem("rp_customer_tab") || "reservations");
   const [accountSubTab, setAccountSubTab] = useState("safescore");
@@ -583,6 +584,9 @@ function App() {
             terms: restoredBusiness.terms || "",
           });
           registerPush(restoredBusiness.email, "business", String(restoredBusiness.id));
+          supabase.rpc("get_business_stats", { p_business_id: restoredBusiness.id }).then(({ data }) => {
+            if (data) setBizStatsArchive(data);
+          });
         }
       }
 
@@ -1074,6 +1078,10 @@ function App() {
     registerPush(business.email, "business", business.id);
     setBizLoginAttempts(0);
     setBizLoginLocked(false);
+    // Arşiv istatistikleri çek
+    supabase.rpc("get_business_stats", { p_business_id: business.id }).then(({ data }) => {
+      if (data) setBizStatsArchive(data);
+    });
     setPanelTab("incoming");
     setPage("businessPanel");
   }
@@ -3036,25 +3044,25 @@ function App() {
           <div className="reservation-box" style={{ marginTop: "24px" }}>
             <h2>🧹 Veritabanı Temizliği</h2>
             <p className="description">
-              Okunmuş bildirimleri (30+ gün), reddedilen randevuları (90+ gün)
-              ve fazla SafeScore geçmişini temizler.
-              Rezervasyonlar istatistikler için tutulur, silinmez.
+              90+ günlük rezervasyonları <strong>istatistiklerini saklayarak</strong> siler.
+              Okunmuş bildirimleri (30+ gün), reddedilen randevuları (90+ gün) ve
+              fazla SafeScore geçmişini temizler. İşletme istatistikleri etkilenmez.
             </p>
             <button
               type="button"
               className="secondary-btn"
               style={{ marginTop: 8 }}
               onClick={async () => {
-                if (!window.confirm("Veritabanı temizliği yapılsın mı?")) return;
+                if (!window.confirm("Veritabanı temizliği yapılsın mı?\n\nRezervasyon istatistikleri arşivlenecek, ham veriler silinecek.")) return;
                 const { data, error } = await supabase.rpc("cleanup_old_data");
                 if (error) { alert("Hata: " + error.message); return; }
                 const d = data || {};
                 alert(
                   `✅ Temizlik tamamlandı:\n` +
-                  `• ${d.deleted_notifications ?? 0} eski bildirim\n` +
-                  `• ${d.deleted_reservations  ?? 0} iptal/red rezervasyon\n` +
-                  `• ${d.deleted_meetings      ?? 0} reddedilen randevu\n` +
-                  `• ${d.deleted_safescore     ?? 0} fazla SafeScore kaydı`
+                  `• ${d.archived_and_deleted_reservations ?? 0} rezervasyon arşivlendi ve silindi\n` +
+                  `• ${d.deleted_notifications ?? 0} eski bildirim silindi\n` +
+                  `• ${d.deleted_meetings      ?? 0} reddedilen randevu silindi\n` +
+                  `• ${d.deleted_safescore     ?? 0} fazla SafeScore kaydı silindi`
                 );
               }}
             >
@@ -5009,20 +5017,29 @@ function App() {
             </div>
           </div>
 
-          <div className="biz-profile-stats">
-            <div className="biz-stat-item">
-              <strong>{reservations.filter(r => r.businessId === selectedBusiness.id && r.status !== "cancelled").length}</strong>
-              <span>Toplam Rezervasyon</span>
-            </div>
-            <div className="biz-stat-item">
-              <strong>{reservations.filter(r => r.businessId === selectedBusiness.id && r.attendanceStatus === "attended").length}</strong>
-              <span>Tamamlanan</span>
-            </div>
-            <div className="biz-stat-item">
-              <strong>{selectedBusiness.availableTimes?.length || 0}</strong>
-              <span>{t.profile.timezone}</span>
-            </div>
-          </div>
+          {(() => {
+            const liveTotal    = reservations.filter(r => r.businessId === selectedBusiness.id).length;
+            const liveAttended = reservations.filter(r => r.businessId === selectedBusiness.id && r.attendanceStatus === "attended").length;
+            const isOwnBiz     = loggedBusiness?.id === selectedBusiness.id;
+            const archTotal    = isOwnBiz ? (bizStatsArchive.total    || 0) : 0;
+            const archAttended = isOwnBiz ? (bizStatsArchive.attended || 0) : 0;
+            return (
+              <div className="biz-profile-stats">
+                <div className="biz-stat-item">
+                  <strong>{liveTotal + archTotal}</strong>
+                  <span>Toplam Rezervasyon</span>
+                </div>
+                <div className="biz-stat-item">
+                  <strong>{liveAttended + archAttended}</strong>
+                  <span>Tamamlanan</span>
+                </div>
+                <div className="biz-stat-item">
+                  <strong>{selectedBusiness.availableTimes?.length || 0}</strong>
+                  <span>{t.profile.timezone}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           {selectedBusiness.description && (
             <div className="biz-profile-section">
