@@ -1770,8 +1770,21 @@ function App() {
             </div>
           )}
 
-          <div className="business-grid">
-            {adminBusinesses
+          <div className="biz-list">
+            {(() => {
+              const now = new Date();
+              const todayDay = now.toLocaleDateString("en-US", { weekday: "long" });
+              const nowMins = now.getHours() * 60 + now.getMinutes();
+              const toMins = str => { const [h,m] = (str||"00:00").split(":").map(Number); return (h||0)*60+(m||0); };
+              const bizIsOpen = biz => {
+                const h = (biz.businessHours || {})[todayDay];
+                if (!h?.open || !h?.close) return null;
+                let o = toMins(h.open), c = toMins(h.close);
+                if (c === 0) c = 1440;
+                if (c <= o) return nowMins >= o || nowMins < c;
+                return nowMins >= o && nowMins < c;
+              };
+              return adminBusinesses
               .filter((business) => {
                 const q = businessSearch.toLowerCase();
                 const bizName = (business.name || "").toLowerCase();
@@ -1799,81 +1812,93 @@ function App() {
               })
               .map((business, index) => (
                 <div
-                  className="business-card"
+                  className="biz-list-item"
                   key={business.id}
-                  style={{ animationDelay: `${index * 0.07}s`, cursor: "pointer" }}
+                  style={{ animationDelay: `${index * 0.05}s` }}
                   onClick={() => { setSelectedBusiness(business); setPage("businessProfile"); }}
                 >
-                  <div className="bc-glow" />
-                  <div className="bc-icon-wrap">
+                  {/* Sol: fotoğraf/ikon */}
+                  <div className="bl-photo">
                     {business.logoUrl
-                      ? <img src={business.logoUrl} alt={business.name} className="bc-logo-img" />
-                      : <span className="bc-icon">{business.icon}</span>
+                      ? <img src={business.logoUrl} alt={business.name} />
+                      : <span className="bl-icon">{business.icon || "🏠"}</span>
                     }
-                    <button className={`hp-card-heart${favorites.some(f => f.id === business.id) ? " active" : ""}`}
+                  </div>
+
+                  {/* Orta: bilgiler */}
+                  <div className="bl-info">
+                    <div className="bl-name">{business.name}</div>
+                    <div className="bl-meta">
+                      <span className="bl-type">{business.type}</span>
+                      {business.location && <span className="bl-dot">·</span>}
+                      {business.location && (
+                        <a className="bl-loc bc-map-link"
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.name + " " + business.location)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}>
+                          📍 {business.location}
+                        </a>
+                      )}
+                    </div>
+                    {(() => {
+                      const os = bizIsOpen(business);
+                      const h = (business.businessHours || {})[todayDay];
+                      if (os === true)  return <span className="bl-status open">Açık{h?.close ? ` · ${h.close}'e kadar` : ""}</span>;
+                      if (os === false) return <span className="bl-status closed">Kapalı{h?.open ? ` · ${h.open}'de açılıyor` : ""}</span>;
+                      return null;
+                    })()}
+                  </div>
+
+                  {/* Sağ: aksiyon */}
+                  <div className="bl-actions">
+                    <button className="bl-fav"
                       onClick={e => { e.stopPropagation(); toggleFavorite(business); }} aria-label="Favori">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill={favorites.some(f => f.id === business.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="16" height="16" viewBox="0 0 24 24"
+                        fill={favorites.some(f => f.id === business.id) ? "#ef4444" : "none"}
+                        stroke={favorites.some(f => f.id === business.id) ? "#ef4444" : "currentColor"}
+                        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
                       </svg>
                     </button>
-                  </div>
-                  <div className="bc-body">
-                    <h3 className="bc-name">{business.name}</h3>
-                    <span className="bc-type-tag">{business.type}</span>
-                    {business.location && (
-                      <a
-                        className="bc-location bc-map-link"
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.name + " " + business.location)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        📍 {business.location}
-                      </a>
-                    )}
-                  </div>
-                  <div className="bc-actions">
                     {business.reservationActive && (
-                      <button
-                        className="bc-select-btn"
-                        onClick={(e) => { e.stopPropagation(); openReservationForm(business); }}
-                      >
-                        {t.businesses.reserveBtn} <span className="bc-arrow">→</span>
+                      <button className="bl-btn primary"
+                        onClick={e => { e.stopPropagation(); openReservationForm(business); }}>
+                        {t.businesses.reserveBtn}
                       </button>
                     )}
                     {business.meetingEnabled && business.meetingDates?.length > 0 && (
-                      <button
-                        className="bc-info-btn"
-                        onClick={(e) => {
+                      <button className="bl-btn secondary"
+                        onClick={e => {
                           e.stopPropagation();
                           setMeetingFormBusiness(business);
                           setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", productCategory: "", date: "", time: "", note: "" });
                           setMeetingTermsChecked({ biz: false, rp: false });
                           setMeetingFormError("");
                           setPage("meetingRequest");
-                        }}
-                      >
+                        }}>
                         {t.businesses.meetingBtn}
                       </button>
                     )}
                   </div>
                 </div>
-              ))}
-            {adminBusinesses.filter((b) => {
+              )).concat(
+                /* Sonuç yok */
+                [] // filtrelenmiş liste boşsa aşağıda handle ediliyor
+              );
+            })()}
+            {/* Sonuç yok mesajı */}
+            {adminBusinesses.filter(b => {
               const q = businessSearch.toLowerCase();
-              if (q && !b.name.toLowerCase().includes(q) && !b.type.toLowerCase().includes(q) && !b.location.toLowerCase().includes(q)) return false;
+              const bn = (b.name||"").toLowerCase(), bt = (b.type||"").toLowerCase(), bl = (b.location||"").toLowerCase();
+              if (q && !bn.includes(q) && !bt.includes(q) && !bl.includes(q)) return false;
               if (searchLocation !== "Hepsi" && b.location !== searchLocation) return false;
-              if (searchDate) {
-                const dayName = new Date(searchDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
-                const dayOk2 = b.availabilityMode === "specific"
-                  ? (b.specificDates || []).includes(searchDate)
-                  : (b.availableDays || []).includes(dayName);
-                if (!dayOk2) return false;
+              if (bizCategory !== "Tümü") {
+                const tm = { "Restoranlar":["restoran","restaurant","yemek","lokanta"],"Kafeler":["kafe","cafe","kahve","coffee"],"Barlar":["bar","cocktail","lounge"],"Meyhaneler":["meyhane","tavern","pub","içki"] };
+                if (!(tm[bizCategory]||[]).some(k => bt.includes(k))) return false;
               }
-              if (searchDate && searchTime && !b.availableTimes.includes(searchTime)) return false;
               return true;
             }).length === 0 && (
-              <p className="description" style={{ gridColumn: "1/-1" }}>
+              <p className="description" style={{ padding: "20px 0" }}>
                 {t.businesses.noResults(businessSearch)}{t.businesses.noResultsSuffix}
               </p>
             )}
