@@ -2197,12 +2197,26 @@ function App() {
                     return;
                   }
                   if (customerMode === "register") {
-                    if (
-                      customerForm.name === "" ||
-                      customerForm.email === "" ||
-                      customerForm.password === ""
-                    ) {
-                      setCustomerAuthError("Tüm alanları doldurun.");
+                    const emailTrimmedR = customerForm.email.trim().toLowerCase();
+                    const emailRegexR = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+                    if (!customerForm.name.trim()) {
+                      setCustomerAuthError("Lütfen adınızı ve soyadınızı girin.");
+                      return;
+                    }
+                    if (!emailTrimmedR) {
+                      setCustomerAuthError("Lütfen e-posta adresinizi girin.");
+                      return;
+                    }
+                    if (!emailRegexR.test(emailTrimmedR)) {
+                      setCustomerAuthError("Geçerli bir e-posta adresi girin. (örn: ad@example.com)");
+                      return;
+                    }
+                    if (!customerForm.password) {
+                      setCustomerAuthError("Lütfen bir şifre girin.");
+                      return;
+                    }
+                    if (customerForm.password.length < 6) {
+                      setCustomerAuthError("Şifre en az 6 karakter olmalıdır.");
                       return;
                     }
 
@@ -2234,9 +2248,25 @@ function App() {
                     setCustomerAuthError("");
                     setEmailPending(true);
                   } else {
+                    /* ── Giriş doğrulaması ── */
+                    const emailTrimmed = customerForm.email.trim().toLowerCase();
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+                    if (!emailTrimmed) {
+                      setCustomerAuthError("Lütfen e-posta adresinizi girin.");
+                      return;
+                    }
+                    if (!emailRegex.test(emailTrimmed)) {
+                      setCustomerAuthError("Geçerli bir e-posta adresi girin. (örn: ad@example.com)");
+                      return;
+                    }
+                    if (!customerForm.password) {
+                      setCustomerAuthError("Lütfen şifrenizi girin.");
+                      return;
+                    }
+
                     const { data: authData, error: authError } =
                       await supabase.auth.signInWithPassword({
-                        email: customerForm.email,
+                        email: emailTrimmed,
                         password: customerForm.password,
                       });
 
