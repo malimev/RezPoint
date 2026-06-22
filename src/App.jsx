@@ -2466,11 +2466,26 @@ function App() {
                     type="button"
                     style={{ background: "none", border: "none", color: "var(--purple)", cursor: "pointer", fontSize: 13, textDecoration: "underline" }}
                     onClick={async () => {
-                      const email = customerForm.email.trim();
-                      if (!email) { setForgotPasswordMsg("Önce e-posta adresinizi girin."); return; }
+                      const email = customerForm.email.trim().toLowerCase();
+                      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+                      if (!email) {
+                        setForgotPasswordMsg("Önce e-posta adresinizi girin.");
+                        return;
+                      }
+                      if (!emailRegex.test(email)) {
+                        setForgotPasswordMsg("Geçerli bir e-posta adresi girin. (örn: ad@example.com)");
+                        return;
+                      }
+                      setForgotPasswordMsg("E-posta domaini kontrol ediliyor...");
+                      const mxOk = await checkEmailDomainMX(email);
+                      if (!mxOk) {
+                        setForgotPasswordMsg("Bu e-posta adresi geçersiz görünüyor.");
+                        return;
+                      }
+                      setForgotPasswordMsg("");
                       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: "https://getrezpoint.com" });
                       if (error) { setForgotPasswordMsg("Gönderilemedi: " + error.message); return; }
-                      setForgotPasswordMsg("Şifre sıfırlama bağlantısı e-postanıza gönderildi.");
+                      setForgotPasswordMsg("✅ Şifre sıfırlama bağlantısı e-postanıza gönderildi.");
                     }}
                   >{t.auth.forgotPassword}</button>
                 </p>
