@@ -5424,67 +5424,96 @@ function App() {
       )}
 
       {/* ── Alt navigation bar (mobile) ── */}
-      <nav className="bottom-nav">
-        <button
-          className={`bn-item${page === "home" ? " active" : ""}`}
-          onClick={() => { setPage("home"); setMobileMenuOpen(false); }}
-        >
-          <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <span>{lang === "en" ? "Home" : "Ana Sayfa"}</span>
-        </button>
+      {(() => {
+        /* Hangi tab aktif — paneller açıkken sayfa-bazlı active'i ezer */
+        const bnActive = showFavPanel ? "fav"
+          : showNotifPanel ? "notif"
+          : page === "home" ? "home"
+          : (page === "customerDashboard" && customerTab === "reservations") ? "rez"
+          : (page === "customerDashboard" || page === "customerAuth") ? "profile"
+          : "home";
 
-        <button
-          className={`bn-item${page === "customerDashboard" && customerTab === "reservations" ? " active" : ""}`}
-          onClick={() => {
-            setMobileMenuOpen(false);
-            if (loggedCustomer) {
-              setCustomerTab("reservations");
-              setPage("customerDashboard");
-            } else {
-              setAfterLoginReturnPage("customerDashboard");
-              setCustomerMode("login");
-              setPage("customerAuth");
-            }
-          }}
-        >
-          <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-          <span>{lang === "en" ? "Reservations" : "Rezervasyon"}</span>
-        </button>
+        const closeAll = () => {
+          setShowFavPanel(false);
+          setShowNotifPanel(false);
+          setMobileMenuOpen(false);
+          setShowWhatsNew(false);
+        };
 
-        <button
-          className={`bn-item${showFavPanel ? " active" : ""}`}
-          onClick={() => { setShowFavPanel(p => !p); setShowNotifPanel(false); setMobileMenuOpen(false); }}
-        >
-          <svg className="bn-icon" viewBox="0 0 24 24" fill={showFavPanel ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
-          </svg>
-          <span>{lang === "en" ? "Favorites" : "Favoriler"}</span>
-        </button>
+        return (
+          <nav className="bottom-nav">
+            {/* Ana Sayfa */}
+            <button
+              className={`bn-item${bnActive === "home" ? " active" : ""}`}
+              onClick={() => { closeAll(); setPage("home"); }}
+            >
+              <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+              <span>{lang === "en" ? "Home" : "Ana Sayfa"}</span>
+            </button>
 
-        <button
-          className={`bn-item${showNotifPanel ? " active" : ""}${loggedCustomer && customerNotifications.filter(n => !n.is_read).length > 0 ? " bn-dot" : ""}`}
-          onClick={() => { setShowNotifPanel(p => !p); setMobileMenuOpen(false); setShowWhatsNew(false); }}
-        >
-          <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
-          </svg>
-          <span>{lang === "en" ? "Alerts" : "Bildirimler"}</span>
-        </button>
+            {/* Rezervasyonlarım */}
+            <button
+              className={`bn-item${bnActive === "rez" ? " active" : ""}`}
+              onClick={() => {
+                closeAll();
+                if (loggedCustomer) { setCustomerTab("reservations"); setPage("customerDashboard"); }
+                else { setAfterLoginReturnPage("customerDashboard"); setCustomerMode("login"); setPage("customerAuth"); }
+              }}
+            >
+              <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              <span>{lang === "en" ? "Reservations" : "Rezervasyon"}</span>
+            </button>
 
-        <button
-          className={`bn-item${page === "customerDashboard" && loggedCustomer ? " active" : ""}`}
-          onClick={() => { loggedCustomer ? setPage("customerDashboard") : setPage("customerAuth"); setMobileMenuOpen(false); }}
-        >
-          <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-          </svg>
-          <span>{lang === "en" ? "Profile" : "Profil"}</span>
-        </button>
-      </nav>
+            {/* Favoriler */}
+            <button
+              className={`bn-item${bnActive === "fav" ? " active" : ""}`}
+              onClick={() => {
+                const opening = !showFavPanel;
+                closeAll();
+                if (opening) setShowFavPanel(true);
+              }}
+            >
+              <svg className="bn-icon" viewBox="0 0 24 24" fill={bnActive === "fav" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+              </svg>
+              <span>{lang === "en" ? "Favorites" : "Favoriler"}</span>
+            </button>
+
+            {/* Bildirimler */}
+            <button
+              className={`bn-item${bnActive === "notif" ? " active" : ""}${loggedCustomer && customerNotifications.filter(n => !n.is_read).length > 0 ? " bn-dot" : ""}`}
+              onClick={() => {
+                const opening = !showNotifPanel;
+                closeAll();
+                if (opening) setShowNotifPanel(true);
+              }}
+            >
+              <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+              </svg>
+              <span>{lang === "en" ? "Alerts" : "Bildirimler"}</span>
+            </button>
+
+            {/* Profil */}
+            <button
+              className={`bn-item${bnActive === "profile" ? " active" : ""}`}
+              onClick={() => {
+                closeAll();
+                loggedCustomer ? setPage("customerDashboard") : setPage("customerAuth");
+              }}
+            >
+              <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              <span>{lang === "en" ? "Profile" : "Profil"}</span>
+            </button>
+          </nav>
+        );
+      })()}
     </div>
   );
 }
