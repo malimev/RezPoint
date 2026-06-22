@@ -5,6 +5,23 @@ import logo from "./assets/logo.png";
 import { supabase } from "./supabaseClient";
 import translations from "./i18n";
 
+/* ── E-posta domain MX kontrolü ── */
+async function checkEmailDomainMX(email) {
+  try {
+    const domain = email.split("@")[1];
+    if (!domain) return false;
+    const res = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=MX`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return true; // ağ hatasında engelleme
+    const data = await res.json();
+    // Status 0 = NOERROR, Answer dolu = MX kaydı var
+    return data.Status === 0 && Array.isArray(data.Answer) && data.Answer.length > 0;
+  } catch {
+    return true; // kontrol yapılamazsa geçir, Supabase zaten doğrulama maili atar
+  }
+}
+
 /* ── Push notification helpers ── */
 const VAPID_PUBLIC = "BDMjWSUxEiOZtQjtivlisIbDYJLYUcIPjx0lDrZbn8gvSUV8ih9EyCxbHyniyrIpjBnjtLROfxY89XatXo2dZG8";
 const PUSH_FN_URL  = "https://sghwmnagplaolqdfqpvz.supabase.co/functions/v1/send-push";
@@ -2219,6 +2236,13 @@ function App() {
                       setCustomerAuthError("Şifre en az 6 karakter olmalıdır.");
                       return;
                     }
+                    setCustomerAuthError("E-posta domaini kontrol ediliyor...");
+                    const mxOkR = await checkEmailDomainMX(emailTrimmedR);
+                    if (!mxOkR) {
+                      setCustomerAuthError("Bu e-posta adresi geçersiz görünüyor. Lütfen gerçek bir e-posta adresi girin.");
+                      return;
+                    }
+                    setCustomerAuthError("");
 
                     // Register via Supabase Auth — secure hashing,
                     // automatic email verification mail handled by Supabase.
@@ -2263,6 +2287,13 @@ function App() {
                       setCustomerAuthError("Lütfen şifrenizi girin.");
                       return;
                     }
+                    setCustomerAuthError("E-posta domaini kontrol ediliyor...");
+                    const mxOk = await checkEmailDomainMX(emailTrimmed);
+                    if (!mxOk) {
+                      setCustomerAuthError("Bu e-posta adresi geçersiz görünüyor. Lütfen gerçek bir e-posta adresi girin.");
+                      return;
+                    }
+                    setCustomerAuthError("");
 
                     const { data: authData, error: authError } =
                       await supabase.auth.signInWithPassword({
