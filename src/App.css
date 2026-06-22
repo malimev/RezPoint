@@ -1986,6 +1986,45 @@ body::after{
 .biz-profile-cta .primary-btn{padding:14px 40px;font-size:16px;border-radius:100px;}
 .biz-profile-phone-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 
+/* ── İşletme sistem toggle ── */
+.biz-status-toggles{display:flex;flex-direction:column;gap:10px;margin:16px 0 24px;}
+.biz-status-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px 16px;border-radius:16px;
+  background:#f9f7ff;border:1px solid rgba(124,58,237,0.1);
+}
+.biz-status-info{display:flex;flex-direction:column;gap:3px;}
+.biz-status-label{font-size:14px;font-weight:700;color:var(--ink);}
+.biz-status-sub{font-size:12px;color:var(--ink-3);}
+
+/* Toggle switch */
+.biz-toggle-btn{
+  flex-shrink:0;width:52px;height:28px;border-radius:100px;
+  border:none;cursor:pointer;position:relative;
+  transition:background 0.25s;padding:0;
+}
+.biz-toggle-btn.on {background:var(--green);}
+.biz-toggle-btn.off{background:#d1d5db;}
+.biz-toggle-knob{
+  position:absolute;top:3px;
+  width:22px;height:22px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.2);
+  transition:left 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+.biz-toggle-btn.on  .biz-toggle-knob{left:27px;}
+.biz-toggle-btn.off .biz-toggle-knob{left:3px;}
+
+/* Kapalı uyarı kutusu (profil sayfası) */
+.biz-closed-notice{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:14px 16px;border-radius:16px;
+  background:rgba(0,0,0,0.04);border:1.5px dashed rgba(0,0,0,0.15);
+  width:100%;
+}
+.bcn-icon{font-size:22px;flex-shrink:0;margin-top:1px;}
+.bcn-title{font-size:14px;font-weight:700;color:var(--ink-2);margin-bottom:3px;}
+.bcn-sub{font-size:12px;color:var(--ink-3);line-height:1.5;}
+
 /* ── Business Hours Profile (public view) ── */
 .biz-hours-profile{display:flex;flex-direction:column;gap:4px;}
 .biz-hours-profile-row{

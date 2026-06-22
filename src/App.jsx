@@ -1629,10 +1629,9 @@ function App() {
                 return isInHours(h.open, h.close, nowMins);
               };
 
-              // Tüm aktif işletmeleri göster (konum filtresi varsa uygula)
+              // Tüm işletmeleri göster — rezervasyon kapalı olsa da listelenir
               const shown = adminBusinesses.filter(b =>
-                b.reservationActive &&
-                (searchLocation === "Hepsi" || b.location === searchLocation)
+                searchLocation === "Hepsi" || b.location === searchLocation
               );
 
               if (shown.length === 0) return (
@@ -4456,10 +4455,63 @@ function App() {
               <div className="reservation-box">
                 <h2>Müsaitlik Ayarları</h2>
                 <p className="description">
-                  Müsait gün ve saatleri düzenleyin.
+                  Rezervasyon ve randevu sistemlerini açıp kapatın; müsait gün ve saatleri düzenleyin.
                 </p>
 
-                <h3>Rezervasyon Modu</h3>
+                {/* ── Sistem Durumu ── */}
+                <div className="biz-status-toggles">
+                  <div className="biz-status-row">
+                    <div className="biz-status-info">
+                      <span className="biz-status-label">📋 Rezervasyon Sistemi</span>
+                      <span className="biz-status-sub">
+                        {loggedBusiness?.reservationActive ? "Müşteriler rezervasyon yapabilir" : "Rezervasyon şu an kapalı"}
+                      </span>
+                    </div>
+                    <button
+                      className={`biz-toggle-btn${loggedBusiness?.reservationActive ? " on" : " off"}`}
+                      onClick={async () => {
+                        const newVal = !loggedBusiness.reservationActive;
+                        const { error } = await supabase.rpc("business_set_status", { p_token: bizSessionToken, p_reservation_enabled: newVal });
+                        if (error) { alert("Güncellenemedi: " + error.message); return; }
+                        setLoggedBusiness(prev => {
+                          const updated = { ...prev, reservationActive: newVal };
+                          localStorage.setItem("rp_biz_cache", JSON.stringify(updated));
+                          return updated;
+                        });
+                        setAdminBusinesses(prev => prev.map(b => b.id === loggedBusiness.id ? { ...b, reservationActive: newVal } : b));
+                      }}
+                    >
+                      <span className="biz-toggle-knob" />
+                    </button>
+                  </div>
+
+                  <div className="biz-status-row">
+                    <div className="biz-status-info">
+                      <span className="biz-status-label">📅 Randevu Sistemi</span>
+                      <span className="biz-status-sub">
+                        {loggedBusiness?.meetingEnabled ? "Müşteriler randevu talep edebilir" : "Randevu şu an kapalı"}
+                      </span>
+                    </div>
+                    <button
+                      className={`biz-toggle-btn${loggedBusiness?.meetingEnabled ? " on" : " off"}`}
+                      onClick={async () => {
+                        const newVal = !loggedBusiness.meetingEnabled;
+                        const { error } = await supabase.rpc("business_set_status", { p_token: bizSessionToken, p_meeting_enabled: newVal });
+                        if (error) { alert("Güncellenemedi: " + error.message); return; }
+                        setLoggedBusiness(prev => {
+                          const updated = { ...prev, meetingEnabled: newVal };
+                          localStorage.setItem("rp_biz_cache", JSON.stringify(updated));
+                          return updated;
+                        });
+                        setAdminBusinesses(prev => prev.map(b => b.id === loggedBusiness.id ? { ...b, meetingEnabled: newVal } : b));
+                      }}
+                    >
+                      <span className="biz-toggle-knob" />
+                    </button>
+                  </div>
+                </div>
+
+                <h3 style={{ marginTop: 24 }}>Rezervasyon Modu</h3>
 
                 <div className="time-slots">
                   <button
@@ -5172,11 +5224,43 @@ function App() {
             </div>
           </div>
 
-          {selectedBusiness.reservationActive && (
-            <div className="biz-profile-cta">
-              <button className="primary-btn" onClick={() => openReservationForm(selectedBusiness)}>{t.profile.reserveBtn}</button>
-            </div>
-          )}
+          {/* Rezervasyon CTA veya kapalı mesajı */}
+          <div className="biz-profile-cta">
+            {selectedBusiness.reservationActive ? (
+              <button className="primary-btn" onClick={() => openReservationForm(selectedBusiness)}>
+                {t.profile.reserveBtn}
+              </button>
+            ) : (
+              <div className="biz-closed-notice">
+                <span className="bcn-icon">📋</span>
+                <div>
+                  <div className="bcn-title">{lang === "en" ? "Reservations not available" : "Rezervasyon şu an kapalı"}</div>
+                  <div className="bcn-sub">{lang === "en" ? "This business is not accepting reservations right now." : "Bu işletme şu an rezervasyon kabul etmiyor."}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Randevu CTA veya kapalı mesajı */}
+            {selectedBusiness.meetingEnabled && selectedBusiness.meetingDates?.length > 0 ? (
+              <button className="secondary-btn" style={{ marginTop: 10 }} onClick={() => {
+                setMeetingFormBusiness(selectedBusiness);
+                setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", productCategory: "", date: "", time: "", note: "" });
+                setMeetingTermsChecked({ biz: false, rp: false });
+                setMeetingFormError("");
+                setPage("meetingRequest");
+              }}>
+                📅 {lang === "en" ? "Request Appointment" : "Randevu Talep Et"}
+              </button>
+            ) : !selectedBusiness.meetingEnabled ? (
+              <div className="biz-closed-notice" style={{ marginTop: 10 }}>
+                <span className="bcn-icon">📅</span>
+                <div>
+                  <div className="bcn-title">{lang === "en" ? "Appointments not available" : "Randevu şu an kapalı"}</div>
+                  <div className="bcn-sub">{lang === "en" ? "This business is not accepting appointment requests." : "Bu işletme şu an randevu talebi kabul etmiyor."}</div>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </section>
       )}
 
