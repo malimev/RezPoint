@@ -338,6 +338,9 @@ function App() {
 
   const [bizLoginAttempts, setBizLoginAttempts] = useState(0);
   const [bizLoginLocked, setBizLoginLocked] = useState(false);
+  const [custLoginAttempts, setCustLoginAttempts] = useState(0);
+  const [custLoginLocked, setCustLoginLocked] = useState(false);
+  const [custLockUntil, setCustLockUntil] = useState(null);
   const [adminLoginAttempts, setAdminLoginAttempts] = useState(0);
   const [adminLoginLocked, setAdminLoginLocked] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
@@ -2199,6 +2202,7 @@ function App() {
 
               <button
                 type="button"
+                disabled={custLoginLocked && Date.now() < (custLockUntil ?? 0)}
                 onClick={async () => {
                   if (isPasswordRecovery) {
                     if (customerForm.password.length < 6) {
@@ -2272,6 +2276,18 @@ function App() {
                     setCustomerAuthError("");
                     setEmailPending(true);
                   } else {
+                    /* ── Kilit kontrolü ── */
+                    if (custLoginLocked) {
+                      const remaining = custLockUntil ? Math.max(0, Math.ceil((custLockUntil - Date.now()) / 1000)) : 0;
+                      if (Date.now() < custLockUntil) {
+                        setCustomerAuthError(`Çok fazla hatalı deneme. ${remaining} saniye bekleyin.`);
+                        return;
+                      }
+                      setCustLoginLocked(false);
+                      setCustLoginAttempts(0);
+                      setCustLockUntil(null);
+                    }
+
                     /* ── Giriş doğrulaması ── */
                     const emailTrimmed = customerForm.email.trim().toLowerCase();
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -2302,13 +2318,21 @@ function App() {
                       });
 
                     if (authError) {
-                      if (authError.message.toLowerCase().includes("email not confirmed")) {
+                      const newAttempts = custLoginAttempts + 1;
+                      setCustLoginAttempts(newAttempts);
+                      if (newAttempts >= 5) {
+                        const unlockAt = Date.now() + 2 * 60 * 1000; // 2 dakika kilit
+                        setCustLoginLocked(true);
+                        setCustLockUntil(unlockAt);
+                        setCustomerAuthError("Çok fazla hatalı deneme. 2 dakika sonra tekrar deneyin.");
+                      } else if (authError.message.toLowerCase().includes("email not confirmed")) {
                         setCustomerAuthError("E-posta adresinizi henüz doğrulamadınız. Mail kutunuzu kontrol edin.");
                       } else {
-                        setCustomerAuthError("Hatalı e-posta veya şifre.");
+                        setCustomerAuthError(`Hatalı e-posta veya şifre. (${newAttempts}/5)`);
                       }
                       return;
                     }
+                    setCustLoginAttempts(0);
 
                     const { data: custData, error: custError } = await supabase
                       .from("customers")
