@@ -587,9 +587,12 @@ function App() {
       }
 
       setLoadProgress(55);
-      // 4. Load reservations
+      // 4. Load reservations — son 6 ay (eski iptal/red zaten temizleniyor)
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       const { data: reservationData, error: reservationError } =
-        await supabase.from("reservations").select("*");
+        await supabase.from("reservations").select("*")
+          .or(`status.in.(pending,accepted),created_at.gte.${sixMonthsAgo.toISOString()}`);
       if (reservationError) console.log("Reservations fetch error:", reservationError);
 
       if (reservationData) {
@@ -619,7 +622,8 @@ function App() {
 
       setLoadProgress(75);
       // 6b. Load meetings
-      const { data: meetingData } = await supabase.from("meetings").select("*");
+      const { data: meetingData } = await supabase.from("meetings").select("*")
+        .or(`status.in.(pending,accepted),created_at.gte.${sixMonthsAgo.toISOString()}`);
       if (meetingData) {
         setMeetings(meetingData.map(m => ({
           id: m.id, businessId: m.business_id, businessName: m.business_name,
@@ -3031,6 +3035,35 @@ function App() {
               </div>
             );
           })()}
+
+          {/* ── Veritabanı Temizliği ── */}
+          <div className="reservation-box" style={{ marginTop: "24px" }}>
+            <h2>🧹 Veritabanı Temizliği</h2>
+            <p className="description">
+              Okunmuş bildirimleri (30+ gün), iptal/red rezervasyonları (90+ gün),
+              reddedilen randevuları (90+ gün) ve fazla geçmiş kayıtları temizler.
+            </p>
+            <button
+              type="button"
+              className="secondary-btn"
+              style={{ marginTop: 8 }}
+              onClick={async () => {
+                if (!window.confirm("Veritabanı temizliği yapılsın mı?")) return;
+                const { data, error } = await supabase.rpc("cleanup_old_data");
+                if (error) { alert("Hata: " + error.message); return; }
+                const d = data || {};
+                alert(
+                  `✅ Temizlik tamamlandı:\n` +
+                  `• ${d.deleted_notifications ?? 0} eski bildirim\n` +
+                  `• ${d.deleted_reservations  ?? 0} iptal/red rezervasyon\n` +
+                  `• ${d.deleted_meetings      ?? 0} reddedilen randevu\n` +
+                  `• ${d.deleted_safescore     ?? 0} fazla SafeScore kaydı`
+                );
+              }}
+            >
+              Temizliği Çalıştır
+            </button>
+          </div>
 
           <div className="reservation-box" style={{ marginTop: "24px" }}>
             <h2>📄 RezPoint Kullanım Koşulları</h2>
