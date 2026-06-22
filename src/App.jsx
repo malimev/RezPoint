@@ -5092,192 +5092,189 @@ function App() {
         <section className="biz-profile-page">
           <button className="back-btn" onClick={() => setPage("businesses")}>← Geri</button>
 
-          <div className="biz-profile-header">
-            <div className="biz-profile-icon-wrap">
-              {selectedBusiness.logoUrl
-                ? <img src={selectedBusiness.logoUrl} alt={selectedBusiness.name} className="biz-profile-logo-img" />
-                : <span className="biz-profile-icon">{selectedBusiness.icon}</span>
-              }
-            </div>
-            <div className="biz-profile-meta">
-              <h1 className="biz-profile-name">{selectedBusiness.name}</h1>
-              <span className="biz-profile-type">{selectedBusiness.type}</span>
-              {(() => {
-                const todayKey = new Date().toLocaleDateString("en-US", { weekday: "long" });
-                const h = (selectedBusiness.businessHours || {})[todayKey];
-                if (!h?.open || !h?.close) return null;
-                const now = new Date();
-                const nowMins = now.getHours() * 60 + now.getMinutes();
-                const toMins = str => { const [hr, m] = (str||"00:00").split(":").map(Number); return (hr||0)*60+(m||0); };
-                const calcOpen = (open, close, now) => {
-                  let o = toMins(open), c = toMins(close);
-                  if (c === 0) c = 1440;
-                  if (c <= o) return now >= o || now < c;
-                  return now >= o && now < c;
-                };
-                const isOpen = calcOpen(h.open, h.close, nowMins);
-                return (
-                  <span className={`biz-open-status${isOpen ? " open" : " closed"}`}>
-                    {isOpen ? `✓ Şu an açık · ${h.open}–${h.close}` : `✕ Şu an kapalı · ${h.open}–${h.close} arası açık`}
-                  </span>
-                );
-              })()}
-              {selectedBusiness.location && (
-                <a
-                  className="biz-profile-loc biz-map-link"
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedBusiness.name + " " + selectedBusiness.location)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={e => e.stopPropagation()}
-                >
-                  📍 {selectedBusiness.location}
-                  <span className="biz-map-badge">🗺️ Haritada gör</span>
-                </a>
-              )}
-              {selectedBusiness.phone && (
-                <span className="biz-profile-phone">📞 {selectedBusiness.phone}</span>
-              )}
-              {selectedBusiness.meetingEnabled && selectedBusiness.meetingDates?.length > 0 && (
-                <div className="biz-profile-phone-row">
-                  <button className="meeting-request-btn" onClick={() => {
-                    setMeetingFormBusiness(selectedBusiness);
-                    setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", productCategory: "", date: "", time: "", note: "" });
-                    setMeetingTermsChecked({ biz: false, rp: false });
-                    setMeetingFormError("");
-                    setPage("meetingRequest");
-                  }}>
-                    {t.profile.meetingBtn}
-                  </button>
+          {/* ── Hero banner ── */}
+          <div className="bpro-hero">
+            <div className="bpro-hero-bg" style={{
+              background: selectedBusiness.logoUrl
+                ? `linear-gradient(135deg, rgba(76,29,149,0.85), rgba(109,40,217,0.7)), url(${selectedBusiness.logoUrl}) center/cover`
+                : "linear-gradient(135deg,#4c1d95,#7c3aed,#a855f7)"
+            }} />
+            <div className="bpro-hero-content">
+              <div className="bpro-logo">
+                {selectedBusiness.logoUrl
+                  ? <img src={selectedBusiness.logoUrl} alt={selectedBusiness.name} />
+                  : <span>{selectedBusiness.icon || "🏠"}</span>
+                }
+              </div>
+              <div className="bpro-hero-info">
+                <h1 className="bpro-name">{selectedBusiness.name}</h1>
+                <div className="bpro-type-row">
+                  <span className="bpro-type-chip">{selectedBusiness.type}</span>
+                  {(() => {
+                    const todayKey = new Date().toLocaleDateString("en-US", { weekday: "long" });
+                    const h = (selectedBusiness.businessHours || {})[todayKey];
+                    if (!h?.open || !h?.close) return null;
+                    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+                    const toMins = s => { const [hr,m] = (s||"00:00").split(":").map(Number); return (hr||0)*60+(m||0); };
+                    let o = toMins(h.open), c = toMins(h.close); if (c===0) c=1440;
+                    const isOpen = c<=o ? nowMins>=o||nowMins<c : nowMins>=o&&nowMins<c;
+                    return <span className={`bpro-status${isOpen?" open":" closed"}`}>{isOpen?"● Açık":"● Kapalı"}</span>;
+                  })()}
                 </div>
-              )}
+                {selectedBusiness.location && (
+                  <a className="bpro-location" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedBusiness.name+" "+selectedBusiness.location)}`} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}>
+                    📍 {selectedBusiness.location}
+                  </a>
+                )}
+                {selectedBusiness.phone && <span className="bpro-phone">📞 {selectedBusiness.phone}</span>}
+              </div>
             </div>
           </div>
 
+          {/* ── Stat bar ── */}
           {(() => {
             const liveTotal    = reservations.filter(r => r.businessId === selectedBusiness.id).length;
             const liveAttended = reservations.filter(r => r.businessId === selectedBusiness.id && r.attendanceStatus === "attended").length;
             const isOwnBiz     = loggedBusiness?.id === selectedBusiness.id;
-            const archTotal    = isOwnBiz ? (bizStatsArchive.total    || 0) : 0;
-            const archAttended = isOwnBiz ? (bizStatsArchive.attended || 0) : 0;
             return (
-              <div className="biz-profile-stats">
-                <div className="biz-stat-item">
-                  <strong>{liveTotal + archTotal}</strong>
-                  <span>Toplam Rezervasyon</span>
+              <div className="bpro-stats">
+                <div className="bpro-stat">
+                  <strong>{liveTotal + (isOwnBiz ? bizStatsArchive.total||0 : 0)}</strong>
+                  <span>Rezervasyon</span>
                 </div>
-                <div className="biz-stat-item">
-                  <strong>{liveAttended + archAttended}</strong>
+                <div className="bpro-stat-div"/>
+                <div className="bpro-stat">
+                  <strong>{liveAttended + (isOwnBiz ? bizStatsArchive.attended||0 : 0)}</strong>
                   <span>Tamamlanan</span>
                 </div>
-                <div className="biz-stat-item">
+                <div className="bpro-stat-div"/>
+                <div className="bpro-stat">
                   <strong>{selectedBusiness.availableTimes?.length || 0}</strong>
-                  <span>{t.profile.timezone}</span>
+                  <span>Saat Dilimi</span>
                 </div>
               </div>
             );
           })()}
 
-          {selectedBusiness.description && (
-            <div className="biz-profile-section">
-              <div className="biz-profile-section-title">{t.profile.about}</div>
-              <p className="biz-profile-text">{selectedBusiness.description}</p>
-            </div>
-          )}
-
-          {selectedBusiness.menu && (
-            <div className="biz-profile-section">
-              <div className="biz-profile-section-title">{t.profile.menu}</div>
-              {selectedBusiness.menu.startsWith("http")
-                ? <a href={selectedBusiness.menu} target="_blank" rel="noopener noreferrer" className="biz-profile-link">Menüyü Görüntüle →</a>
-                : <p className="biz-profile-text">{selectedBusiness.menu}</p>}
-            </div>
-          )}
-
-          {(() => {
-            const hours = selectedBusiness.businessHours || {};
-            const days = [
-              { key: "Monday",    label: "Pazartesi" },
-              { key: "Tuesday",   label: "Salı" },
-              { key: "Wednesday", label: "Çarşamba" },
-              { key: "Thursday",  label: "Perşembe" },
-              { key: "Friday",    label: "Cuma" },
-              { key: "Saturday",  label: "Cumartesi" },
-              { key: "Sunday",    label: "Pazar" },
-            ];
-            const hasAny = days.some(d => hours[d.key]?.open);
-            if (!hasAny) return null;
-            const todayKey = new Date().toLocaleDateString("en-US", { weekday: "long" });
-            return (
-              <div className="biz-profile-section">
-                <div className="biz-profile-section-title">🕐 Çalışma Saatleri</div>
-                <div className="biz-hours-profile">
-                  {days.map(({ key, label }) => {
-                    const h = hours[key];
-                    const isToday = key === todayKey;
-                    const isOpen = h?.open && h?.close;
-                    return (
-                      <div key={key} className={`biz-hours-profile-row${isToday ? " today" : ""}${!isOpen ? " closed" : ""}`}>
-                        <span className="bhp-day">{label}</span>
-                        <span className="bhp-hours">
-                          {isOpen ? `${h.open} – ${h.close}` : "Kapalı"}
-                        </span>
-                        {isToday && isOpen && <span className="bhp-badge open">Şu an açık</span>}
-                        {isToday && !isOpen && <span className="bhp-badge closed">Bugün kapalı</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-
-          <div className="biz-profile-section">
-            <div className="biz-profile-section-title">{t.profile.times}</div>
-            <div className="biz-profile-times">
-              {(selectedBusiness.availableTimes || []).map(slot => (
-                <span key={slot} className="biz-time-chip">{slot}</span>
-              ))}
-            </div>
-          </div>
-
-          {/* Rezervasyon CTA veya kapalı mesajı */}
-          <div className="biz-profile-cta">
+          {/* ── CTA butonları ── */}
+          <div className="bpro-cta-row">
             {selectedBusiness.reservationActive ? (
-              <button className="primary-btn" onClick={() => openReservationForm(selectedBusiness)}>
-                {t.profile.reserveBtn}
+              <button className="primary-btn bpro-cta-main" onClick={() => openReservationForm(selectedBusiness)}>
+                📋 Rezervasyon Yap
               </button>
             ) : (
               <div className="biz-closed-notice">
                 <span className="bcn-icon">📋</span>
                 <div>
-                  <div className="bcn-title">{lang === "en" ? "Reservations not available" : "Rezervasyon şu an kapalı"}</div>
-                  <div className="bcn-sub">{lang === "en" ? "This business is not accepting reservations right now." : "Bu işletme şu an rezervasyon kabul etmiyor."}</div>
+                  <div className="bcn-title">Rezervasyon şu an kapalı</div>
+                  <div className="bcn-sub">Bu işletme şu an rezervasyon kabul etmiyor.</div>
                 </div>
               </div>
             )}
-
-            {/* Randevu CTA veya kapalı mesajı */}
-            {selectedBusiness.meetingEnabled && selectedBusiness.meetingDates?.length > 0 ? (
-              <button className="secondary-btn" style={{ marginTop: 10 }} onClick={() => {
+            {selectedBusiness.meetingEnabled && selectedBusiness.meetingDates?.length > 0 && (
+              <button className="secondary-btn bpro-cta-sec" onClick={() => {
                 setMeetingFormBusiness(selectedBusiness);
                 setMeetingForm({ fullName: loggedCustomer?.name || "", email: loggedCustomer?.email || "", phone: "", company: "", reason: "is_gorusmesi", productCategory: "", date: "", time: "", note: "" });
                 setMeetingTermsChecked({ biz: false, rp: false });
                 setMeetingFormError("");
                 setPage("meetingRequest");
-              }}>
-                📅 {lang === "en" ? "Request Appointment" : "Randevu Talep Et"}
-              </button>
-            ) : !selectedBusiness.meetingEnabled ? (
-              <div className="biz-closed-notice" style={{ marginTop: 10 }}>
+              }}>📅 Randevu Talep Et</button>
+            )}
+            {!selectedBusiness.meetingEnabled && (
+              <div className="biz-closed-notice" style={{marginTop:8}}>
                 <span className="bcn-icon">📅</span>
-                <div>
-                  <div className="bcn-title">{lang === "en" ? "Appointments not available" : "Randevu şu an kapalı"}</div>
-                  <div className="bcn-sub">{lang === "en" ? "This business is not accepting appointment requests." : "Bu işletme şu an randevu talebi kabul etmiyor."}</div>
+                <div><div className="bcn-title">Randevu şu an kapalı</div></div>
+              </div>
+            )}
+          </div>
+
+          {/* ── İçerik sekmeleri ── */}
+          {(() => {
+            const [bpTab, setBpTab] = window._bpTab || (window._bpTab = [null, null]);
+            return null; // state workaround — aşağıda direkt render
+          })()}
+
+          <div className="bpro-body">
+            {/* Hakkımızda */}
+            {selectedBusiness.description && (
+              <div className="bpro-section">
+                <div className="bpro-sec-title">
+                  <span className="bpro-sec-icon">💬</span> Hakkımızda
+                </div>
+                <p className="bpro-sec-text">{selectedBusiness.description}</p>
+              </div>
+            )}
+
+            {/* Menü */}
+            {selectedBusiness.menu && (
+              <div className="bpro-section">
+                <div className="bpro-sec-title">
+                  <span className="bpro-sec-icon">🍽️</span> {t.profile.menu}
+                </div>
+                {selectedBusiness.menu.startsWith("http")
+                  ? <a href={selectedBusiness.menu} target="_blank" rel="noopener noreferrer" className="bpro-menu-link">
+                      Menüyü Görüntüle
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </a>
+                  : <p className="bpro-sec-text">{selectedBusiness.menu}</p>
+                }
+              </div>
+            )}
+
+            {/* Çalışma Saatleri */}
+            {(() => {
+              const hours = selectedBusiness.businessHours || {};
+              const days = [
+                { key: "Monday", label: "Pazartesi" }, { key: "Tuesday", label: "Salı" },
+                { key: "Wednesday", label: "Çarşamba" }, { key: "Thursday", label: "Perşembe" },
+                { key: "Friday", label: "Cuma" }, { key: "Saturday", label: "Cumartesi" },
+                { key: "Sunday", label: "Pazar" },
+              ];
+              if (!days.some(d => hours[d.key]?.open)) return null;
+              const todayKey = new Date().toLocaleDateString("en-US", { weekday: "long" });
+              const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+              const toMins = s => { const [h,m]=(s||"00:00").split(":").map(Number); return (h||0)*60+(m||0); };
+              const calcOpen = (o,c,now) => { let om=toMins(o),cm=toMins(c); if(cm===0)cm=1440; return cm<=om?now>=om||now<cm:now>=om&&now<cm; };
+              return (
+                <div className="bpro-section">
+                  <div className="bpro-sec-title"><span className="bpro-sec-icon">🕐</span> Çalışma Saatleri</div>
+                  <div className="bpro-hours-list">
+                    {days.map(({ key, label }) => {
+                      const h = hours[key];
+                      const isToday = key === todayKey;
+                      const hasHours = h?.open && h?.close;
+                      const open = hasHours && calcOpen(h.open, h.close, nowMins);
+                      return (
+                        <div key={key} className={`bpro-hours-row${isToday ? " today" : ""}${!hasHours ? " closed" : ""}`}>
+                          <span className="bpro-hr-day">{label}</span>
+                          <span className="bpro-hr-time">{hasHours ? `${h.open} – ${h.close}` : "Kapalı"}</span>
+                          {isToday && (
+                            <span className={`bpro-hr-now${open ? " open" : " closed"}`}>
+                              {open ? "Açık" : "Kapalı"}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Rezervasyon saatleri */}
+            {(selectedBusiness.availableTimes || []).length > 0 && (
+              <div className="bpro-section">
+                <div className="bpro-sec-title"><span className="bpro-sec-icon">⏰</span> Rezervasyon Saatleri</div>
+                <div className="bpro-time-chips">
+                  {(selectedBusiness.availableTimes || []).map(slot => (
+                    <span key={slot} className="bpro-time-chip">{slot}</span>
+                  ))}
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
-        </section>
+
+          </section>
       )}
 
       {page === "meetingRequest" && meetingFormBusiness && (
