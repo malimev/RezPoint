@@ -2027,7 +2027,7 @@ body::after{
 .bcn-sub{font-size:12px;color:var(--ink-3);line-height:1.5;}
 
 /* ══════════════════════════════════
-   İŞLETME PROFİLİ — yeni tasarım
+   İŞLETME PROFİLİ v2
 ══════════════════════════════════ */
 @keyframes bproFadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
 
@@ -2049,6 +2049,56 @@ body::after{
   display:flex;align-items:flex-end;gap:16px;
   padding:20px 18px 22px;width:100%;
 }
+/* Favori butonu */
+.bpro-fav-btn{
+  position:absolute;top:14px;right:14px;z-index:2;
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);
+  backdrop-filter:blur(8px);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:background 0.15s,transform 0.15s;
+}
+.bpro-fav-btn:hover{background:rgba(255,255,255,0.3);transform:scale(1.1);}
+
+/* Contact items */
+.bpro-contact-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;}
+.bpro-contact-item{font-size:12px;color:rgba(255,255,255,0.85);text-decoration:none;}
+.bpro-contact-item:hover{color:#fff;}
+
+/* Info bar */
+.bpro-infobar{
+  display:flex;align-items:center;
+  background:#fff;border:1px solid rgba(124,58,237,0.1);
+  border-radius:16px;padding:14px 18px;margin:10px 0;
+  box-shadow:0 2px 10px rgba(0,0,0,0.05);
+  animation:bproFadeUp 0.45s var(--ease-out) both 0.05s;
+}
+.bpro-ib-item{flex:1;display:flex;align-items:center;gap:10px;}
+.bpro-ib-icon{font-size:22px;flex-shrink:0;}
+.bpro-ib-val{font-size:17px;font-weight:800;color:var(--ink);}
+.bpro-ib-val.green{color:#16a34a;}
+.bpro-ib-val.red  {color:#dc2626;}
+.bpro-ib-sub{font-size:11px;color:var(--ink-3);margin-top:1px;}
+.bpro-ib-div{width:1px;height:36px;background:rgba(124,58,237,0.1);flex-shrink:0;margin:0 8px;}
+
+/* Sekmeler */
+.bpro-tabs{
+  display:flex;gap:0;
+  border-bottom:2px solid rgba(124,58,237,0.1);
+  margin:14px 0 0;
+  animation:bproFadeUp 0.45s var(--ease-out) both 0.1s;
+}
+.bpro-tab{
+  flex:1;background:none;border:none;border-bottom:2.5px solid transparent;
+  margin-bottom:-2px;padding:11px 8px;
+  font-size:13px;font-weight:600;color:var(--ink-3);
+  cursor:pointer;font-family:inherit;transition:color 0.15s,border-color 0.15s;
+  white-space:nowrap;
+}
+.bpro-tab:hover{color:var(--purple);}
+.bpro-tab.active{color:var(--purple);border-bottom-color:var(--purple);font-weight:700;}
+.bpro-tab-content{padding:18px 0;animation:bproFadeUp 0.3s var(--ease-out) both;}
+
 .bpro-logo{
   width:72px;height:72px;border-radius:16px;flex-shrink:0;overflow:hidden;
   border:2.5px solid rgba(255,255,255,0.35);
