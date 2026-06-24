@@ -1191,17 +1191,72 @@ function App() {
     setTimeout(() => setSavedMessage(""), 3000);
   }
   if (!appReady) {
-    const fillPct = 100 - loadProgress; // inset: 100% = boş, 0% = dolu
+    const fillPct = 100 - loadProgress;
+    const deg = Math.round((loadProgress / 100) * 360);
     return (
       <div className="app-loading">
-        <div className="app-loading-fill-wrap">
-          <div className="alf-bg">RP</div>
-          <div className="alf-fill" style={{ clipPath: `inset(${fillPct}% 0 0 0)` }}>RP</div>
+        {/* Aurora mesh arka plan */}
+        <div className="alf-aurora-bg" />
+        <div className="alf-blob alf-blob-1" />
+        <div className="alf-blob alf-blob-2" />
+        <div className="alf-blob alf-blob-3" />
+
+        {/* RP yazı efekti */}
+        <div className="alf-scene">
+          {/* Conic progress ring */}
+          <svg className="alf-ring" viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="85"
+              fill="none" stroke="rgba(99,102,241,0.08)" strokeWidth="6"/>
+            <circle cx="100" cy="100" r="85"
+              fill="none"
+              stroke="url(#ringGrad)"
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={`${2 * Math.PI * 85}`}
+              strokeDashoffset={`${2 * Math.PI * 85 * (1 - loadProgress / 100)}`}
+              transform="rotate(-90 100 100)"
+              style={{transition:"stroke-dashoffset 0.45s cubic-bezier(0.25,1,0.5,1)"}}
+            />
+            <defs>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%"   stopColor="#6366f1"/>
+                <stop offset="40%"  stopColor="#8b5cf6"/>
+                <stop offset="70%"  stopColor="#a855f7"/>
+                <stop offset="100%" stopColor="#ec4899"/>
+              </linearGradient>
+            </defs>
+          </svg>
+
+          {/* Dışarı yayılan glow halkası */}
+          <div className="alf-glow-ring" style={{opacity: loadProgress/100}} />
+
+          {/* RP metin katmanları */}
+          <div className="alf-text-wrap">
+            {/* Gölge / arka plan katmanı */}
+            <div className="alf-text-shadow">RP</div>
+            {/* Asıl iridescent katman */}
+            <div className="alf-text-main">RP</div>
+            {/* Dolan katman — progress ile */}
+            <div className="alf-text-fill"
+              style={{ clipPath: `inset(${fillPct}% 0 0 0)` }}>RP</div>
+            {/* Shimmer katman */}
+            <div className="alf-text-shimmer">RP</div>
+          </div>
+
+          {/* Floating partiküller */}
+          <div className="alf-particles">
+            {[...Array(6)].map((_,i) => (
+              <div key={i} className={`alf-particle alf-p${i+1}`}
+                style={{opacity: Math.min(1, loadProgress/40)}}/>
+            ))}
+          </div>
         </div>
-        <div className="alf-bar-wrap">
-          <div className="alf-bar" style={{ width: `${loadProgress}%` }} />
+
+        {/* Alt bilgi */}
+        <div className="alf-bottom">
+          <div className="alf-brand">RezPoint</div>
+          <div className="alf-progress-text">{loadProgress < 100 ? `${loadProgress}%` : "Hazır"}</div>
         </div>
-        <div className="alf-label">RezPoint</div>
       </div>
     );
   }
