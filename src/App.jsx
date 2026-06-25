@@ -385,8 +385,8 @@ function App() {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [emailPending, setEmailPending] = useState(false);
 
-  const [bizLoginAttempts, setBizLoginAttempts] = useState(0);
-  const [bizLoginLocked, setBizLoginLocked] = useState(false);
+  const [bizLoginAttempts, setBizLoginAttempts] = useState(() => rlCheck(RL_KEYS.business).attempts);
+  const [bizLoginLocked, setBizLoginLocked] = useState(() => rlCheck(RL_KEYS.business).locked);
   const [custLoginAttempts, setCustLoginAttempts] = useState(0);
   const [custLoginLocked, setCustLoginLocked] = useState(false);
   const [custLockUntil, setCustLockUntil] = useState(null);
@@ -458,6 +458,17 @@ function App() {
   // ---------------------------------------------------------------------
   // Initial data load
   // ---------------------------------------------------------------------
+  /* ── Biz rate-limiter auto-unlock ── */
+  useEffect(() => {
+    if (!bizLoginLocked) return;
+    const d = rlGet(RL_KEYS.business);
+    if (!d.until) { setBizLoginLocked(false); return; }
+    const ms = d.until - Date.now();
+    if (ms <= 0) { setBizLoginLocked(false); setLoginError(""); return; }
+    const t = setTimeout(() => { setBizLoginLocked(false); setLoginError(""); }, ms);
+    return () => clearTimeout(t);
+  }, [bizLoginLocked]);
+
   /* ── Service Worker kaydı + güncelleme tespiti ── */
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
