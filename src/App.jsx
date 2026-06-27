@@ -262,7 +262,6 @@ function formatBusiness(b) {
     reservationDateTimes: Object.fromEntries(
       Object.entries(b.reservation_date_times || {}).map(([d, v]) => [d, (v || "").split(",").filter(Boolean)])
     ),
-    closingPin: b.closing_pin || "",
     meetingTimes: b.meeting_times ? b.meeting_times.split(",") : [],
     meetingDates: b.meeting_dates ? b.meeting_dates.split(",") : [],
     rating: b.rating || 0,
@@ -584,7 +583,7 @@ function App() {
       // 2. Load businesses
       const { data: businessData, error: businessError } = await supabase
         .from("businesses")
-        .select("*");
+        .select("id,name,email,reservation_enabled,ai_menu_enabled,availability_mode,available_days,available_times,location,menu_text,about,menu_url,external_link,rating,meeting_times,meeting_dates,specific_dates,type,icon,logo_url,meeting_enabled,date_times,reservation_date_times,business_hours,admin_reservation_locked,admin_meeting_locked");
       if (businessError) console.log("Businesses fetch error:", businessError);
 
       let formattedBusinesses = [];
@@ -3543,7 +3542,6 @@ function App() {
                       specificDates: [],
                       meetingTimes: [],
                       meetingDates: [],
-                      closingPin: "",
                       rating: 0,
                     };
 
