@@ -180,7 +180,7 @@ const ALL_TIME_SLOTS = (() => {
   return slots;
 })();
 
-const SAFE_PAGES = ["home","businesses","contact","customerAuth","businessLogin","adminLogin","businessProfile"];
+const SAFE_PAGES = ["home","businesses","contact","customerAuth","adminLogin","businessProfile"];
 const CUSTOMER_PAGES = ["customerDashboard"];
 const BUSINESS_PAGES = ["businessPanel"];
 const NO_RESTORE = ["reservation","summary","success","adminPanel"];
@@ -1073,6 +1073,13 @@ function App() {
       return;
     }
 
+    // Tek oturum: müşteri varsa kapat
+    if (loggedCustomer) {
+      await supabase.auth.signOut();
+      setLoggedCustomer(null);
+      setEmailVerified(false);
+    }
+
     const token = data[0].session_token || "";
     setBizSessionToken(token);
     localStorage.setItem("rp_biz_token", token);
@@ -1458,25 +1465,22 @@ function App() {
           <button
             className="nav-button"
             onClick={() => {
-              if (loggedCustomer) {
+              if (loggedBusiness) {
+                setPage("businessPanel");
+              } else if (loggedCustomer) {
                 setPage("customerDashboard");
               } else {
+                setCustomerMode("login");
                 setPage("customerAuth");
               }
               setMobileMenuOpen(false);
             }}
           >
-            {loggedCustomer ? t.nav.myAccount : t.nav.customerLogin}
-          </button>
-
-          <button
-            className="nav-button"
-            onClick={() => {
-              setPage(loggedBusiness ? "businessPanel" : "businessLogin");
-              setMobileMenuOpen(false);
-            }}
-          >
-            {loggedBusiness ? (lang === "en" ? "My Business" : "İşletmem") : t.nav.businessLogin}
+            {loggedBusiness
+              ? (lang === "en" ? "My Business" : "İşletmem")
+              : loggedCustomer
+                ? t.nav.myAccount
+                : (lang === "en" ? "Sign In" : "Giriş Yap")}
           </button>
 
           <button
@@ -2350,20 +2354,56 @@ function App() {
             )}
 
             <h1>
-              {customerMode === "login" ? t.nav.customerLogin : t.auth.registerBtn}
+              {customerMode === "business"
+                ? (lang === "en" ? "Business Login" : "İşletme Girişi")
+                : customerMode === "register"
+                  ? t.auth.registerBtn
+                  : t.nav.customerLogin}
             </h1>
 
             <p className="description">{t.auth.subtitle}</p>
 
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-              <button className={customerMode === "login" ? "selected-time" : "time-btn"} type="button" onClick={() => setCustomerMode("login")}>
-                {t.auth.loginTab}
+              <button
+                className={customerMode !== "business" ? "selected-time" : "time-btn"}
+                type="button"
+                onClick={() => setCustomerMode("login")}
+              >
+                {lang === "en" ? "Customer" : "Müşteri Girişi"}
               </button>
-              <button className={customerMode === "register" ? "selected-time" : "time-btn"} type="button" onClick={() => setCustomerMode("register")}>
-                {t.auth.registerTab}
+              <button
+                className={customerMode === "business" ? "selected-time" : "time-btn"}
+                type="button"
+                onClick={() => { setCustomerMode("business"); setLoginError(""); setCustomerAuthError(""); }}
+              >
+                {lang === "en" ? "Business" : "İşletme Girişi"}
               </button>
             </div>
 
+            {customerMode === "business" ? (
+              <form className="reservation-form" onSubmit={e => { e.preventDefault(); handleBusinessLogin(); }}>
+                <input
+                  type="email"
+                  placeholder="İşletme E-postası"
+                  autoComplete="username"
+                  disabled={bizLoginLocked || loginLoading}
+                  value={businessLogin.email}
+                  onChange={(e) => setBusinessLogin({ ...businessLogin, email: e.target.value })}
+                />
+                <input
+                  type="password"
+                  placeholder="Şifre"
+                  autoComplete="current-password"
+                  disabled={bizLoginLocked || loginLoading}
+                  value={businessLogin.password}
+                  onChange={(e) => setBusinessLogin({ ...businessLogin, password: e.target.value })}
+                />
+                {loginError && <p className="error-message">{loginError}</p>}
+                <button type="submit" disabled={bizLoginLocked || loginLoading}>
+                  {loginLoading ? <Spinner /> : "Giriş Yap"}
+                </button>
+              </form>
+            ) : (
             <form className="reservation-form">
               {isPasswordRecovery ? (
                 <>
@@ -2546,6 +2586,14 @@ function App() {
 
                     setCustomerAuthError("");
                     setCustomerForm({ name: custData.name, email: custData.email, password: "" });
+                    // Tek oturum: işletme varsa kapat
+                    if (loggedBusiness) {
+                      localStorage.removeItem("rp_biz_id");
+                      localStorage.removeItem("rp_biz_token");
+                      localStorage.removeItem("rp_biz_cache");
+                      setBizSessionToken("");
+                      setLoggedBusiness(null);
+                    }
                     setLoggedCustomer(foundCustomer);
                     setCustomerProfile({
                       phone: custData.phone || "",
@@ -2607,7 +2655,32 @@ function App() {
                   {forgotPasswordMsg}
                 </p>
               )}
+              {customerMode === "login" && !isPasswordRecovery && (
+                <p style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "var(--muted)" }}>
+                  Hesabın yok mu?{" "}
+                  <button
+                    type="button"
+                    style={{ background: "none", border: "none", color: "var(--purple)", cursor: "pointer", fontSize: 13, fontWeight: 600, textDecoration: "underline" }}
+                    onClick={() => setCustomerMode("register")}
+                  >
+                    Üye Ol
+                  </button>
+                </p>
+              )}
+              {customerMode === "register" && !isPasswordRecovery && (
+                <p style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "var(--muted)" }}>
+                  Zaten hesabın var mı?{" "}
+                  <button
+                    type="button"
+                    style={{ background: "none", border: "none", color: "var(--purple)", cursor: "pointer", fontSize: 13, fontWeight: 600, textDecoration: "underline" }}
+                    onClick={() => setCustomerMode("login")}
+                  >
+                    Giriş Yap
+                  </button>
+                </p>
+              )}
             </form>
+            )}
               </>
             )}
           </div>
@@ -3009,40 +3082,7 @@ function App() {
         </section>
       )}
 
-      {page === "businessLogin" && (
-        <section className="reservation-section">
-          <div className="reservation-box">
-            <h1>İşletme Girişi</h1>
-            <p className="description">Rezervasyonları yönetmek için giriş yapın.</p>
-
-            <form className="reservation-form" onSubmit={e => { e.preventDefault(); handleBusinessLogin(); }}>
-              <input
-                type="email"
-                placeholder="İşletme E-postası"
-                autoComplete="username"
-                disabled={bizLoginLocked || loginLoading}
-                value={businessLogin.email}
-                onChange={(e) => setBusinessLogin({ ...businessLogin, email: e.target.value })}
-              />
-
-              <input
-                type="password"
-                placeholder="Şifre"
-                autoComplete="current-password"
-                disabled={bizLoginLocked || loginLoading}
-                value={businessLogin.password}
-                onChange={(e) => setBusinessLogin({ ...businessLogin, password: e.target.value })}
-              />
-
-              {loginError && <p className="error-message">{loginError}</p>}
-
-              <button type="submit" disabled={bizLoginLocked || loginLoading}>
-                {loginLoading ? <Spinner /> : "Giriş Yap"}
-              </button>
-            </form>
-          </div>
-        </section>
-      )}
+      {/* businessLogin artık customerAuth'un işletme sekmesiyle birleşti */}
       {page === "adminLogin" && (
         <section className="reservation-section">
           <div className="reservation-box">
@@ -5802,22 +5842,24 @@ function App() {
               <span>{lang === "en" ? "Home" : "Ana Sayfa"}</span>
             </button>
 
-            {/* Rezervasyonlarım */}
+            {/* Rezervasyonlarım / Gelen İstekler */}
             <button
               className={`bn-item${bnActive === "rez" ? " active" : ""}`}
               onClick={() => {
                 closeAll();
-                if (loggedCustomer) { setCustomerTab("reservations"); setPage("customerDashboard"); }
+                if (loggedBusiness) { setPanelTab("incoming"); setPage("businessPanel"); }
+                else if (loggedCustomer) { setCustomerTab("reservations"); setPage("customerDashboard"); }
                 else { setAfterLoginReturnPage("customerDashboard"); setCustomerMode("login"); setPage("customerAuth"); }
               }}
             >
               <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
               </svg>
-              <span>{lang === "en" ? "Reservations" : "Rezervasyon"}</span>
+              <span>{loggedBusiness ? (lang === "en" ? "Requests" : "İstekler") : (lang === "en" ? "Reservations" : "Rezervasyon")}</span>
             </button>
 
-            {/* Favoriler */}
+            {/* Favoriler — sadece müşteride göster */}
+            {!loggedBusiness && (
             <button
               className={`bn-item${bnActive === "fav" ? " active" : ""}`}
               onClick={() => {
@@ -5831,14 +5873,18 @@ function App() {
               </svg>
               <span>{lang === "en" ? "Favorites" : "Favoriler"}</span>
             </button>
+            )}
 
             {/* Bildirimler */}
             <button
               className={`bn-item${bnActive === "notif" ? " active" : ""}${loggedCustomer && customerNotifications.filter(n => !n.is_read).length > 0 ? " bn-dot" : ""}`}
               onClick={() => {
-                const opening = !showNotifPanel;
                 closeAll();
-                if (opening) setShowNotifPanel(true);
+                if (loggedBusiness) { setPage("businessPanel"); setPanelTab("incoming"); }
+                else {
+                  const opening = !showNotifPanel;
+                  if (opening) setShowNotifPanel(true);
+                }
               }}
             >
               <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -5852,14 +5898,15 @@ function App() {
               className={`bn-item${bnActive === "profile" ? " active" : ""}`}
               onClick={() => {
                 closeAll();
-                if (loggedCustomer) { setCustomerTab("account"); setPage("customerDashboard"); }
-                else setPage("customerAuth");
+                if (loggedBusiness) { setPage("businessPanel"); }
+                else if (loggedCustomer) { setCustomerTab("account"); setPage("customerDashboard"); }
+                else { setCustomerMode("login"); setPage("customerAuth"); }
               }}
             >
               <svg className="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
               </svg>
-              <span>{lang === "en" ? "Profile" : "Profil"}</span>
+              <span>{loggedBusiness ? (lang === "en" ? "My Business" : "İşletmem") : (lang === "en" ? "Profile" : "Profil")}</span>
             </button>
           </nav>
         );
