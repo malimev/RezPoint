@@ -1541,21 +1541,18 @@ function App() {
         {/* ══ HERO ══ */}
         <section className="hp-hero lp-hero">
           <div className="lp-hero-content">
-            <div className="lp-hero-eyebrow">
-              {lang === "en" ? "🇨🇾 Cyprus Reservation Platform" : "🇨🇾 Kıbrıs'ın Rezervasyon Platformu"}
-            </div>
             <h1 className="lp-hero-headline">
               <span className="lp-hero-phrase" key={heroPhase}>
                 {lang === "en"
-                  ? ["Smart Reservation Platform", "Zero No-Show Guarantee", "Grow Your Business"][heroPhase]
-                  : ["Akıllı Rezervasyon Platformu", "Sıfır No-Show Garantisi", "İşletmenizi Büyütün"][heroPhase]
+                  ? ["Smart Reservation Platform", "Fast & Easy Booking", "Discover Nearby Venues"][heroPhase]
+                  : ["Akıllı Rezervasyon Platformu", "Hızlı ve Kolay Rezervasyon", "Yakındaki Mekanları Keşfet"][heroPhase]
                 }
               </span>
             </h1>
             <p className="lp-hero-sub">
               {lang === "en"
-                ? "Instant online reservations and appointments for restaurants, cafes and businesses. Understand your customers, boost your occupancy."
-                : "Restoranlar, kafeler ve işletmeler için anlık online rezervasyon ve randevu sistemi. Müşterilerinizi tanıyın, doluluk oranınızı artırın."}
+                ? "Instant online reservations and appointments for restaurants, cafes and businesses."
+                : "Restoranlar, kafeler ve işletmeler için anlık online rezervasyon ve randevu sistemi."}
             </p>
           </div>
 
@@ -1833,11 +1830,11 @@ function App() {
                   : "Gün, saat veya özel tarih bazlı müsaitlik tanımlayın. Takviminiz üzerinde tam kontrol.",
               },
               {
-                icon: "🤖",
-                title: lang === "en" ? "AI-Powered Menu" : "YZ Destekli Menü",
+                icon: "⭐",
+                title: lang === "en" ? "Ratings & Reviews" : "Puan & Değerlendirme",
                 desc: lang === "en"
-                  ? "Let customers browse your menu instantly. Enable or disable with one click."
-                  : "Müşterilerin menünüze anında göz atmasını sağlayın. Tek tıkla açın veya kapatın.",
+                  ? "Businesses earn ratings based on real visit data. Find the best venues instantly."
+                  : "İşletmeler gerçek ziyaret verilerine göre puan kazanır. En iyi mekanları anında bulun.",
               },
               {
                 icon: "🔔",
