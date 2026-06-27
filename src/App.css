@@ -1616,7 +1616,7 @@ body::after{
 .date-time-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;overflow:hidden;}
 .strip-section{display:flex;flex-direction:column;gap:8px;min-width:0;overflow:hidden;}
 .strip-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--purple-light);}
-.date-strip,.time-strip{display:flex;gap:6px;overflow-x:auto;overflow-y:visible;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:6px;width:100%;}
+.date-strip,.time-strip{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;padding-bottom:6px;width:100%;}
 .date-strip::-webkit-scrollbar,.time-strip::-webkit-scrollbar{display:none;}
 .strip-scroll-wrap{display:flex;align-items:center;gap:4px;min-width:0;}
 .strip-arrow{
@@ -1651,7 +1651,7 @@ body::after{
 .date-strip .strip-btn:nth-child(7){animation-delay:0.24s;}
 
 /* Home strips */
-.home-date-strip,.home-time-strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+.home-date-strip,.home-time-strip{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;padding-bottom:4px;}
 .home-date-strip::-webkit-scrollbar,.home-time-strip::-webkit-scrollbar{display:none;}
 .home-strip-btn{
   flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;
@@ -1681,7 +1681,15 @@ body::after{
 .panel-content{max-width:840px;padding-top:4px;}
 
 /* Tabs — underline style Aurora */
-.panel-tabs{display:flex;gap:0;flex-wrap:wrap;margin-bottom:16px;border-bottom:2px solid rgba(99,102,241,0.1);}
+.panel-tabs{
+  display:flex;gap:0;flex-wrap:nowrap;
+  margin-bottom:16px;border-bottom:2px solid rgba(99,102,241,0.1);
+  overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-x;
+}
+.panel-tabs::-webkit-scrollbar{display:none;}
 .panel-tabs button{
   background:transparent;color:#a5b4fc;border:none;border-bottom:2px solid transparent;
   margin-bottom:-2px;
@@ -1689,6 +1697,8 @@ body::after{
   cursor:pointer;font-weight:600;font-size:13px;font-family:var(--font-body);
   transition:color var(--transition-fast),border-color var(--transition-fast);
   white-space:nowrap;
+  flex-shrink:0;
+  touch-action:pan-x;
 }
 .panel-tabs button:hover{color:#6366f1;}
 .active-tab,.panel-tabs button.active-tab{
