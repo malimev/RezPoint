@@ -336,6 +336,7 @@ function App() {
   const [loggedCustomer, setLoggedCustomer] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
+  const [heroPhase, setHeroPhase] = useState(0);
   const [navScrolled, setNavScrolled] = useState(false);
   const [adminEditingBiz, setAdminEditingBiz] = useState(null);
   const [loggedBusiness, setLoggedBusiness] = useState(null);
@@ -465,6 +466,24 @@ function App() {
 
   // ---------------------------------------------------------------------
   // Initial data load
+  /* ── Hero dönen başlık ── */
+  useEffect(() => {
+    const t = setInterval(() => setHeroPhase(p => (p + 1) % 3), 4000);
+    return () => clearInterval(t);
+  }, []);
+
+  /* ── Landing page scroll reveal ── */
+  useEffect(() => {
+    if (page !== "home") return;
+    const els = document.querySelectorAll(".lp-reveal");
+    const io = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("lp-visible"); io.unobserve(e.target); } }),
+      { threshold: 0.1 }
+    );
+    els.forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, [page]);
+
   // ---------------------------------------------------------------------
   /* ── Biz rate-limiter auto-unlock ── */
   useEffect(() => {
@@ -1519,20 +1538,25 @@ function App() {
 
       {page === "home" && (
         <>
-        {/* ══ YENİ ANASAYFA ══ */}
-        <section className="hp-hero">
-          {/* Başlık sol + emoji sağ */}
-          <div className="hp-hero-top">
-            <div className="hp-hero-text">
-              <h1 className="hp-headline">
-                {lang === "en"
-                  ? <><span className="hp-hl-plain">Smart </span><span className="hp-hl-purple">reservations</span><span className="hp-hl-plain"><br/>and appointments.</span></>
-                  : <><span className="hp-hl-plain">Modern işletmeler için<br/></span><span className="hp-hl-purple">akıllı rezervasyon</span><span className="hp-hl-plain"><br/>ve randevu.</span></>
-                }
-              </h1>
-              <p className="hp-subline">{t.hero.subheadline}</p>
+        {/* ══ HERO ══ */}
+        <section className="hp-hero lp-hero">
+          <div className="lp-hero-content">
+            <div className="lp-hero-eyebrow">
+              {lang === "en" ? "🇨🇾 Cyprus Reservation Platform" : "🇨🇾 Kıbrıs'ın Rezervasyon Platformu"}
             </div>
-            <div className="hp-hero-emoji" aria-hidden>📅</div>
+            <h1 className="lp-hero-headline">
+              <span className="lp-hero-phrase" key={heroPhase}>
+                {lang === "en"
+                  ? ["Smart Reservation Platform", "Zero No-Show Guarantee", "Grow Your Business"][heroPhase]
+                  : ["Akıllı Rezervasyon Platformu", "Sıfır No-Show Garantisi", "İşletmenizi Büyütün"][heroPhase]
+                }
+              </span>
+            </h1>
+            <p className="lp-hero-sub">
+              {lang === "en"
+                ? "Instant online reservations and appointments for restaurants, cafes and businesses. Understand your customers, boost your occupancy."
+                : "Restoranlar, kafeler ve işletmeler için anlık online rezervasyon ve randevu sistemi. Müşterilerinizi tanıyın, doluluk oranınızı artırın."}
+            </p>
           </div>
 
           {/* Arama kartı */}
@@ -1780,27 +1804,152 @@ function App() {
           </div>
         </section>
 
-        {/* ── Özellikler satırı ── */}
-        <div className="hp-features-row">
-          {[
-            { icon: "🛡️", label: lang === "en" ? "Secure Reservation" : "Güvenli Rezervasyon" },
-            { icon: "⚡", label: lang === "en" ? "Fast & Easy" : "Hızlı ve Kolay" },
-            { icon: "📍", label: lang === "en" ? "Nearby Venues" : "Yakındaki Mekanlar" },
-            { icon: "⭐", label: lang === "en" ? "Best Experience" : "En iyi Deneyim" },
-          ].map(f => (
-            <div key={f.label} className="hp-feature-item">
-              <span className="hp-feature-icon">{f.icon}</span>
-              <span className="hp-feature-label">{f.label}</span>
+        {/* ══ ÖZELLİKLERİMİZ ══ */}
+        <section className="lp-section lp-reveal">
+          <div className="lp-section-header">
+            <h2 className="lp-section-title">
+              {lang === "en" ? "Our Features" : "Özelliklerimiz"}
+            </h2>
+            <p className="lp-section-sub">
+              {lang === "en"
+                ? "Everything you need to manage reservations and grow your venue."
+                : "Rezervasyonları yönetmek ve işletmenizi büyütmek için ihtiyacınız olan her şey."}
+            </p>
+          </div>
+          <div className="lp-features-grid">
+            {[
+              {
+                icon: "🛡️",
+                title: lang === "en" ? "SafeScore System" : "SafeScore Sistemi",
+                desc: lang === "en"
+                  ? "Customer trust score tracks no-shows and rewards reliable guests automatically."
+                  : "Müşteri güven puanı, no-show'ları izler ve güvenilir misafirleri otomatik ödüllendirir.",
+              },
+              {
+                icon: "📅",
+                title: lang === "en" ? "Smart Slot Management" : "Akıllı Slot Yönetimi",
+                desc: lang === "en"
+                  ? "Define availability by day, time or specific dates. Full control over your calendar."
+                  : "Gün, saat veya özel tarih bazlı müsaitlik tanımlayın. Takviminiz üzerinde tam kontrol.",
+              },
+              {
+                icon: "🤖",
+                title: lang === "en" ? "AI-Powered Menu" : "YZ Destekli Menü",
+                desc: lang === "en"
+                  ? "Let customers browse your menu instantly. Enable or disable with one click."
+                  : "Müşterilerin menünüze anında göz atmasını sağlayın. Tek tıkla açın veya kapatın.",
+              },
+              {
+                icon: "🔔",
+                title: lang === "en" ? "Instant Push Alerts" : "Anlık Push Bildirimler",
+                desc: lang === "en"
+                  ? "New reservation? You'll know in seconds — even when the app is closed."
+                  : "Yeni rezervasyon mu geldi? Uygulama kapalıyken bile saniyeler içinde haberdar olun.",
+              },
+              {
+                icon: "📊",
+                title: lang === "en" ? "Single-Panel Control" : "Tek Panel Yönetim",
+                desc: lang === "en"
+                  ? "Accept, reject, view stats and manage appointments — all from one screen."
+                  : "Kabul et, reddet, istatistikleri gör, randevuları yönet — tek ekrandan.",
+              },
+              {
+                icon: "🌐",
+                title: lang === "en" ? "TR / EN Support" : "TR / EN Destek",
+                desc: lang === "en"
+                  ? "Full bilingual experience for both your local and international customers."
+                  : "Yerel ve uluslararası müşterileriniz için tam iki dilli deneyim.",
+              },
+            ].map((f, i) => (
+              <div className="lp-feat-card" key={i} style={{ animationDelay: `${i * 0.07}s` }}>
+                <div className="lp-feat-icon">{f.icon}</div>
+                <div className="lp-feat-title">{f.title}</div>
+                <div className="lp-feat-desc">{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ══ FAYDALARIMIZ ══ */}
+        <section className="lp-section lp-benefits lp-reveal">
+          <div className="lp-section-header">
+            <h2 className="lp-section-title">
+              {lang === "en" ? "Benefits" : "Faydalarımız"}
+            </h2>
+            <p className="lp-section-sub">
+              {lang === "en"
+                ? "RezPoint works for both sides of the table."
+                : "RezPoint hem işletmeye hem müşteriye değer katıyor."}
+            </p>
+          </div>
+          <div className="lp-benefits-grid">
+            {/* İşletme */}
+            <div className="lp-benefit-col lp-benefit-biz">
+              <div className="lp-benefit-label">
+                🏢 {lang === "en" ? "For Businesses" : "İşletme İçin"}
+              </div>
+              <ul className="lp-benefit-list">
+                {(lang === "en" ? [
+                  "Reduce no-shows with SafeScore filtering",
+                  "Fill your calendar — see daily occupancy at a glance",
+                  "View customer profiles before they arrive",
+                  "Manage both reservations and appointments in one panel",
+                  "Lock days, set availability, close with a PIN",
+                ] : [
+                  "SafeScore filtresiyle no-show'ları azaltın",
+                  "Takviminizi doldurun — günlük doluluk oranını tek bakışta görün",
+                  "Müşteri profillerini gelişlerinden önce inceleyin",
+                  "Rezervasyon ve randevuları tek panelden yönetin",
+                  "Gün kilitleyin, müsaitlik belirleyin, PIN ile kapayın",
+                ]).map((item, i) => (
+                  <li key={i} className="lp-benefit-item"><span className="lp-check">✓</span>{item}</li>
+                ))}
+              </ul>
             </div>
-          ))}
-        </div>
+            {/* Müşteri */}
+            <div className="lp-benefit-col lp-benefit-cust">
+              <div className="lp-benefit-label">
+                👤 {lang === "en" ? "For Customers" : "Müşteri İçin"}
+              </div>
+              <ul className="lp-benefit-list">
+                {(lang === "en" ? [
+                  "Reserve a table in seconds, no phone calls",
+                  "Book appointments at your preferred time",
+                  "Get instant push notifications on your phone",
+                  "Track all your reservations in one place",
+                  "Earn loyalty points with every visit",
+                ] : [
+                  "Saniyeler içinde masa ayırtın, telefon aramanıza gerek yok",
+                  "Tercih ettiğiniz saatte randevu alın",
+                  "Telefonunuza anlık push bildirim alın",
+                  "Tüm rezervasyonlarınızı tek yerden takip edin",
+                  "Her ziyarette sadakat puanı kazanın",
+                ]).map((item, i) => (
+                  <li key={i} className="lp-benefit-item"><span className="lp-check">✓</span>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
 
-        <div style={{ height: 80 }} />
-
-        <section className="lp-cta-section lp-animate">
-          <h2>{t.landing.ctaTitle}</h2>
-          <p>{t.landing.ctaSub}</p>
-          <button className="lp-cta-btn" onClick={() => setPage("businesses")}>{t.landing.ctaBtn}</button>
+        {/* ══ CTA ══ */}
+        <section className="lp-cta-section lp-reveal">
+          <h2 className="lp-cta-title">
+            {lang === "en" ? "Ready to get started?" : "Hemen başlamaya hazır mısınız?"}
+          </h2>
+          <p className="lp-cta-sub">
+            {lang === "en"
+              ? "Make a reservation now or add your business to RezPoint."
+              : "Şimdi rezervasyon oluşturun veya işletmenizi RezPoint'e ekleyin."}
+          </p>
+          <div className="lp-cta-btns">
+            <button className="lp-cta-btn lp-cta-primary" onClick={goToReservationFlow}>
+              {lang === "en" ? "Make Reservation" : "Rezervasyon Oluştur"}
+            </button>
+            <button className="lp-cta-btn lp-cta-secondary" onClick={() => {}}>
+              {lang === "en" ? "Add Your Business — Apply" : "İşletmenizi Ekleyin — Başvur"}
+            </button>
+          </div>
         </section>
         </>
       )}
