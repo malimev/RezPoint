@@ -764,25 +764,6 @@ function App() {
 
   useEffect(() => { localStorage.setItem("rp_page", page); }, [page]);
 
-  useEffect(() => {
-    if (page !== "home") return;
-    const checkVisible = () => {
-      document.querySelectorAll(".lp-animate").forEach(el => {
-        const rect = el.getBoundingClientRect();
-        const inView = rect.top < window.innerHeight - 20 && rect.bottom > 20;
-        el.classList.toggle("lp-visible", inView);
-      });
-    };
-    const timer = setTimeout(checkVisible, 100);
-    window.addEventListener("scroll", checkVisible, { passive: true });
-    const pageDiv = document.querySelector(".page");
-    if (pageDiv) pageDiv.addEventListener("scroll", checkVisible, { passive: true });
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("scroll", checkVisible);
-      if (pageDiv) pageDiv.removeEventListener("scroll", checkVisible);
-    };
-  }, [page]);
 
   useEffect(() => { localStorage.setItem("rp_panel_tab", panelTab); }, [panelTab]);
   useEffect(() => { localStorage.setItem("rp_customer_tab", customerTab); }, [customerTab]);
@@ -1240,7 +1221,6 @@ function App() {
   }
   if (!appReady) {
     const fillPct = 100 - loadProgress;
-    const deg = Math.round((loadProgress / 100) * 360);
     return (
       <div className="app-loading">
         {/* Aurora mesh arka plan */}
@@ -2523,7 +2503,7 @@ function App() {
               <button
                 className={customerMode === "business" ? "selected-time" : "time-btn"}
                 type="button"
-                onClick={() => { setCustomerMode("business"); setLoginError(""); setCustomerAuthError(""); }}
+                onClick={() => { setCustomerMode("business"); setLoginError(""); setCustomerAuthError(""); setBusinessLogin({ email: "", password: "" }); }}
               >
                 {lang === "en" ? "Business" : "İşletme Girişi"}
               </button>
