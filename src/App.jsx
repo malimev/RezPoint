@@ -661,6 +661,9 @@ function App() {
       const { data: rpTermsData } = await supabase.from("site_settings").select("value").eq("key", "rezpoint_terms").single();
       if (rpTermsData?.value) { setRpTerms(rpTermsData.value); setRpTermsEdit(rpTermsData.value); }
 
+      // Süresi geçmiş bekleyen rezervasyonları otomatik reddet
+      supabase.rpc("auto_reject_expired_reservations").then(() => {});
+
       setLoadProgress(100);
       setTimeout(() => setAppReady(true), 200);
     };
