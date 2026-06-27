@@ -92,13 +92,21 @@ async function registerPush(userEmail, userType, userId) {
     });
 
     const { endpoint, keys } = sub.toJSON();
+    const numericId = userId ? Number(userId) : null;
+
+    // Bu endpoint başka bir kullanıcıya kayıtlıysa önce sil
+    await supabase.from("push_subscriptions")
+      .delete()
+      .eq("endpoint", endpoint)
+      .neq("user_id", numericId);
+
     await supabase.from("push_subscriptions").upsert({
       endpoint,
       p256dh:     keys.p256dh,
       auth:       keys.auth,
       user_email: userEmail || null,
       user_type:  userType  || null,
-      user_id:    userId    ? String(userId) : null,
+      user_id:    numericId,
     }, { onConflict: "endpoint" });
   } catch (e) {
     console.warn("Push registration failed:", e);
