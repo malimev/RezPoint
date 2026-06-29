@@ -471,6 +471,35 @@ function App() {
     return () => clearInterval(t);
   }, []);
 
+  /* ── Business panel polling (30s) ── */
+  useEffect(() => {
+    if (page !== "businessPanel" || !loggedBusiness || !bizSessionToken) return;
+    const refresh = () => {
+      supabase.rpc("get_business_reservations", {
+        p_token: bizSessionToken,
+        p_business_id: loggedBusiness.id,
+      }).then(({ data }) => {
+        if (data) setReservations(data.map(formatRez));
+      });
+    };
+    const id = setInterval(refresh, 30000);
+    return () => clearInterval(id);
+  }, [page, loggedBusiness?.id, bizSessionToken]);
+
+  /* ── Admin panel polling (30s) ── */
+  useEffect(() => {
+    if (page !== "adminPanel" || !adminPassword) return;
+    const refresh = () => {
+      supabase.rpc("get_admin_reservations", {
+        p_admin_password: adminPassword,
+      }).then(({ data }) => {
+        if (data) setReservations(data.map(formatRez));
+      });
+    };
+    const id = setInterval(refresh, 30000);
+    return () => clearInterval(id);
+  }, [page, adminPassword]);
+
   /* ── Landing page scroll reveal ── */
   useEffect(() => {
     if (page !== "home" || !appReady) return;
