@@ -631,14 +631,27 @@ function App() {
       }
 
       setLoadProgress(55);
-      // 4. Load reservations — tümünü çek (istatistikler için gerekli, sınır yok)
-      const { data: reservationData, error: reservationError } =
-        await supabase.from("reservations").select("*");
-      if (reservationError) console.log("Reservations fetch error:", reservationError);
-
-      if (reservationData) {
-        setReservations(reservationData.map(formatRez));
+      // 4. Load reservations — role-based:
+      //    authenticated customer → RLS filters to their own rows
+      //    business restore       → SECURITY DEFINER RPC
+      //    anon / unauthenticated → empty (RLS blocks direct SELECT)
+      let rezRaw = [];
+      if (sessionCustomer) {
+        const { data, error } = await supabase.from("reservations").select("*");
+        if (error) console.log("Reservations fetch error:", error);
+        if (data) rezRaw = data;
+      } else if (restoredBusiness) {
+        const savedToken = localStorage.getItem("rp_biz_token") || "";
+        if (savedToken) {
+          const { data, error } = await supabase.rpc("get_business_reservations", {
+            p_token: savedToken,
+            p_business_id: restoredBusiness.id,
+          });
+          if (error) console.log("Business reservations fetch error:", error);
+          if (data) rezRaw = data;
+        }
       }
+      setReservations(rezRaw.map(formatRez));
 
       // 5. Customers loaded after admin login via admin_get_customers RPC
 
@@ -1117,6 +1130,13 @@ function App() {
     supabase.rpc("get_business_stats", { p_business_id: business.id }).then(({ data }) => {
       if (data) setBizStatsArchive(data);
     });
+    // Yeni RLS sonrası: işletme rezervasyonlarını güvenli RPC ile yükle
+    supabase.rpc("get_business_reservations", {
+      p_token: token,
+      p_business_id: business.id,
+    }).then(({ data }) => {
+      if (data) setReservations(data.map(formatRez));
+    });
     setPanelTab("incoming");
     setPage("businessPanel");
   }
@@ -1171,6 +1191,12 @@ function App() {
           profile: { phone: c.phone || "", gender: c.gender || "", birthDate: c.birth_date || "", job: c.job || "", smoking: c.smoking || "" },
         })));
       }
+    });
+    // Yeni RLS sonrası: admin rezervasyonlarını güvenli RPC ile yükle
+    supabase.rpc("get_admin_reservations", {
+      p_admin_password: adminLogin.password,
+    }).then(({ data }) => {
+      if (data) setReservations(data.map(formatRez));
     });
   }
 
