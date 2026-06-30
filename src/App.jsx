@@ -778,6 +778,7 @@ function App() {
       .channel("reservations-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "reservations" }, (payload) => {
         const incoming = payload.new;
+        if (!incoming?.id) return; // RLS-blocked anon events arrive with null/empty payload
         setReservations(prev => {
           // If we already added this optimistically (matched by code), just update the ID
           const optimisticIdx = prev.findIndex(r => r.code === incoming.code);
@@ -790,6 +791,7 @@ function App() {
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "reservations" }, (payload) => {
         const updated = payload.new;
+        if (!updated?.id) return; // RLS-blocked anon events arrive with null/empty payload
         setReservations(prev => prev.map(r => r.id === updated.id ? formatRez(updated) : r));
       })
       .subscribe();
@@ -2445,7 +2447,7 @@ function App() {
                   return;
                 }
 
-                setReservations([...reservations, newReservation]);
+                setReservations(prev => [...prev, newReservation]);
                 setIsCreatingReservation(false);
                 // İşletmeye yeni rezervasyon bildirimi
                 sendPush({ userType: "business", userId: String(selectedBusiness?.id), title: "🔔 Yeni Rezervasyon İsteği", body: `${loggedCustomer?.name || "Misafir"} rezervasyon oluşturdu · ${newReservation.date} ${newReservation.time}`, url: "/" });
@@ -3805,7 +3807,7 @@ function App() {
                             if (error) { alert("Silinemedi: " + error.message); return; }
                             if (business.logoUrl) supabase.storage.from("business-logos").remove([`${business.id}/logo.jpg`]);
                             setAdminBusinesses(adminBusinesses.filter(item => item.id !== business.id));
-                            setReservations(reservations.filter(rez => rez.businessId !== business.id));
+                            setReservations(prev => prev.filter(rez => rez.businessId !== business.id));
                             if (loggedBusiness?.id === business.id) { setLoggedBusiness(null); setPage("home"); }
                           }}
                         >
@@ -4466,6 +4468,7 @@ function App() {
                                 return;
                               }
 
+                              // Optimistic: anında güncelle
                               setReservations((prev) =>
                                 prev.map((item) =>
                                   item.id === rez.id
@@ -4473,6 +4476,13 @@ function App() {
                                     : item,
                                 ),
                               );
+                              // Arka planda tam listeyi çekip senkronla
+                              supabase.rpc("get_business_reservations", {
+                                p_token: bizSessionToken,
+                                p_business_id: loggedBusiness.id,
+                              }).then(({ data }) => {
+                                if (data) setReservations(data.map(formatRez));
+                              });
                               // Müşteriye bildirim gönder
                               sendPush({ userEmail: rez.email, title: "✅ Rezervasyonunuz Kabul Edildi!", body: `${loggedBusiness?.name || "İşletme"} rezervasyonunuzu onayladı. ${rez.date} · ${rez.time}`, url: "/" });
                               setLoadingReservationId(null);
@@ -4500,6 +4510,7 @@ function App() {
                                 return;
                               }
 
+                              // Optimistic: anında güncelle
                               setReservations((prev) =>
                                 prev.map((item) =>
                                   item.id === rez.id
@@ -4507,6 +4518,13 @@ function App() {
                                     : item,
                                 ),
                               );
+                              // Arka planda tam listeyi çekip senkronla
+                              supabase.rpc("get_business_reservations", {
+                                p_token: bizSessionToken,
+                                p_business_id: loggedBusiness.id,
+                              }).then(({ data }) => {
+                                if (data) setReservations(data.map(formatRez));
+                              });
                               // Müşteriye bildirim gönder
                               sendPush({ userEmail: rez.email, title: "❌ Rezervasyon Reddedildi", body: `${loggedBusiness?.name || "İşletme"} bu tarih için uygun değil. ${rez.date} · ${rez.time}`, url: "/" });
                               setLoadingReservationId(null);
