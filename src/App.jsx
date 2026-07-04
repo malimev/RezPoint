@@ -2809,7 +2809,7 @@ function App() {
                 <p style={{ textAlign: "center", marginTop: 12, fontSize: 13 }}>
                   <button
                     type="button"
-                    style={{ background: "none", border: "none", color: "var(--purple)", cursor: "pointer", fontSize: 13, textDecoration: "underline" }}
+                    style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, textDecoration: "underline" }}
                     onClick={async () => {
                       const email = customerForm.email.trim().toLowerCase();
                       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;

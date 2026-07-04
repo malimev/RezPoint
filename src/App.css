@@ -1394,49 +1394,47 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 }
 .reservation-box{
   width:100%;max-width:640px;min-width:0;
-  background:#fff;
-  border:1px solid rgba(99,102,241,0.1);
-  border-radius:28px;padding:36px;
-  box-shadow:0 8px 40px rgba(99,102,241,0.1),0 2px 8px rgba(0,0,0,0.04);
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);padding:36px;
+  box-shadow:var(--shadow);
 }
 .reservation-section .reservation-box{animation:fadeSlideUp var(--transition-slow) both;}
 .reservation-box h1{
   font-family:var(--font-heading);
   font-size:26px;font-weight:800;letter-spacing:-0.03em;
-  background:linear-gradient(135deg,#3730a3,#6366f1,#8b5cf6);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  color:var(--text);
   margin-bottom:6px;
 }
 .reservation-box h2{
   font-family:var(--font-heading);
-  font-size:18px;margin-bottom:14px;color:#1e1b4b;font-weight:700;-webkit-text-fill-color:#1e1b4b;
+  font-size:18px;margin-bottom:14px;color:var(--text);font-weight:700;
 }
 .reservation-form{display:flex;flex-direction:column;gap:14px;}
 .reservation-form label{
   font-family:var(--font-heading);
   font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;
-  color:#6366f1;margin-bottom:4px;display:block;
+  color:var(--accent);margin-bottom:4px;display:block;
 }
 .reservation-form button{
-  background:linear-gradient(135deg,#6366f1,#8b5cf6,#7c3aed);
-  color:#fff;border:none;padding:15px;border-radius:100px;
+  background:var(--accent);
+  color:var(--accent-text);border:none;padding:15px;border-radius:var(--radius);
   font-family:var(--font-heading);font-weight:700;font-size:15px;cursor:pointer;
-  box-shadow:0 6px 24px rgba(99,102,241,0.4);
-  transition:transform var(--transition-fast),box-shadow var(--transition-normal);
+  transition:background var(--transition-fast);
 }
-.reservation-form button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 32px rgba(124,58,237,0.5);}
+.reservation-form button:hover:not(:disabled){background:var(--accent-hover);}
 
 /* Strip overrides in form */
 .reservation-form .strip-btn{
-  background:#fff;border:1.5px solid rgba(124,58,237,0.15);
-  color:var(--ink-2);box-shadow:var(--shadow-sm);
+  background:var(--surface);border:1.5px solid var(--border);
+  color:var(--text);box-shadow:var(--shadow);
   padding:8px 12px;transform:none;font-size:13px;font-weight:600;
 }
-.reservation-form .strip-btn:hover:not(.active){background:rgba(124,58,237,0.06);border-color:var(--purple-light);color:var(--purple);transform:none;box-shadow:none;}
-.reservation-form .strip-btn.active{background:linear-gradient(135deg,var(--purple),var(--purple-dark));border-color:var(--purple-light);color:#fff;box-shadow:0 4px 14px rgba(124,58,237,0.4);transform:none;}
+.reservation-form .strip-btn:hover:not(.active){background:var(--bg);border-color:var(--accent-border);color:var(--accent);transform:none;box-shadow:none;}
+.reservation-form .strip-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:none;transform:none;}
 .reservation-form .strip-btn.active .strip-day,.reservation-form .strip-btn.active .strip-date{color:#fff;}
-.reservation-form .strip-arrow{background:#fff;color:var(--purple);border:1.5px solid rgba(124,58,237,0.22);box-shadow:none;padding:0;width:26px;height:26px;border-radius:50%;font-size:17px;transform:none;}
-.reservation-form .strip-arrow:hover:not(:disabled){background:rgba(124,58,237,0.08);border-color:var(--purple);transform:none;box-shadow:none;}
+.reservation-form .strip-arrow{background:var(--surface);color:var(--text-muted);border:1.5px solid var(--border);box-shadow:none;padding:0;width:26px;height:26px;border-radius:var(--radius-full);font-size:17px;transform:none;}
+.reservation-form .strip-arrow:hover:not(:disabled){background:var(--bg);border-color:var(--accent-border);color:var(--accent);transform:none;box-shadow:none;}
 
 /* Time slots */
 .time-slots{display:flex;gap:8px;flex-wrap:wrap;}
@@ -1448,51 +1446,51 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 .rez-terms-label{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--ink-2);cursor:pointer;line-height:1.45;}
 .rez-terms-label input[type="checkbox"]{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
 .rez-check-box{
-  flex-shrink:0;width:22px;height:22px;border-radius:7px;
-  border:2px solid rgba(124,58,237,0.3);background:#fff;
+  flex-shrink:0;width:22px;height:22px;border-radius:var(--radius);
+  border:2px solid var(--border);background:var(--surface);
   display:flex;align-items:center;justify-content:center;
   font-size:14px;font-weight:800;color:#fff;
-  transition:background var(--transition-fast),border-color var(--transition-fast),box-shadow var(--transition-fast);
+  transition:background var(--transition-fast),border-color var(--transition-fast);
   margin-top:1px;
 }
-.rez-terms-label:has(input:checked) .rez-check-box{background:var(--purple);border-color:var(--purple);box-shadow:0 2px 8px rgba(124,58,237,0.35);}
-.rez-terms-label:has(input:checked){color:var(--ink);}
+.rez-terms-label:has(input:checked) .rez-check-box{background:var(--accent);border-color:var(--accent);}
+.rez-terms-label:has(input:checked){color:var(--text);}
 .terms-link,.reservation-form .terms-link{
   background:none;border:none;outline:none;box-shadow:none;padding:0;
-  color:var(--purple);font-size:13px;font-weight:600;cursor:pointer;
+  color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;
   text-decoration:underline;font-family:inherit;transform:none;
 }
-.terms-link:hover,.reservation-form .terms-link:hover{color:var(--purple-dark);transform:none;box-shadow:none;}
+.terms-link:hover,.reservation-form .terms-link:hover{color:var(--accent-hover);transform:none;box-shadow:none;}
 .terms-link:focus,.reservation-form .terms-link:focus{outline:none;box-shadow:none;}
 
 /* Date/time strips */
 .date-time-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;overflow:hidden;}
 .strip-section{display:flex;flex-direction:column;gap:8px;min-width:0;overflow:hidden;}
-.strip-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--purple-light);}
+.strip-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--accent);}
 .date-strip,.time-strip{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;padding-bottom:6px;width:100%;}
 .date-strip::-webkit-scrollbar,.time-strip::-webkit-scrollbar{display:none;}
 .strip-scroll-wrap{display:flex;align-items:center;gap:4px;min-width:0;}
 .strip-arrow{
-  flex-shrink:0;width:26px;height:26px;border-radius:50%;
-  border:1.5px solid rgba(124,58,237,0.22);background:#fff;color:var(--purple);
+  flex-shrink:0;width:26px;height:26px;border-radius:var(--radius-full);
+  border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);
   font-size:17px;line-height:1;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:background var(--transition-fast),border-color var(--transition-fast);
   padding:0;font-family:inherit;
 }
-.strip-arrow:hover{background:rgba(124,58,237,0.08);border-color:var(--purple);}
+.strip-arrow:hover{background:var(--bg);border-color:var(--accent-border);color:var(--accent);}
 .strip-btn{
-  flex-shrink:0;background:#fff;border:1.5px solid rgba(124,58,237,0.12);
-  border-radius:12px;color:var(--ink-2);cursor:pointer;
-  box-shadow:var(--shadow-sm);font-family:inherit;font-size:13px;
+  flex-shrink:0;background:var(--surface);border:1.5px solid var(--border);
+  border-radius:var(--radius);color:var(--text);cursor:pointer;
+  box-shadow:var(--shadow);font-family:inherit;font-size:13px;
   padding:8px 12px;
   display:flex;flex-direction:column;align-items:center;gap:2px;min-width:56px;
   animation:stripBtnIn 0.3s var(--ease-bounce) both;
   transition:all var(--transition-fast);
 }
-.strip-btn:hover:not(.active){background:rgba(124,58,237,0.06);border-color:var(--purple);color:var(--purple);transform:translateY(-1px);}
+.strip-btn:hover:not(.active){background:var(--bg);border-color:var(--accent-border);color:var(--accent);transform:translateY(-1px);}
 .strip-btn:active{transform:scale(0.95);}
-.strip-btn.active{background:linear-gradient(135deg,var(--purple),var(--purple-dark));border-color:transparent;color:#fff;box-shadow:0 4px 14px rgba(124,58,237,0.4);}
+.strip-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:none;}
 .strip-day{font-size:10px;opacity:0.75;text-transform:uppercase;letter-spacing:0.04em;}
 .strip-date{font-size:13px;font-weight:700;}
 .date-strip .strip-btn:nth-child(1){animation-delay:0s;}
