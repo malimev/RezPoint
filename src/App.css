@@ -1528,13 +1528,13 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 ══════════════════════════════════ */
 .business-panel-section{padding-top:48px;}
 .business-panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;}
-.business-panel-header h1{font-family:var(--font-heading);font-size:28px;color:#1e1b4b;-webkit-text-fill-color:#1e1b4b;font-weight:800;letter-spacing:-0.03em;}
+.business-panel-header h1{font-family:var(--font-heading);font-size:28px;color:var(--text);font-weight:800;letter-spacing:-0.03em;}
 .panel-content{max-width:840px;padding-top:4px;}
 
-/* Tabs — underline style Aurora */
+/* Tabs — underline style */
 .panel-tabs{
   display:flex;gap:0;flex-wrap:nowrap;
-  margin-bottom:16px;border-bottom:2px solid rgba(99,102,241,0.1);
+  margin-bottom:16px;border-bottom:2px solid var(--border);
   overflow-x:auto;overflow-y:hidden;
   scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
@@ -1542,7 +1542,7 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 }
 .panel-tabs::-webkit-scrollbar{display:none;}
 .panel-tabs button{
-  background:transparent;color:#a5b4fc;border:none;border-bottom:2px solid transparent;
+  background:transparent;color:var(--text-muted);border:none;border-bottom:2px solid transparent;
   margin-bottom:-2px;
   padding:10px 16px;border-radius:0;
   cursor:pointer;font-weight:600;font-size:13px;font-family:var(--font-body);
@@ -1551,10 +1551,10 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
   flex-shrink:0;
   touch-action:pan-x;
 }
-.panel-tabs button:hover{color:#6366f1;}
+.panel-tabs button:hover{color:var(--accent);}
 .active-tab,.panel-tabs button.active-tab{
-  background:transparent!important;border-color:#6366f1!important;
-  color:#6366f1!important;box-shadow:none;font-weight:700;
+  background:transparent!important;border-color:var(--accent)!important;
+  color:var(--accent)!important;box-shadow:none;font-weight:700;
 }
 
 /* ── Stat cards ── */
@@ -2303,9 +2303,9 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 
 /* Business mode toggle */
 .biz-mode-toggle{display:flex;gap:10px;margin-bottom:20px;}
-.biz-mode-btn{flex:1;padding:12px 20px;border-radius:100px;border:1.5px solid rgba(124,58,237,0.18);background:#fff;color:var(--ink-2);font-size:14px;font-weight:600;cursor:pointer;transition:all var(--transition-fast);font-family:inherit;}
-.biz-mode-btn.active{background:linear-gradient(135deg,var(--purple),var(--purple-dark));border-color:transparent;color:#fff;box-shadow:0 4px 16px rgba(124,58,237,0.35);}
-.biz-mode-btn:hover:not(.active){border-color:var(--purple);background:rgba(124,58,237,0.06);}
+.biz-mode-btn{flex:1;padding:12px 20px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all var(--transition-fast);font-family:inherit;}
+.biz-mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.biz-mode-btn:hover:not(.active){border-color:var(--accent-border);background:var(--bg);color:var(--accent);}
 
 /* Business types */
 .biz-types-add-row{display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap;}
@@ -2401,25 +2401,24 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 }
 .lp-hero-eyebrow{
   display:inline-block;font-size:12px;font-weight:700;letter-spacing:0.12em;
-  text-transform:uppercase;color:var(--purple);
-  background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.18);
-  border-radius:100px;padding:5px 14px;margin-bottom:20px;
+  text-transform:uppercase;color:var(--accent);
+  background:var(--accent-subtle);border:1px solid var(--accent-border);
+  border-radius:var(--radius-full);padding:5px 14px;margin-bottom:20px;
 }
 .lp-hero-headline{
   font-size:clamp(2rem,6vw,3rem);font-weight:900;
-  color:var(--ink);letter-spacing:-0.03em;line-height:1.12;
+  color:var(--text);letter-spacing:-0.03em;line-height:1.12;
   margin-bottom:18px;min-height:3.5em;
   display:flex;align-items:center;justify-content:center;
 }
 @keyframes lpFadeIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 .lp-hero-phrase{
   display:block;
-  background:linear-gradient(135deg,var(--purple) 0%,#a855f7 50%,var(--pink) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  color:var(--accent);
   animation:lpFadeIn 0.55s cubic-bezier(0.22,1,0.36,1) both;
 }
 .lp-hero-sub{
-  font-size:1.05rem;color:var(--ink-3);line-height:1.65;
+  font-size:1.05rem;color:var(--text-muted);line-height:1.65;
   max-width:520px;margin:0 auto;
 }
 
@@ -3248,7 +3247,7 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 
   /* ── Rezervasyon kutusu ── */
   .reservation-box{
-    border-radius:22px!important;
+    border-radius:var(--radius)!important;
     box-shadow:var(--shadow)!important;
   }
 
@@ -3260,20 +3259,19 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
   }
   .rez-list-item:active,.accepted-list-item:active{
     transform:scale(0.98)!important;
-    background:#f5f3ff!important;
+    background:var(--accent-subtle)!important;
   }
 
   /* ── Strip butonlar pulse ── */
   .strip-btn.active{
-    box-shadow:0 4px 16px rgba(99,102,241,0.35),0 0 0 3px rgba(99,102,241,0.1)!important;
+    box-shadow:none!important;
   }
 
 
   /* ── Öne çıkanlar title ── */
   .hp-featured-title{
     font-size:20px!important;
-    background:linear-gradient(135deg,#1e1b4b,#6366f1,#8b5cf6)!important;
-    -webkit-background-clip:text!important;-webkit-text-fill-color:transparent!important;background-clip:text!important;
+    color:var(--text)!important;
   }
 
   /* ── Biz profile hero ── */
