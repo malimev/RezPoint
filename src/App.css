@@ -566,7 +566,7 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 
 /* Hero */
 .hp-hero{
-  padding:24px 0 0;
+  padding:8px 0 0;
   position:relative;z-index:1;
 }
 .hp-hero-top{
@@ -2332,7 +2332,7 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 /* ── Hero yeni ── */
 .lp-hero{padding-bottom:0;}
 .lp-hero-content{
-  text-align:center;padding:40px 20px 36px;
+  text-align:center;padding:22px 20px 30px;
   max-width:680px;margin:0 auto;
 }
 .lp-hero-eyebrow{
