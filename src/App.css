@@ -770,8 +770,8 @@ input[type="tel"]:focus,input[type="date"]:focus,select:focus,textarea:focus{
 
 /* Mobile overrides */
 @media(max-width:850px){
-  .hp-hero{padding:4px 0 0;}
-  .lp-hero-content{padding-top:10px;}
+  .hp-hero{padding:0;}
+  .lp-hero-content{padding-top:0;}
   .hp-headline{font-size:22px;margin-bottom:6px;}
   .hp-subline{font-size:12px;}
   .hp-hero-emoji{font-size:60px;}
