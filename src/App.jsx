@@ -1290,7 +1290,7 @@ function App() {
           {/* Conic progress ring */}
           <svg className="alf-ring" viewBox="0 0 200 200">
             <circle cx="100" cy="100" r="85"
-              fill="none" stroke="rgba(99,102,241,0.08)" strokeWidth="6"/>
+              fill="none" stroke="rgba(15,118,110,0.1)" strokeWidth="6"/>
             <circle cx="100" cy="100" r="85"
               fill="none"
               stroke="url(#ringGrad)"
@@ -1303,10 +1303,10 @@ function App() {
             />
             <defs>
               <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%"   stopColor="#6366f1"/>
-                <stop offset="40%"  stopColor="#8b5cf6"/>
-                <stop offset="70%"  stopColor="#a855f7"/>
-                <stop offset="100%" stopColor="#ec4899"/>
+                <stop offset="0%"   stopColor="#0f766e"/>
+                <stop offset="40%"  stopColor="#14b8a6"/>
+                <stop offset="70%"  stopColor="#0d9488"/>
+                <stop offset="100%" stopColor="#0f766e"/>
               </linearGradient>
             </defs>
           </svg>
@@ -2218,7 +2218,7 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <div style={{ background: "rgba(109,40,217,0.05)", border: "1px dashed rgba(109,40,217,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 4, fontSize: 13, color: "#6b7280" }}>
+                <div style={{ background: "var(--accent-subtle)", border: "1px solid var(--accent-border)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: 4, fontSize: 13, color: "var(--text-muted)" }}>
                   {t.reservation.loginHint}
                 </div>
               )}
@@ -2845,7 +2845,7 @@ function App() {
                   Hesabın yok mu?{" "}
                   <button
                     type="button"
-                    style={{ background: "none", border: "none", color: "var(--purple)", cursor: "pointer", fontSize: 13, fontWeight: 600, textDecoration: "underline" }}
+                    style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, fontWeight: 600, textDecoration: "underline" }}
                     onClick={() => setCustomerMode("register")}
                   >
                     Üye Ol
@@ -2857,7 +2857,7 @@ function App() {
                   Zaten hesabın var mı?{" "}
                   <button
                     type="button"
-                    style={{ background: "none", border: "none", color: "var(--purple)", cursor: "pointer", fontSize: 13, fontWeight: 600, textDecoration: "underline" }}
+                    style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, fontWeight: 600, textDecoration: "underline" }}
                     onClick={() => setCustomerMode("login")}
                   >
                     Giriş Yap
@@ -3052,7 +3052,7 @@ function App() {
                           <div className="safescore-page" style={{ padding: 0 }}>
                             <div className="safescore-circle-wrap">
                               <svg viewBox="0 0 100 100" className="safescore-svg">
-                                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(124,58,237,0.1)" strokeWidth="10"/>
+                                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(15,118,110,0.1)" strokeWidth="10"/>
                                 <circle cx="50" cy="50" r="42" fill="none" stroke={col} strokeWidth="10"
                                   strokeDasharray={`${circ * score / 100} ${circ * (1 - score / 100)}`}
                                   strokeDashoffset={circ * 0.25} strokeLinecap="round"
@@ -3646,7 +3646,7 @@ function App() {
                         <div>
                           <strong>{business.name}</strong>
                           <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{business.email}</div>
-                          <label style={{ fontSize: 11, color: "var(--purple)", cursor: "pointer", marginTop: 3, display: "block", fontWeight: 600 }}>
+                          <label style={{ fontSize: 11, color: "var(--accent)", cursor: "pointer", marginTop: 3, display: "block", fontWeight: 600 }}>
                             {business.logoUrl ? "🔄 Logo değiştir" : "📷 Logo yükle"}
                             <input type="file" accept="image/*" style={{ display: "none" }} onChange={async (e) => {
                               const file = e.target.files[0];
@@ -3693,7 +3693,7 @@ function App() {
                             value={adminEditingBiz.type}
                             onChange={e => setAdminEditingBiz({ ...adminEditingBiz, type: e.target.value })}
                             placeholder="Tür"
-                            style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--purple)", width: 110 }}
+                            style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--accent-border)", width: 110 }}
                           />
                           <input
                             value={adminEditingBiz.location}
@@ -3715,7 +3715,7 @@ function App() {
                         <div style={{ cursor: "pointer" }} onClick={() => setAdminEditingBiz({ id: business.id, type: business.type, location: business.location })}>
                           <span style={{ color: "var(--text-muted)", fontSize: 13 }}>{business.type}</span><br />
                           <span style={{ fontSize: 11, color: "#94a3b8" }}>{business.location || "—"}</span>
-                          <div style={{ fontSize: 10, color: "var(--purple)", marginTop: 2, fontWeight: 600 }}>✏ Düzenle</div>
+                          <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 2, fontWeight: 600 }}>✏ Düzenle</div>
                         </div>
                       )}
                     </td>
@@ -4216,7 +4216,7 @@ function App() {
                                   <span>{isExpanded ? "▲" : "▼"}</span>
                                 </button>
                                 {isExpanded && (
-                                  <div style={{ background: "rgba(109,40,217,0.04)", border: "1px solid rgba(109,40,217,0.12)", borderRadius: 12, padding: "12px 10px", marginTop: 4 }}>
+                                  <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "12px 10px", marginTop: 4 }}>
                                     <div className="time-slots-grid">
                                       {ALL_TIME_SLOTS.map(time => (
                                         <button key={time}
@@ -4292,7 +4292,7 @@ function App() {
                           {meetingDetailPopup.fullName}
                         </div>
                         {meetingDetailPopup.company && (
-                          <div style={{ fontSize: 13, color: "#7c3aed", fontWeight: 600, marginBottom: 5 }}>{meetingDetailPopup.company}</div>
+                          <div style={{ fontSize: 13, color: "var(--accent)", fontWeight: 600, marginBottom: 5 }}>{meetingDetailPopup.company}</div>
                         )}
                         <div style={{ fontSize: 13, color: "#6b7280", display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
                           <span>{meetingDetailPopup.email}</span>
@@ -4303,10 +4303,10 @@ function App() {
 
                       {/* Önemli bilgi chipler: tarih, saat, sebep */}
                       <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 20 }}>
-                        <span style={{ background: "rgba(109,40,217,0.12)", color: "#5b21b6", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
+                        <span style={{ background: "var(--accent-subtle)", color: "var(--accent)", borderRadius: "var(--radius)", padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
                           📅 {formatDate(meetingDetailPopup.date)}
                         </span>
-                        <span style={{ background: "rgba(109,40,217,0.12)", color: "#5b21b6", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
+                        <span style={{ background: "var(--accent-subtle)", color: "var(--accent)", borderRadius: "var(--radius)", padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
                           🕐 {meetingDetailPopup.time}
                         </span>
                         <span style={{ background: "rgba(59,130,246,0.12)", color: "#1e40af", borderRadius: 12, padding: "9px 16px", fontWeight: 600, fontSize: "0.85rem" }}>
@@ -4314,7 +4314,7 @@ function App() {
                         </span>
                       </div>
 
-                      <hr style={{ border: "none", borderTop: "1px solid rgba(109,40,217,0.08)", margin: "0 0 16px" }} />
+                      <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "0 0 16px" }} />
 
                       {/* Durum badge */}
                       {(() => {
@@ -4336,8 +4336,8 @@ function App() {
 
                       {/* Not */}
                       {meetingDetailPopup.note && meetingDetailPopup.note !== "—" && (
-                        <div style={{ background: "rgba(109,40,217,0.04)", border: "1px solid rgba(109,40,217,0.1)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#374151" }}>
-                          <span style={{ fontWeight: 600, color: "#6d28d9" }}>Not: </span>
+                        <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "var(--text)" }}>
+                          <span style={{ fontWeight: 600, color: "var(--accent)" }}>Not: </span>
                           {meetingDetailPopup.note}
                         </div>
                       )}
@@ -4898,7 +4898,7 @@ function App() {
                                 <span>{isExpanded ? "▲" : "▼"}</span>
                               </button>
                               {isExpanded && (
-                                <div style={{ background: "rgba(109,40,217,0.04)", border: "1px solid rgba(109,40,217,0.12)", borderRadius: 12, padding: "12px 10px", marginTop: 4 }}>
+                                <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "12px 10px", marginTop: 4 }}>
                                   <div className="time-slots-grid">
                                     {ALL_TIME_SLOTS.map(time => (
                                       <button key={time}
@@ -5432,8 +5432,8 @@ function App() {
             <div className="bpro-hero">
               <div className="bpro-hero-bg" style={{
                 background: selectedBusiness.logoUrl
-                  ? `linear-gradient(180deg,rgba(30,10,80,0.5) 0%,rgba(20,5,60,0.85) 100%), url(${selectedBusiness.logoUrl}) center/cover`
-                  : "linear-gradient(135deg,#3b1fa8,#7c3aed,#a855f7)"
+                  ? `linear-gradient(180deg,rgba(0,0,0,0.3) 0%,rgba(0,0,0,0.72) 100%), url(${selectedBusiness.logoUrl}) center/cover`
+                  : "var(--accent)"
               }} />
               {/* Favori */}
               <button className="bpro-fav-btn"
@@ -5603,7 +5603,7 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <div style={{ background: "rgba(109,40,217,0.05)", border: "1px dashed rgba(109,40,217,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 4, fontSize: 13, color: "#6b7280" }}>
+                <div style={{ background: "var(--accent-subtle)", border: "1px solid var(--accent-border)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: 4, fontSize: 13, color: "var(--text-muted)" }}>
                   {t.meeting.loginHint}
                 </div>
               )}
@@ -5619,7 +5619,7 @@ function App() {
                 <select
                   value={meetingForm.productCategory}
                   onChange={e => setMeetingForm(p => ({ ...p, productCategory: e.target.value }))}
-                  style={{ borderColor: meetingForm.productCategory ? "rgba(124,58,237,0.4)" : "rgba(239,68,68,0.35)" }}
+                  style={{ borderColor: meetingForm.productCategory ? "var(--accent-border)" : "rgba(239,68,68,0.35)" }}
                 >
                   <option value="">📂 {lang === "en" ? "Select product category" : "Ürün kategorisi seçin"}</option>
                   {[
@@ -5842,10 +5842,10 @@ function App() {
 
             {/* Önemli bilgi chipler: tarih, saat, kişi sayısı */}
             <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 20 }}>
-              <span style={{ background: "rgba(109,40,217,0.12)", color: "#5b21b6", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
+              <span style={{ background: "var(--accent-subtle)", color: "var(--accent)", borderRadius: "var(--radius)", padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
                 📅 {formatDate(selectedReservation.date)}
               </span>
-              <span style={{ background: "rgba(109,40,217,0.12)", color: "#5b21b6", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
+              <span style={{ background: "var(--accent-subtle)", color: "var(--accent)", borderRadius: "var(--radius)", padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
                 🕐 {selectedReservation.time}
               </span>
               <span style={{ background: "rgba(34,197,94,0.12)", color: "#166534", borderRadius: 12, padding: "9px 16px", fontWeight: 700, fontSize: "0.85rem" }}>
@@ -5853,7 +5853,7 @@ function App() {
               </span>
             </div>
 
-            <hr style={{ border: "none", borderTop: "1px solid rgba(109,40,217,0.08)", margin: "0 0 16px" }} />
+            <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "0 0 16px" }} />
 
             {/* Durum badge */}
             {(() => {
@@ -5862,7 +5862,7 @@ function App() {
                 pending: { bg: "rgba(234,179,8,0.1)", color: "#854d0e", label: t.status.pending },
                 accepted: { bg: "rgba(34,197,94,0.1)", color: "#166534", label: t.status.accepted },
                 rejected: { bg: "rgba(239,68,68,0.1)", color: "#7f1d1d", label: t.status.rejected },
-                completed: { bg: "rgba(109,40,217,0.1)", color: "#4c1d95", label: t.status.completed },
+                completed: { bg: "var(--accent-subtle)", color: "var(--accent)", label: t.status.completed },
               };
               const st = map[s] || map.pending;
               return (
@@ -5882,7 +5882,7 @@ function App() {
               </div>
               <div style={{ flex: 1, background: "rgba(0,0,0,0.03)", borderRadius: 10, padding: "10px 14px" }}>
                 <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>{t.popup.fieldCode}</div>
-                <div style={{ fontWeight: 700, color: "#7c3aed" }}>{selectedReservation.code}</div>
+                <div style={{ fontWeight: 700, color: "var(--accent)" }}>{selectedReservation.code}</div>
               </div>
             </div>
 
@@ -5905,8 +5905,8 @@ function App() {
 
             {/* Not */}
             {selectedReservation.note && (
-              <div style={{ background: "rgba(109,40,217,0.04)", border: "1px solid rgba(109,40,217,0.1)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#374151" }}>
-                <span style={{ fontWeight: 600, color: "#6d28d9" }}>Not: </span>
+              <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "var(--text)" }}>
+                <span style={{ fontWeight: 600, color: "var(--accent)" }}>Not: </span>
                 {selectedReservation.note}
               </div>
             )}
