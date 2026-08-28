@@ -20,12 +20,8 @@ The goal is simple: customers can create reservations in seconds, while business
 
 ## Planned Features
 
-* Supabase integration
 * AI Menu Assistant
 * QR based menu access
-* Business management tools
-* Push notifications
-* Multi-language support
 
 ## Technologies
 
@@ -59,12 +55,9 @@ Amaç; müşterilerin hızlı şekilde rezervasyon oluşturabilmesi, işletmeler
 
 ## Planlanan Özellikler
 
-* Supabase entegrasyonu
 * AI Menü Asistanı
 * QR kod destekli menü sistemi
-* İşletme yönetim araçları
-* Anlık bildirimler
-* Çoklu dil desteği
+
 
 ## Kullanılan Teknolojiler
 
